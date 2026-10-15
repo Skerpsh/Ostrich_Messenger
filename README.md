@@ -1,0 +1,530 @@
+<div align="center">
+
+<img src="frontend/assets/images/icon.png" width="112" alt="Ostrich logo">
+
+# Ostrich Messenger
+
+**A private, end-to-end encrypted messenger for the web, iOS, Android and the terminal.**
+
+The server stores only ciphertext. Your key never leaves your device.
+
+[![CI](https://github.com/Skerpsh/Ostrich_Messenger/actions/workflows/ci.yml/badge.svg)](https://github.com/Skerpsh/Ostrich_Messenger/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/Skerpsh/Ostrich_Messenger?label=CLI&sort=semver)](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)
+![Expo](https://img.shields.io/badge/Expo-000020?logo=expo&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+
+[**Open the web app**](https://62.238.111.55.nip.io) ·
+[Install the CLI](#terminal-client-cli) ·
+[Self-host](#self-hosting-on-a-server) ·
+[How the encryption works](#how-the-encryption-works)
+
+</div>
+
+---
+
+## Contents
+
+- [Features](#features)
+- [Clients](#clients)
+- [Quick start for users](#quick-start-for-users)
+- [Terminal client (CLI)](#terminal-client-cli)
+- [How the encryption works](#how-the-encryption-works)
+- [Architecture](#architecture)
+- [Local development](#local-development)
+- [Self-hosting on a server](#self-hosting-on-a-server)
+- [Configuration](#configuration)
+- [Operations: deploys, backups and monitoring](#operations-deploys-backups-and-monitoring)
+- [Testing and CI](#testing-and-ci)
+- [Releasing the CLI](#releasing-the-cli)
+- [Project structure](#project-structure)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
+
+## Features
+
+**Privacy**
+- 🔐 **End-to-end encryption** of messages, files, group names and group photos (X25519 + XChaCha20-Poly1305 + HKDF-SHA256)
+- 🪪 **OstrichID**: a 20-character recovery key, created on your device and never sent to the server
+- 🛡 **Safety codes**: compare 40 digits with a contact to make sure nobody swapped your keys
+- ⚠️ **Key change warnings**: sending is paused until you confirm a contact's new key
+- 👁 Optional online status and read receipts, blocking, per-device sessions with remote log out
+
+**Messaging**
+- 💬 Direct chats, **groups** of up to 50 members with roles, **invite links** and join requests
+- 📎 Encrypted **files and photos** (up to 10 per message, 25 MB each) with upload progress and a photo viewer
+- ↩️ Replies, forwarding, editing, deleting, **reactions with any emoji**, pinned messages
+- 🔖 **Saved messages**, @mentions, formatting, search in a chat or across all chats
+- ⌨️ Typing indicators, read receipts, unread counters, jump to the first unread message
+- 📌 Pin, mute, clear and delete chats
+
+**Everywhere**
+- 🌐 Installable **web app** (PWA) that works offline
+- 📱 **iOS and Android** apps from the same code, with push notifications
+- 🖥 Full-featured **terminal client** with mouse support, QR codes and offline cache
+- 🌗 Light and dark themes with an accent color
+
+## Clients
+
+| Client | Built with | Where to get it |
+|---|---|---|
+| **Web** | Expo + React Native Web | [62.238.111.55.nip.io](https://62.238.111.55.nip.io), installable as an app from the browser |
+| **iOS / Android** | Expo (React Native) | Build from [`frontend/`](frontend) with Expo / EAS, see [Mobile apps](#mobile-apps) |
+| **Terminal** | Go + Bubble Tea | [One-line install](#terminal-client-cli) or the [latest release](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) |
+
+All clients use the same account, the same chats and the same encryption.
+
+## Quick start for users
+
+1. Open the [web app](https://62.238.111.55.nip.io) or install the [CLI](#terminal-client-cli).
+2. **Create an account** with a `@username` and a password.
+3. **Save your OstrichID.** It is shown **once**. Keep it in a password manager or on paper.
+   You need it to log in on a new device. Nobody, including the server owner, can recover it for you.
+4. Start a chat: **New chat** → type the exact `@username` of your contact.
+5. Optional: open the chat's **safety code** and compare the 40 digits with your contact
+   in person or over another channel. If they match, your conversation cannot be read by the server.
+
+> [!IMPORTANT]
+> Lose your OstrichID and you lose access to your messages on new devices. This is the
+> price of the server knowing nothing about them.
+
+To install the web app, use the browser's **Install app** / **Add to Home Screen** option.
+It keeps working offline and sends messages when it is back online.
+
+## Terminal client (CLI)
+
+<table><tr><td>
+
+**Linux and macOS**
+
+```bash
+curl -fsSL https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/install.sh | sh
+```
+
+The script downloads the build for your system, checks its SHA-256 checksum and puts it in
+`~/.local/bin/ostrich`.
+
+**Windows**
+
+Download `ostrich-windows-amd64.exe` from the
+[latest release](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest).
+SmartScreen asks once: *More info* → *Run anyway*.
+
+**From source** (Go 1.27+)
+
+```bash
+cd cli && go build -o ostrich . && ./ostrich
+```
+
+</td></tr></table>
+
+Then run `ostrich`. Chats are on the left and the open chat is on the right, or one at a time
+in a narrow terminal. The keyboard and the mouse both work.
+
+### Most useful keys
+
+| Where | Keys |
+|---|---|
+| Chats list | `↑↓` move · `Enter` open · `/` search · `n` new chat · `m` chat menu · `s` settings · `t` theme · `q` quit |
+| Chat | `Enter` send · `Alt+Enter` new line · `Ctrl+A` attach a file · `↑` choose a message · `Ctrl+F` search · `Ctrl+K` safety code · `Esc` back |
+| Chosen message | `r` reply · `e` edit · `d` delete · `c` copy · `1`–`8` react · `Enter` more |
+
+The full key reference, the "Remember me" option, where sessions and the cache are stored and
+other details are in [`cli/README.md`](cli/README.md).
+
+| Environment variable | Purpose |
+|---|---|
+| `OSTRICH_SERVER` | Use another backend, e.g. `http://localhost:3000` |
+| `OSTRICH_NO_UPDATE_CHECK=1` | Do not check for a newer release at start |
+
+## How the encryption works
+
+The full specification is at the top of [`frontend/src/lib/crypto.ts`](frontend/src/lib/crypto.ts).
+The Go client implements the same scheme in [`cli/crypto.go`](cli/crypto.go), and both are
+tested against shared vectors in [`testdata/crypto-vectors.json`](testdata/crypto-vectors.json).
+
+```mermaid
+flowchart LR
+    ID["OstrichID<br/>(only on your device)"] -->|"HKDF 'auth'"| AUTH["auth key"]
+    ID -->|"HKDF 'key-wrap'"| WRAP["wrap key"]
+    AUTH -->|"server keeps SHA-256"| S[(Server)]
+    PRIV["X25519 private key"] -->|"encrypted with wrap key"| S
+    PRIV -->|"X25519 with contact's public key<br/>+ HKDF"| CK["chat key"]
+    CK -->|"XChaCha20-Poly1305"| MSG["message ciphertext"] --> S
+```
+
+- **Account.** Each account has a random X25519 key pair. The server stores the public key and the
+  private key **encrypted with a key derived from your OstrichID**, so any device that knows the
+  OstrichID can unlock it. The server never sees the OstrichID itself.
+- **Direct chats.** Both sides derive the same chat key from X25519 and HKDF. Every message is
+  encrypted with XChaCha20-Poly1305. The chat, sender and message ids are bound in as associated
+  data, so the server cannot move, replay or reattribute messages.
+- **Files.** Each file has its own random key, which travels inside the encrypted message.
+- **Groups.** A random group key is wrapped separately for every member. A new key epoch starts
+  whenever someone leaves or is removed. The group name and photo are encrypted too.
+- **Safety codes.** 40 digits computed from both public keys. If the codes match on both devices,
+  the server has not substituted a key.
+
+**What the server can see:** usernames, who talks to whom and when, message sizes, profile photos,
+and IP addresses. **What it cannot see:** message text, files, group names and photos, your
+OstrichID or your private key.
+
+> [!NOTE]
+> Ostrich has not had an independent security audit. Read
+> [SECURITY.md](SECURITY.md) before relying on it for anything critical.
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph Clients
+        W["Web app (PWA)"]
+        M["iOS / Android"]
+        C["Terminal client"]
+    end
+    W & M & C -->|"HTTPS /api · WSS /ws"| CADDY["Caddy<br/>TLS + static files"]
+    CADDY --> B1["Backend<br/>Fastify, Node.js"]
+    CADDY -.->|optional| B2["More backend<br/>processes"]
+    B1 & B2 --> PG[(PostgreSQL)]
+    B1 & B2 -.->|optional| R[(Redis)]
+    B1 & B2 --> FS[("Encrypted files<br/>on disk")]
+    B1 -->|push| EXPO["Expo push service"]
+    MON["Monitoring bot"] -->|reports and alerts| TG["Telegram"]
+    MON --> B1
+```
+
+| Part | Stack | Directory |
+|---|---|---|
+| Backend | Node.js 22, TypeScript, Fastify 5, PostgreSQL (`pg`), WebSockets, Argon2, optional Redis | [`backend/`](backend) |
+| Web and mobile apps | Expo SDK 57, React Native 0.86, expo-router, `@noble/*` cryptography | [`frontend/`](frontend) |
+| Terminal client | Go, Bubble Tea | [`cli/`](cli) |
+| Server operations | Bash, systemd, Caddy | [`ops/`](ops) |
+
+## Local development
+
+### Requirements
+
+- **Node.js 22** and npm
+- **PostgreSQL 13+**
+- **Go 1.27+** (only for the CLI)
+- Redis (optional, only to test several backend processes)
+
+### 1. Database
+
+```bash
+sudo -u postgres psql -c "CREATE USER ostrich WITH PASSWORD 'ostrich';"
+sudo -u postgres psql -c "CREATE DATABASE ostrich_db OWNER ostrich;"
+```
+
+### 2. Backend
+
+```bash
+cd backend
+npm install
+cat > .env <<'EOF'
+DB_HOST=localhost
+DB_NAME=ostrich_db
+DB_USER=ostrich
+DB_PASSWORD=ostrich
+EOF
+npm run db:migrate   # creates the tables
+npm run dev          # http://localhost:3000, restarts on changes
+```
+
+Check it: `curl http://localhost:3000/api/health` should answer `{"status":"ok","database":"connected",...}`.
+
+### 3. Web and mobile app
+
+```bash
+cd frontend
+npm install
+echo 'EXPO_PUBLIC_API_URL=http://localhost:3000' > .env.local
+npm start            # then press w for web, i for iOS, a for Android
+```
+
+When testing on a phone, use your computer's LAN IP instead of `localhost`
+(e.g. `http://192.168.1.10:3000`).
+
+### 4. Terminal client
+
+```bash
+cd cli
+go build -o ostrich .
+OSTRICH_SERVER=http://localhost:3000 ./ostrich
+```
+
+### Mobile apps
+
+The apps are built with [EAS Build](https://docs.expo.dev/build/introduction/)
+(profiles are in [`frontend/eas.json`](frontend/eas.json)):
+
+```bash
+cd frontend
+npx eas-cli build --platform android --profile preview   # installable APK
+npx eas-cli build --platform ios --profile production
+```
+
+Set `EXPO_PUBLIC_API_URL` to your server's address for the build.
+
+### Useful commands
+
+| Where | Command | What it does |
+|---|---|---|
+| `backend/` | `npm run dev` | Development server with reload |
+| `backend/` | `npm test` | Tests |
+| `backend/` | `npm run typecheck` | Type check, including tests |
+| `backend/` | `npm run db:migrate` | Apply new migrations |
+| `backend/` | `npm run dev-badge -- add @username` | Give a user the DEV badge |
+| `frontend/` | `npm start` | Expo development server |
+| `frontend/` | `npm test` · `npm run lint` · `npm run typecheck` | Checks |
+| `frontend/` | `npm run build:web` | Static web build in `dist/` |
+| `cli/` | `go test ./...` · `go vet ./...` | Checks |
+
+## Self-hosting on a server
+
+This walks through one Ubuntu/Debian VPS running everything: the backend, PostgreSQL and Caddy,
+which provides HTTPS and serves the web app. The [`ops/`](ops) scripts assume this layout:
+
+| What | Where |
+|---|---|
+| Repository | `/opt/ostrich` |
+| Backend settings | `/opt/ostrich/backend/.env` |
+| Backend service | systemd unit `ostrich` |
+| Web app files | `/var/www/ostrich-web` |
+| Backups | `/var/backups/ostrich` |
+
+### 1. Install the software
+
+```bash
+apt-get update && apt-get install -y git curl rsync postgresql caddy
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
+```
+
+([Caddy's install guide](https://caddyserver.com/docs/install) covers adding its repository if
+your distribution does not ship it. Node from [nvm](https://github.com/nvm-sh/nvm) works too: the
+systemd units find it.)
+
+### 2. Get the code and create the database
+
+```bash
+git clone https://github.com/Skerpsh/Ostrich_Messenger.git /opt/ostrich
+sudo -u postgres psql -c "CREATE USER ostrich WITH PASSWORD 'CHANGE_ME';"
+sudo -u postgres psql -c "CREATE DATABASE ostrich_db OWNER ostrich;"
+```
+
+### 3. Configure the backend
+
+```bash
+cat > /opt/ostrich/backend/.env <<'EOF'
+DB_HOST=localhost
+DB_NAME=ostrich_db
+DB_USER=ostrich
+DB_PASSWORD=CHANGE_ME
+HOST=127.0.0.1
+CORS_ORIGINS=https://chat.example.com
+EOF
+chmod 600 /opt/ostrich/backend/.env
+```
+
+### 4. Create the systemd service
+
+```bash
+cat > /etc/systemd/system/ostrich.service <<'EOF'
+[Unit]
+Description=Ostrich backend
+After=network.target postgresql.service
+
+[Service]
+WorkingDirectory=/opt/ostrich/backend
+EnvironmentFile=/opt/ostrich/backend/.env
+Environment=NODE_ENV=production
+ExecStart=/bin/bash -c '[ -s /root/.nvm/nvm.sh ] && . /root/.nvm/nvm.sh; exec node dist/server.js'
+Restart=always
+RestartSec=2
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload && systemctl enable ostrich
+```
+
+### 5. Configure Caddy
+
+Point your domain's DNS at the server, then replace `/etc/caddy/Caddyfile`:
+
+```caddy
+chat.example.com {
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle /ws {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle {
+		root * /var/www/ostrich-web
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Content-Security-Policy "frame-ancestors 'none'"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Strict-Transport-Security "max-age=31536000"
+	}
+}
+```
+
+Caddy gets and renews the HTTPS certificate on its own.
+
+### 6. Point the clients at your server and deploy
+
+Build the web app for your domain and run the deploy script. It builds the backend, applies the
+migrations, restarts the service, checks that it answers, then builds and publishes the web app:
+
+```bash
+echo 'EXPO_PUBLIC_API_URL=https://chat.example.com' > /opt/ostrich/frontend/.env.local
+cd /opt/ostrich && ops/deploy.sh --no-backup && systemctl reload caddy
+```
+
+Open `https://chat.example.com`. For the CLI, run it with
+`OSTRICH_SERVER=https://chat.example.com ostrich`.
+
+Next steps: [daily backups](#backups) and [monitoring](#monitoring).
+
+## Configuration
+
+The backend reads its settings from environment variables, usually in `backend/.env`.
+
+| Variable | Default | Description |
+|---|---|---|
+| `DB_HOST` | `localhost` | PostgreSQL host |
+| `DB_PORT` | `5432` | PostgreSQL port |
+| `DB_NAME` | `ostrich_db` | Database name |
+| `DB_USER` | `ostrich` | Database user |
+| `DB_PASSWORD` | none | Database password |
+| `PORT` | `3000` | HTTP port |
+| `HOST` | `0.0.0.0` | Address to listen on. Use `127.0.0.1` behind a reverse proxy. |
+| `CORS_ORIGINS` | any | Comma-separated browser origins allowed to call the API |
+| `TRUST_PROXY` | `loopback` | Proxies trusted for `X-Forwarded-For`: `true`, `false` or an address list |
+| `REDIS_URL` | none | Shared state for several backend processes, e.g. `redis://127.0.0.1:6379` |
+| `ATTACHMENTS_DIR` | `backend/data/attachments` | Where encrypted files are stored |
+| `EXPO_ACCESS_TOKEN` | none | Expo token for push notifications, if your Expo project requires one |
+| `MONITOR_SECRET` | none | Shared secret for the monitoring bot's stats endpoint |
+
+The monitoring bot's own settings (`MONITOR_*`) are listed in
+[`ops/README.md`](ops/README.md#monitoring-bot).
+
+Client settings:
+
+| Client | Variable | Default |
+|---|---|---|
+| Web / mobile | `EXPO_PUBLIC_API_URL` (in `frontend/.env.local`, at build time) | `https://62.238.111.55.nip.io` |
+| CLI | `OSTRICH_SERVER` | `https://62.238.111.55.nip.io` |
+
+## Operations: deploys, backups and monitoring
+
+The complete guide is [`ops/README.md`](ops/README.md). In short:
+
+### Deploys
+
+```bash
+cd /opt/ostrich && ops/deploy.sh                 # backend + web, with a backup first
+ops/deploy.sh --backend-only                     # or --web-only, --no-backup
+```
+
+### Database migrations
+
+Schema changes live in [`backend/migrations/`](backend/migrations) as numbered SQL files. Each
+file is applied once, in its own transaction, and recorded in `schema_migrations`. To change the
+schema, add the next numbered file. Never edit an applied one.
+
+### Backups
+
+[`ops/backup.sh`](ops/backup.sh) writes a compressed `pg_dump` and keeps the 7 newest copies. It
+skips the backup when the disk is nearly full and can ping
+[Healthchecks.io](https://healthchecks.io). Daily runs come from a systemd timer:
+
+```bash
+cp /opt/ostrich/ops/ostrich-backup.{service,timer} /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now ostrich-backup.timer
+```
+
+Restore: `pg_restore --clean --if-exists -d ostrich_db <file>`.
+
+### Monitoring
+
+- **Monitoring bot** ([`backend/src/monitor/`](backend/src/monitor)): reports to Telegram every
+  15 minutes and sends a daily summary. It alerts when the backend is down or slow, the database
+  fails, a service crashes, a disk or memory runs low, a backup is missing, errors or failed logins
+  spike, or an SSL certificate is about to expire. Commands: `/stats`, `/today`, `/health`.
+- **UptimeRobot** watches `/api/health` from outside, so you hear about it even when the whole
+  server is down.
+
+### Scaling
+
+One backend process handles a lot. To use several CPU cores or restart without downtime, run
+several processes (`ops/ostrich@.service`) behind Caddy and set `REDIS_URL`. They then share
+WebSocket events, presence, rate limits and failed login counts through Redis.
+
+## Testing and CI
+
+```bash
+(cd backend && npm test && npm run typecheck)
+(cd frontend && npm test && npm run lint && npm run typecheck)
+(cd cli && go vet ./... && go test ./...)
+```
+
+[GitHub Actions](.github/workflows/ci.yml) runs all of these on every push and pull request,
+plus a `gofmt` check. The TypeScript and Go cryptography is checked against the same test vectors,
+so the clients cannot drift apart.
+
+## Releasing the CLI
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+The [Release CLI](.github/workflows/release-cli.yml) workflow tests the CLI and builds it for
+Linux, macOS and Windows on x86-64 and ARM64. It then publishes a GitHub release with the
+binaries, `install.sh` and `SHA256SUMS`, plus notes generated from the commits.
+
+## Project structure
+
+```
+.
+├── backend/                Fastify API, WebSockets, database
+│   ├── migrations/         numbered SQL migrations
+│   ├── src/
+│   │   ├── routes/         HTTP and WebSocket endpoints
+│   │   ├── monitor/        Telegram monitoring bot
+│   │   └── server.ts       entry point
+│   └── test/
+├── frontend/               Expo app: web (PWA), iOS and Android
+│   ├── src/app/            screens (expo-router)
+│   ├── src/components/     UI components
+│   ├── src/context/        auth, chats, realtime, theme
+│   └── src/lib/            API client, crypto, cache, helpers
+├── cli/                    Go terminal client
+├── ops/                    deploy and backup scripts, systemd units
+├── testdata/               test vectors shared by the TypeScript and Go code
+└── .github/workflows/      CI and CLI releases
+```
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how
+to set up the project and what a good pull request looks like.
+
+## Security
+
+Please **do not** open public issues for vulnerabilities. Report them privately as described in
+[SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Skerpsh

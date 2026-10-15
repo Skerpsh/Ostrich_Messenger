@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an idea for Ostrich
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+      placeholder: "I often want to ..."
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How should it work? Which clients should have it?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other ways around the problem you have considered.
