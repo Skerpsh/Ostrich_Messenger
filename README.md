@@ -10,7 +10,7 @@
 ![Expo](https://img.shields.io/badge/Expo-000020?logo=expo&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
 
-[**Open the web app**](https://62.238.111.55.nip.io) ·
+[**Open the web app**](https://ostrich-messenger.online) ·
 [Install the CLI](#terminal-client-cli) ·
 [Self-host](#self-hosting-on-a-server) ·
 [How the encryption works](#how-the-encryption-works)
