@@ -1,12 +1,6 @@
 <div align="center">
 
-<img src="frontend/assets/images/icon.png" width="112" alt="Ostrich logo">
-
-# Ostrich Messenger
-
-**A private, end-to-end encrypted messenger for the web, iOS, Android and the terminal.**
-
-The server stores only ciphertext. Your key never leaves your device.
+<img src=".github/social-preview.png" alt="Ostrich: a private messenger where the server only ever sees ciphertext. Web, iOS, Android and Terminal.">
 
 [![CI](https://github.com/Skerpsh/Ostrich_Messenger/actions/workflows/ci.yml/badge.svg)](https://github.com/Skerpsh/Ostrich_Messenger/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/Skerpsh/Ostrich_Messenger?label=CLI&sort=semver)](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest)
