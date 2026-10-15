@@ -38,4 +38,11 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "Ostrich CLI $GITHUB_REF_NAME" --generate-notes
+        # A release made by hand on GitHub (which also makes the tag) gets
+        # the files added to it instead.
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --title "Ostrich CLI $GITHUB_REF_NAME" --generate-notes
+          fi
