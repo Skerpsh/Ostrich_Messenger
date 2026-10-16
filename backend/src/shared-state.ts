@@ -482,11 +482,19 @@ export class RedisState implements SharedState {
   }
 
   async addFailure(key: string, windowMs: number) {
-    const count = await this.redis.incr(failedKey(key));
+    // The window starts with the first failure: the key is made with its
+    // expiry and counted up in one transaction (INCR keeps the expiry), so
+    // a crash in between cannot leave a count that never expires.
+    const results = await this.redis
+      .multi()
+      .set(failedKey(key), "0", "PX", windowMs, "NX")
+      .incr(failedKey(key))
+      .exec();
 
-    // The window starts with the first failure.
-    if (count === 1) {
-      await this.redis.pexpire(failedKey(key), windowMs);
+    for (const [error] of results ?? []) {
+      if (error) {
+        throw error;
+      }
     }
   }
 

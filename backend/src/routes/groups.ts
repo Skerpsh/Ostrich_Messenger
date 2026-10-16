@@ -317,6 +317,11 @@ export default async function groupsRoutes(server: FastifyInstance) {
       const me = request.user.id;
 
       const done = await change(reply, async (client) => {
+        // One change at a time per group: the key epoch and the member
+        // count below cannot change meanwhile (e.g. a new key that leaves
+        // the new member out).
+        await client.query("SELECT 1 FROM chats WHERE id = $1 FOR UPDATE", [chatId]);
+
         const membership = await groupMembership(chatId, me, client);
 
         if (!membership || !isAdmin(membership.role)) {
@@ -326,9 +331,6 @@ export default async function groupsRoutes(server: FastifyInstance) {
         if (epoch !== membership.key_epoch || membership.rotation_needed) {
           throw new Refused(409, "The group key has changed: load it and try again");
         }
-
-        // One add at a time per group (the member count below).
-        await client.query("SELECT 1 FROM chats WHERE id = $1 FOR UPDATE", [chatId]);
 
         const count = await client.query("SELECT COUNT(*)::int AS n FROM chat_members WHERE chat_id = $1", [chatId]);
 
@@ -523,6 +525,9 @@ export default async function groupsRoutes(server: FastifyInstance) {
       const me = request.user.id;
 
       const done = await change(reply, async (client) => {
+        // Not at the same time as the owner leaving (ownership handed over).
+        await client.query("SELECT 1 FROM chats WHERE id = $1 FOR UPDATE", [chatId]);
+
         const membership = await groupMembership(chatId, me, client);
         const target = await groupMembership(chatId, userId, client);
 
@@ -580,6 +585,9 @@ export default async function groupsRoutes(server: FastifyInstance) {
       const me = request.user.id;
 
       const done = await change(reply, async (client) => {
+        // Not encrypted with a key that a new one replaces meanwhile.
+        await client.query("SELECT 1 FROM chats WHERE id = $1 FOR UPDATE", [chatId]);
+
         const membership = await groupMembership(chatId, me, client);
 
         if (!membership || !isAdmin(membership.role)) {
@@ -602,6 +610,7 @@ export default async function groupsRoutes(server: FastifyInstance) {
               `
               UPDATE attachments SET chat_id = $1
               WHERE id = $2 AND uploader_id = $3 AND message_id IS NULL
+                AND (chat_id IS NULL OR chat_id = $1)
               `,
               [chatId, photoId, me],
             );

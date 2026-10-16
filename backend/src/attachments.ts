@@ -12,6 +12,11 @@ export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024 + 40;
 
 export const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 
+// How much one user may upload (and copy) per day, so nobody can fill the
+// disk for everyone. ATTACHMENT_DAILY_QUOTA_MB in .env, 2 GB by default.
+export const DAILY_UPLOAD_BYTES =
+  (Number(process.env.ATTACHMENT_DAILY_QUOTA_MB) || 2048) * 1024 * 1024;
+
 // Uploads are refused when less disk space would be left.
 const MIN_FREE_BYTES = 1024 * 1024 * 1024;
 

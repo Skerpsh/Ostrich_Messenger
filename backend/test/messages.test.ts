@@ -11,7 +11,8 @@ import {
 
 test("only encrypted messages are accepted", () => {
   assert.ok(isEncryptedMessage("e2:AAAA"));
-  assert.ok(isEncryptedMessage("e1:AAAA=="));
+  // "e1" (bound to the chat only) is no longer accepted.
+  assert.ok(!isEncryptedMessage("e1:AAAA=="));
   assert.ok(!isEncryptedMessage("hello"));
   assert.ok(!isEncryptedMessage("e3:AAAA"));
   assert.ok(!isEncryptedMessage("e2:AA AA"));

@@ -185,7 +185,12 @@ func (m *model) unwrapGroupKeys(chatID string, wrapped []wrappedGroupKey) {
 			continue
 		}
 
-		if item.WrapperPublicKey != own && item.WrapperID != "" {
+		if item.WrapperPublicKey != own {
+			// Nobody to check the key against: the server could have made it.
+			if item.WrapperID == "" {
+				continue
+			}
+
 			known, ok := m.knownKeys[item.WrapperID]
 
 			switch {
@@ -653,8 +658,8 @@ func reencryptForGroup(token string, me Account, privateKey []byte, keys map[int
 	own, _ := publicKeyOf(privateKey)
 
 	for _, item := range wrapped {
-		trusted := item.WrapperPublicKey == own || item.WrapperID == "" ||
-			known[item.WrapperID] == "" || known[item.WrapperID] == item.WrapperPublicKey
+		trusted := item.WrapperPublicKey == own || (item.WrapperID != "" &&
+			(known[item.WrapperID] == "" || known[item.WrapperID] == item.WrapperPublicKey))
 
 		if fresh[item.Epoch] == nil && trusted {
 			if key, err := unwrapGroupKey(item.WrappedKey, item.Epoch, chat.ID, privateKey, me.ID, item.WrapperPublicKey); err == nil {

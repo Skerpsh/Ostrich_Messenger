@@ -256,6 +256,10 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 		info = append(info, "🔓 not encrypted")
 	}
 
+	if status == decryptOK && isLegacyMessage(message.Content) {
+		info = append(info, "old format, sender not verified")
+	}
+
 	if message.EditedAt != nil {
 		info = append(info, "edited")
 	}

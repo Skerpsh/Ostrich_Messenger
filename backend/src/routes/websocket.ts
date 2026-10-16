@@ -383,7 +383,7 @@ export default async function websocketRoutes(server: FastifyInstance) {
         userId: user.id,
         tokenHash: session.tokenHash,
       });
-      userConnected(user.id, session.tokenHash, socket);
+      userConnected(user.id, session.tokenHash, socket, MAX_CONNECTIONS_PER_USER);
 
       send({
         type: "connected",

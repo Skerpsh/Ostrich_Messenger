@@ -364,6 +364,11 @@ export default async function authRoutes(server: FastifyInstance) {
 
       const row = result.rows[0];
 
+      // Deleted meanwhile (from another device).
+      if (!row) {
+        return reply.status(401).send({ error: "Invalid or expired token" });
+      }
+
       if (!row.public_key) {
         return reply.status(409).send({
           error: "This account needs its OstrichID once to set up encryption",
@@ -401,6 +406,10 @@ export default async function authRoutes(server: FastifyInstance) {
       );
 
       const row = result.rows[0];
+
+      if (!row) {
+        return reply.status(401).send({ error: "Invalid or expired token" });
+      }
 
       if (row.public_key) {
         return reply.status(409).send({

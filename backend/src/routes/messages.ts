@@ -260,7 +260,8 @@ export default async function messagesRoutes(server: FastifyInstance) {
     },
   );
 
-  // EDIT MESSAGE: own messages only; the new text is encrypted too.
+  // EDIT MESSAGE: own messages only, while in the chat; the new text is
+  // encrypted too.
   server.patch<{ Params: MessageParams; Body: { content: string } }>(
     "/api/chats/:chatId/messages/:messageId",
     {
@@ -307,6 +308,8 @@ export default async function messagesRoutes(server: FastifyInstance) {
           AND chat_id = $2
           AND sender_id = $3
           AND kind = 'text'
+          -- Not after leaving the chat (e.g. removed from a group).
+          AND EXISTS (SELECT 1 FROM chat_members WHERE chat_id = $2 AND user_id = $3)
         RETURNING id
         `,
         [messageId, chatId, request.user.id, request.body.content],
@@ -325,7 +328,7 @@ export default async function messagesRoutes(server: FastifyInstance) {
     },
   );
 
-  // DELETE MESSAGE: own messages, for everyone.
+  // DELETE MESSAGE: own messages, for everyone, while in the chat.
   server.delete<{ Params: MessageParams }>(
     "/api/chats/:chatId/messages/:messageId",
     {
@@ -345,6 +348,7 @@ export default async function messagesRoutes(server: FastifyInstance) {
         WHERE id = $1
           AND chat_id = $2
           AND (sender_id = $3 OR $4::boolean)
+          AND EXISTS (SELECT 1 FROM chat_members WHERE chat_id = $2 AND user_id = $3)
         RETURNING id
         `,
         [messageId, chatId, request.user.id, Boolean(group && isAdmin(group.role))],

@@ -4,12 +4,14 @@ import { blockedEitherWay } from "./visibility.js";
 // Messages are end-to-end encrypted, see frontend/src/lib/crypto.ts:
 //   "e2:" + base64(nonce + ciphertext), bound to the chat, the sender and
 //         the message id, which the client chooses for that reason;
-//   "e1:" the same bound to the chat only (older clients);
+//   "e1:" the same bound to the chat only (older clients; no longer
+//         accepted, since it lets the server pass it off as another
+//         sender's: clients mark the old ones);
 //   "e3:<epoch>:" + base64(…) in groups, with the group key of that epoch.
 // The server cannot read or shorten them; clients limit the text to 4096
 // characters before encrypting, which is at most ~22 000 characters of
 // base64.
-export const MESSAGE_PATTERN = "^(e[12]:|e3:[0-9]{1,9}:)[A-Za-z0-9+/]+={0,2}$";
+export const MESSAGE_PATTERN = "^(e2:|e3:[0-9]{1,9}:)[A-Za-z0-9+/]+={0,2}$";
 export const MAX_MESSAGE_LENGTH = 22_000;
 
 const MESSAGE_RE = new RegExp(MESSAGE_PATTERN);
@@ -181,12 +183,13 @@ export type CreateMessageResult =
   | { error: CreateMessageError };
 
 // SQL: whether the attachments in parameter `ids` are uploads of the
-// sender ($2) not yet sent in a message.
+// sender ($2) not yet sent in a message nor used as a group's photo.
 const attachmentsFree = (ids: string) => `(
   SELECT COUNT(*) FROM attachments
   WHERE id = ANY(${ids}::uuid[])
     AND uploader_id = $2
     AND message_id IS NULL
+    AND chat_id IS NULL
 ) = cardinality(${ids}::uuid[])`;
 
 // SQL: whether $2 (a member of direct chat $1) and the chat's other
@@ -267,6 +270,7 @@ export async function createMessage(
         WHERE id = ANY($6::uuid[])
           AND uploader_id = $2
           AND message_id IS NULL
+          AND chat_id IS NULL
           AND EXISTS (SELECT 1 FROM inserted)
       ),
       touched AS (
@@ -307,10 +311,12 @@ export async function createMessage(
         ${REPLY_COLUMNS},
         COALESCE((SELECT array_agg(user_id) FROM mentioned), '{}') AS mentions,
         -- The statement's snapshot does not contain the new row yet.
+        -- Text only, as presenceVisible() counts (not group events).
         NOT EXISTS (
           SELECT 1 FROM messages
           WHERE chat_id = $1
             AND sender_id = $2
+            AND kind = 'text'
         ) AS first_from_sender
       FROM inserted
       JOIN users ON users.id = inserted.sender_id

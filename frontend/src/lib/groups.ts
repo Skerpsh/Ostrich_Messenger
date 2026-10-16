@@ -90,7 +90,12 @@ async function unwrapAll(
       continue;
     }
 
-    if (item.wrapper_public_key !== ownPublicKey && item.wrapper_id) {
+    if (item.wrapper_public_key !== ownPublicKey) {
+      // Nobody to check the key against: the server could have made it.
+      if (!item.wrapper_id) {
+        continue;
+      }
+
       if ((await checkPeerKey(ownId, item.wrapper_id, item.wrapper_public_key)) === "changed") {
         distrusted.add(chatId);
         continue;

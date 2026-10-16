@@ -370,6 +370,13 @@ func (m model) textOf(chat Chat, messageID, senderID, content string) string {
 	return shown.text
 }
 
+// isLegacyMessage tells an "e1" message (older clients): it is bound to the
+// chat only, so the server could have moved it to another sender or sent
+// it again.
+func isLegacyMessage(content string) bool {
+	return strings.HasPrefix(content, messagePrefixV1)
+}
+
 // decryptMessage returns the text of an "e2" or "e1" message, or plain
 // text as it is (decryptPlain).
 func decryptMessage(content, messageID, senderID string, privateKey []byte, peerPublicKey, chatID string) (string, decryptStatus) {

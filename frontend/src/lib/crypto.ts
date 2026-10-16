@@ -307,6 +307,12 @@ export function encryptMessage(
   return PREFIX_V2 + toBase64(concat(nonce, sealed));
 }
 
+// An "e1" message (older clients): bound to the chat only, so the server
+// could have moved it to another sender or sent it again.
+export function isLegacyMessage(content: string) {
+  return content.startsWith(PREFIX_V1);
+}
+
 // ok: decrypted; plain: not encrypted at all (from before end-to-end
 // encryption, or put there by the server); error: cannot be decrypted.
 export type Decrypted = {

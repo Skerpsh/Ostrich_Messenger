@@ -324,7 +324,9 @@ const counted = new WeakMap<WebSocket, Promise<unknown>>();
 
 // A socket opened: online for everyone who may see it, unless the user
 // was already (another device, or back within the grace period).
-export function userConnected(userId: string, tokenHash: string, socket: WebSocket) {
+// A socket over `maxSockets` (counted on all processes, so connections
+// opened at the same moment cannot all slip under the limit) is closed.
+export function userConnected(userId: string, tokenHash: string, socket: WebSocket, maxSockets = Infinity) {
   const pendingOffline = offlineTimers.get(userId);
 
   if (pendingOffline) {
@@ -345,6 +347,12 @@ export function userConnected(userId: string, tokenHash: string, socket: WebSock
 
   const opening = (async () => {
     const total = await state.addSocket(userId, tokenHash);
+
+    if (total > maxSockets) {
+      socket.close(1008, "Too many connections");
+      return;
+    }
+
     const wasLeaving = await state.takeLeaving(userId);
 
     if (total === 1 && !wasLeaving) {

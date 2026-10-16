@@ -7,6 +7,7 @@ import IconButton from "@/components/icon-button";
 import MarkupText from "@/components/markup-text";
 import { useAppTheme } from "@/context/theme";
 import type { Reaction } from "@/lib/api";
+import { isLegacyMessage } from "@/lib/crypto";
 import type { MessageRow } from "@/lib/chat-rows";
 import type { Attachment } from "@/lib/payload";
 import { formatTime, previewText } from "@/lib/format";
@@ -260,6 +261,18 @@ export default function MessageBubble({
               >
                 <Ionicons name="lock-open-outline" size={11} color={metaColor} />
                 <Text style={[styles.time, { color: metaColor }]}>not encrypted</Text>
+              </View>
+            ) : null}
+            {text.status === "ok" && isLegacyMessage(message.content) ? (
+              // Older clients' format, bound to the chat only: the server
+              // could have moved it to another sender or sent it again.
+              <View
+                style={styles.plain}
+                accessibilityLabel="old format, sender not verified"
+                {...({ title: "Old message format: the sender is not verified" } as object)}
+              >
+                <Ionicons name="alert-circle-outline" size={11} color={metaColor} />
+                <Text style={[styles.time, { color: metaColor }]}>old format</Text>
               </View>
             ) : null}
             {message.edited_at ? (
