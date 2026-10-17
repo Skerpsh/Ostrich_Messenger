@@ -166,6 +166,11 @@ function diskForecasts(snapshot: Snapshot) {
 
 async function refreshSlowChecks() {
   if (Date.now() - slowCheckedAt < SLOW_CHECK_MS) {
+    // A site that could not be reached (a timeout, a network blip) is tried
+    // again on every check, so one failure is not reported for 6 hours.
+    certificates = await Promise.all(
+      certificates.map((cert) => (cert.expiresAt ? cert : certificate(cert.host))),
+    );
     return;
   }
 
