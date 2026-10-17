@@ -57,6 +57,24 @@ test("payloads", () => {
   assert.deepEqual(decodePayload("\u001eostrich1:{oops"), { text: "\u001eostrich1:{oops" });
 });
 
+test("voice messages", () => {
+  // The same as cli/markup_test.go.
+  const plain =
+    '\u001eostrich1:{"t":"","a":[{"i":"6f2b4ad0-8a3e-4c51-9d7b-1e2f3a4b5c6d","k":"a2V5","n":"voice.m4a","m":"audio/mp4","s":5000,"d":7300,"v":"AH//"}]}';
+  const payload = decodePayload(plain);
+
+  assert.deepEqual(payload.attachments?.[0], {
+    id: "6f2b4ad0-8a3e-4c51-9d7b-1e2f3a4b5c6d",
+    key: "a2V5",
+    name: "voice.m4a",
+    mime: "audio/mp4",
+    size: 5000,
+    duration: 7300,
+    waveform: "AH//",
+  });
+  assert.equal(encodePayload(payload), plain);
+});
+
 test("payloads with attachments", () => {
   const v = JSON.parse(
     readFileSync(new URL("../../../testdata/crypto-vectors.json", import.meta.url), "utf8"),

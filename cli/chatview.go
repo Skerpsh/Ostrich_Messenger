@@ -204,6 +204,14 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 	}
 
 	for _, a := range shown.attachments {
+		if isVoice(a) {
+			length := formatDuration(a.Duration)
+			label := "🎤 " + waveform(a.Waveform, min(32, maxInner-len(length)-6)) + " " + length
+			content = append(content, bold(clip(label, maxInner), fg, fill))
+
+			continue
+		}
+
 		icon := "📎 "
 
 		if isImage(a.Mime) {

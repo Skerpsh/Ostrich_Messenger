@@ -10,7 +10,8 @@ import { toBase64 } from "./crypto";
 // cannot send or read raw bytes reliably), showing and saving decrypted
 // ones. The web implementation lives in files.web.ts. Decrypted files
 // never stay on the disk: pictures are shown from memory, and a file
-// saved through the share sheet is removed afterwards.
+// saved through the share sheet or a voice message being played is
+// removed afterwards.
 
 const headers = (token: string) => ({
   Authorization: `Bearer ${token}`,
@@ -99,6 +100,39 @@ export async function downloadSealed(token: string, id: string): Promise<Uint8Ar
 // A picture to show, from memory.
 export function imageSource(bytes: Uint8Array, mime: string) {
   return `data:${mime};base64,${toBase64(bytes)}`;
+}
+
+// Removes a file of this device (a recording once it has been read).
+export function removeUri(uri: string) {
+  try {
+    const file = new File(uri);
+
+    if (file.exists) {
+      file.delete();
+    }
+  } catch {}
+}
+
+// A decrypted voice message for the player, which needs a file: kept in
+// the cache only while it is on screen (release() removes it).
+export function playableSource(bytes: Uint8Array, id: string, mime: string) {
+  const extension = mime === "audio/webm" ? "webm" : mime === "audio/ogg" ? "ogg" : "m4a";
+  const file = new File(Paths.cache, `voice-${id}.${extension}`);
+
+  if (file.exists) {
+    file.delete();
+  }
+
+  file.write(bytes);
+
+  return {
+    uri: file.uri,
+    release: () => {
+      if (file.exists) {
+        file.delete();
+      }
+    },
+  };
 }
 
 // Hands a decrypted file to the system's share sheet (save to Files,

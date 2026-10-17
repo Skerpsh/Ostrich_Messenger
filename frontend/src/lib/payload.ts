@@ -18,6 +18,10 @@ export type Attachment = {
   // Pictures: their size in pixels.
   width?: number;
   height?: number;
+  // Voice messages (lib/voice.ts): length in milliseconds and the loudness
+  // along it, base64 of one byte (0–255) per bar.
+  duration?: number;
+  waveform?: string;
 };
 
 export type Payload = {
@@ -27,7 +31,17 @@ export type Payload = {
   attachments?: Attachment[];
 };
 
-type WireAttachment = { i: string; k: string; n: string; m: string; s: number; w?: number; h?: number };
+type WireAttachment = {
+  i: string;
+  k: string;
+  n: string;
+  m: string;
+  s: number;
+  w?: number;
+  h?: number;
+  d?: number;
+  v?: string;
+};
 type Wire = { t: string; f?: string; a?: WireAttachment[] };
 
 export function encodePayload(payload: Payload): string {
@@ -51,6 +65,8 @@ export function encodePayload(payload: Payload): string {
       m: a.mime,
       s: a.size,
       ...(a.width && a.height ? { w: a.width, h: a.height } : {}),
+      ...(a.duration !== undefined ? { d: Math.round(a.duration) } : {}),
+      ...(a.waveform ? { v: a.waveform } : {}),
     }));
   }
 
@@ -81,6 +97,8 @@ function readAttachment(value: unknown): Attachment | null {
     mime: a.m,
     size: a.s,
     ...(typeof a.w === "number" && typeof a.h === "number" ? { width: a.w, height: a.h } : {}),
+    ...(typeof a.d === "number" && Number.isFinite(a.d) && a.d >= 0 ? { duration: a.d } : {}),
+    ...(typeof a.v === "string" && a.v.length <= 512 ? { waveform: a.v } : {}),
   };
 }
 

@@ -71,6 +71,20 @@ export function imageSource(bytes: Uint8Array, mime: string) {
   return URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
 }
 
+// Releases a recording once it has been read.
+export function removeUri(uri: string) {
+  if (uri.startsWith("blob:")) {
+    URL.revokeObjectURL(uri);
+  }
+}
+
+// A decrypted voice message for the player.
+export function playableSource(bytes: Uint8Array, _id: string, mime: string) {
+  const uri = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
+
+  return { uri, release: () => URL.revokeObjectURL(uri) };
+}
+
 // Downloads a decrypted file.
 export async function saveFile(bytes: Uint8Array, name: string, mime: string) {
   const link = document.createElement("a");

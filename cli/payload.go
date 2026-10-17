@@ -26,6 +26,12 @@ type attachment struct {
 	Size int64
 	// Pictures: their size in pixels.
 	Width, Height int
+	// Voice messages (recorded in the app) carry their length in
+	// milliseconds and the loudness along it, base64 of one byte per bar;
+	// kept as they are when forwarding.
+	HasDuration bool
+	Duration    int64
+	Waveform    string
 }
 
 type payload struct {
@@ -43,6 +49,8 @@ type wireAttachment struct {
 	S int64  `json:"s"`
 	W int    `json:"w,omitempty"`
 	H int    `json:"h,omitempty"`
+	D *int64 `json:"d,omitempty"`
+	V string `json:"v,omitempty"`
 }
 
 type payloadWire struct {
@@ -59,7 +67,12 @@ func encodePayload(p payload) string {
 	wire := payloadWire{T: p.text, F: p.forwardedFrom}
 
 	for _, a := range p.attachments {
-		w := wireAttachment{I: a.ID, K: a.Key, N: a.Name, M: a.Mime, S: a.Size}
+		w := wireAttachment{I: a.ID, K: a.Key, N: a.Name, M: a.Mime, S: a.Size, V: a.Waveform}
+
+		if a.HasDuration {
+			d := a.Duration
+			w.D = &d
+		}
 
 		if a.Width > 0 && a.Height > 0 {
 			w.W, w.H = a.Width, a.Height
@@ -102,9 +115,15 @@ func decodePayload(plain string) payload {
 			continue
 		}
 
-		p.attachments = append(p.attachments, attachment{
-			ID: a.I, Key: a.K, Name: a.N, Mime: a.M, Size: a.S, Width: a.W, Height: a.H,
-		})
+		item := attachment{
+			ID: a.I, Key: a.K, Name: a.N, Mime: a.M, Size: a.S, Width: a.W, Height: a.H, Waveform: a.V,
+		}
+
+		if a.D != nil && *a.D >= 0 {
+			item.HasDuration, item.Duration = true, *a.D
+		}
+
+		p.attachments = append(p.attachments, item)
 	}
 
 	return p

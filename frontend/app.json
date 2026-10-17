@@ -68,6 +68,13 @@
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Ostrich uses the microphone to record voice messages.",
+          "enableBackgroundRecording": false
+        }
       ]
     ],
     "experiments": {

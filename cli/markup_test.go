@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -57,6 +58,31 @@ func TestPayload(t *testing.T) {
 
 	if broken := "\u001eostrich1:{oops"; decodePayload(broken).text != broken {
 		t.Fatal("broken payload not shown as text")
+	}
+
+	// A voice message from the app (the same as frontend/src/lib/markup.test.ts),
+	// forwarded as it is.
+	voice := decodePayload("\u001eostrich1:{\"t\":\"\",\"a\":[{\"i\":\"6f2b4ad0-8a3e-4c51-9d7b-1e2f3a4b5c6d\",\"k\":\"a2V5\",\"n\":\"voice.m4a\",\"m\":\"audio/mp4\",\"s\":5000,\"d\":7300,\"v\":\"AH//\"}]}")
+
+	if len(voice.attachments) != 1 || !isVoice(voice.attachments[0]) || voice.attachments[0].Duration != 7300 {
+		t.Fatalf("voice message: %+v", voice)
+	}
+
+	if again := decodePayload(encodePayload(voice)); again.attachments[0] != voice.attachments[0] {
+		t.Fatalf("voice message changed: %+v", again)
+	}
+
+	if got := attachmentsLabel(voice.attachments); got != "🎤 Voice message (0:07)" {
+		t.Fatalf("voice label %q", got)
+	}
+
+	if got := waveform("AH//", 3); got != "▁▄█" {
+		t.Fatalf("waveform %q", got)
+	}
+
+	// Files from here are not voice messages.
+	if strings.Contains(encodePayload(payload{attachments: []attachment{{ID: "x", Mime: "audio/mp4"}}}), `"d"`) {
+		t.Fatal("a file got a duration")
 	}
 
 	// Malformed attachments are left out.

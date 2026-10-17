@@ -4,7 +4,8 @@ import { Image } from "expo-image";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
-import { formatSize, isImage, loadAttachment } from "@/lib/attachments";
+import VoiceMessage from "@/components/voice-message";
+import { formatSize, isImage, isVoice, loadAttachment } from "@/lib/attachments";
 import { imageSource, saveFile } from "@/lib/files";
 import type { Attachment } from "@/lib/payload";
 
@@ -12,7 +13,7 @@ const MAX_WIDTH = 240;
 const MAX_HEIGHT = 320;
 
 // The files of a message: pictures shown in the bubble (tapping one shows
-// it on the whole screen), other files as a card (tapping one saves it; the
+// it on the whole screen), voice messages as a player, other files as a card (tapping one saves it; the
 // share sheet on the phones).
 export default function AttachmentView({
   attachments,
@@ -35,6 +36,8 @@ export default function AttachmentView({
             onError={onError}
             onOpen={onOpenPhoto ? () => onOpenPhoto(attachment) : undefined}
           />
+        ) : isVoice(attachment) ? (
+          <VoiceMessage key={attachment.id} attachment={attachment} own={own} onError={onError} />
         ) : (
           <AttachmentFile key={attachment.id} attachment={attachment} own={own} onError={onError} />
         ),

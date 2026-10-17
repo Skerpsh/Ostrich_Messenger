@@ -46,7 +46,10 @@ const POLICY = [
   // Avatars come from the API; expo-image may use blob: URLs.
   `img-src 'self' data: blob: ${apiOrigin}`,
   "font-src 'self' data:",
-  `connect-src 'self' ${apiOrigin} ${wsOrigin}`,
+  // blob: is a voice message just recorded, read to be encrypted.
+  `connect-src 'self' blob: ${apiOrigin} ${wsOrigin}`,
+  // Voice messages play from blob: URLs (decrypted in memory).
+  "media-src 'self' blob:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   "object-src 'none'",

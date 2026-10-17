@@ -30,6 +30,7 @@ import IconButton from "@/components/icon-button";
 import MessageBubble from "@/components/message-bubble";
 import PhotoViewer from "@/components/photo-viewer";
 import SafetyCode from "@/components/safety-code";
+import { RecordButton, RecordingBar, useVoiceRecorder } from "@/components/voice-recorder";
 import { noWebOutline } from "@/components/text-field";
 import { useAuth, useCurrentUser, usePrivateKey } from "@/context/auth";
 import { useChats } from "@/context/chats";
@@ -63,6 +64,7 @@ import {
   copyAttachments,
   formatSize,
   isImage,
+  isVoice,
   loadAttachment,
   MAX_ATTACHMENTS,
   uploadAttachment,
@@ -487,14 +489,16 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
   const showError = (e: unknown, fallback: string) =>
     setError(e instanceof Error ? e.message : fallback);
 
-  const send = async () => {
-    const content = draft.trim();
+  // A voice message is sent on its own, the draft and the files stay.
+  const send = async (voiceNote?: PickedFile) => {
+    const content = voiceNote ? "" : draft.trim();
+    const files = voiceNote ? [voiceNote] : picked;
 
-    if ((!content && picked.length === 0) || sending || uploading || keyChanged) {
+    if ((!content && files.length === 0) || sending || uploading || keyChanged) {
       return;
     }
 
-    if (editing) {
+    if (editing && !voiceNote) {
       if (!content) {
         return;
       }
@@ -541,15 +545,15 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
     // the message then goes through the outbox like any other.
     let attachments: Attachment[] = [];
 
-    if (picked.length > 0) {
+    if (files.length > 0) {
       setUploading(true);
       setUploadProgress(null);
 
-      const total = picked.reduce((sum, file) => sum + file.bytes.length, 0) || 1;
+      const total = files.reduce((sum, file) => sum + file.bytes.length, 0) || 1;
       let done = 0;
 
       try {
-        for (const file of picked) {
+        for (const file of files) {
           attachments.push(
             await withToken((t) =>
               uploadAttachment(t, file, (part) =>
@@ -562,6 +566,12 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       } catch (e) {
         showError(e, "Failed to upload the file");
         attachments = [];
+
+        // Kept, to be sent again with the send button.
+        if (voiceNote) {
+          setPicked((current) => [...current, voiceNote].slice(0, MAX_ATTACHMENTS));
+        }
+
         return;
       } finally {
         setUploading(false);
@@ -597,10 +607,13 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       ...(mentions.length ? { mentions } : {}),
     });
 
-    setDraft("");
-    storeDraft(chatId, "");
-    setPicked([]);
-    setInputHeight(INPUT_MIN_HEIGHT);
+    if (!voiceNote) {
+      setDraft("");
+      storeDraft(chatId, "");
+      setPicked([]);
+      setInputHeight(INPUT_MIN_HEIGHT);
+    }
+
     // Own messages end the "unread" section.
     setUnreadAfter(null);
     setReplyTo(null);
@@ -623,6 +636,11 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       showError(e, "Failed to open the file");
     }
   };
+
+  const voice = useVoiceRecorder({
+    onDone: (file) => send(file),
+    onError: (message) => setError(message),
+  });
 
   const closeViewer = useCallback(() => setViewing(null), []);
 
@@ -1133,7 +1151,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
             onPress: () => togglePin(pinned ? null : message),
           }]
         : []),
-      ...(own && !shown.forwardedFrom && shown.status === "ok"
+      ...(own && !shown.forwardedFrom && shown.status === "ok" && !shown.attachments?.some(isVoice)
         ? [{ icon: "create-outline" as const, label: "Edit", onPress: () => startEdit(message) }]
         : []),
       ...(own || groupAdmin
@@ -1206,7 +1224,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
         .find((m) => m.sender_id === user?.id && !outgoingOf(m));
       const shown = last && textOf(last);
 
-      if (last && shown && !shown.forwardedFrom && shown.status === "ok") {
+      if (last && shown && !shown.forwardedFrom && shown.status === "ok" && !shown.attachments?.some(isVoice)) {
         event.preventDefault();
         startEdit(last);
       }
@@ -1814,64 +1832,83 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
             ) : null}
 
             <View style={styles.composerRow}>
-              <IconButton
-                icon={emojiOpen ? "happy" : "happy-outline"}
-                label="Emoji"
-                size={22}
-                color={emojiOpen ? colors.accent : colors.muted}
-                onPress={() => setEmojiOpen((open) => !open)}
-              />
-              {editing ? null : (
+              {voice.active ? (
+                <RecordingBar voice={voice} />
+              ) : (
+                <>
+                  <IconButton
+                    icon={emojiOpen ? "happy" : "happy-outline"}
+                    label="Emoji"
+                    size={22}
+                    color={emojiOpen ? colors.accent : colors.muted}
+                    onPress={() => setEmojiOpen((open) => !open)}
+                  />
+                  {editing ? null : (
+                    <IconButton
+                      icon="attach"
+                      label="Attach a photo or file"
+                      size={22}
+                      color={colors.muted}
+                      disabled={uploading || picked.length >= MAX_ATTACHMENTS}
+                      onPress={() => setAttachMenu(true)}
+                    />
+                  )}
+                  <View style={[styles.inputBox, { backgroundColor: colors.panelAlt }]}>
+                    <TextInput
+                      ref={inputRef}
+                      value={draft}
+                      onChangeText={onDraftChange}
+                      onKeyPress={onKeyPress}
+                      onSelectionChange={(event) => setCursor(event.nativeEvent.selection.end)}
+                      placeholder="Message"
+                      placeholderTextColor={colors.muted}
+                      multiline
+                      // One row on web (textarea defaults to two); grows while typing.
+                      numberOfLines={1}
+                      maxLength={MAX_MESSAGE_LENGTH}
+                      autoFocus={Platform.OS === "web"}
+                      onContentSizeChange={(event) =>
+                        setInputHeight(
+                          Math.min(
+                            INPUT_MAX_HEIGHT,
+                            Math.max(
+                              INPUT_MIN_HEIGHT,
+                              event.nativeEvent.contentSize.height,
+                            ),
+                          ),
+                        )
+                      }
+                      style={[
+                        styles.input,
+                        { color: colors.text, height: inputHeight },
+                        noWebOutline,
+                      ]}
+                    />
+                  </View>
+                </>
+              )}
+
+              {voice.active ? (
                 <IconButton
-                  icon="attach"
-                  label="Attach a photo or file"
+                  icon="arrow-up"
+                  label="Send the voice message"
+                  filled
                   size={22}
-                  color={colors.muted}
-                  disabled={uploading || picked.length >= MAX_ATTACHMENTS}
-                  onPress={() => setAttachMenu(true)}
+                  onPress={voice.finish}
+                  disabled={uploading}
+                />
+              ) : !draft.trim() && picked.length === 0 && !editing ? (
+                <RecordButton voice={voice} disabled={sending || uploading || keyChanged} />
+              ) : (
+                <IconButton
+                  icon={editing ? "checkmark" : "arrow-up"}
+                  label={editing ? "Save" : "Send"}
+                  filled
+                  size={22}
+                  onPress={() => send()}
+                  disabled={!canSend}
                 />
               )}
-              <View style={[styles.inputBox, { backgroundColor: colors.panelAlt }]}>
-                <TextInput
-                  ref={inputRef}
-                  value={draft}
-                  onChangeText={onDraftChange}
-                  onKeyPress={onKeyPress}
-                  onSelectionChange={(event) => setCursor(event.nativeEvent.selection.end)}
-                  placeholder="Message"
-                  placeholderTextColor={colors.muted}
-                  multiline
-                  // One row on web (textarea defaults to two); grows while typing.
-                  numberOfLines={1}
-                  maxLength={MAX_MESSAGE_LENGTH}
-                  autoFocus={Platform.OS === "web"}
-                  onContentSizeChange={(event) =>
-                    setInputHeight(
-                      Math.min(
-                        INPUT_MAX_HEIGHT,
-                        Math.max(
-                          INPUT_MIN_HEIGHT,
-                          event.nativeEvent.contentSize.height,
-                        ),
-                      ),
-                    )
-                  }
-                  style={[
-                    styles.input,
-                    { color: colors.text, height: inputHeight },
-                    noWebOutline,
-                  ]}
-                />
-              </View>
-
-              <IconButton
-                icon={editing ? "checkmark" : "arrow-up"}
-                label={editing ? "Save" : "Send"}
-                filled
-                size={22}
-                onPress={send}
-                disabled={!canSend}
-              />
             </View>
           </View>
         )}

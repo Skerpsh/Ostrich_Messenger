@@ -18,9 +18,22 @@ export type PickedFile = {
   height?: number;
   // For the preview before sending.
   previewUri?: string;
+  // Voice messages.
+  duration?: number;
+  waveform?: string;
 };
 
 export const isImage = (mime: string) => /^image\/(jpeg|png|gif|webp)$/.test(mime);
+
+// A voice message: recorded in the app, so it knows its length.
+export const isVoice = (attachment: Attachment) =>
+  attachment.mime.startsWith("audio/") && attachment.duration !== undefined;
+
+// "0:07", "12:30".
+export function formatDuration(ms: number) {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
 
 export async function uploadAttachment(
   token: string,
@@ -44,6 +57,8 @@ export async function uploadAttachment(
     mime: file.mime,
     size: file.bytes.length,
     ...(file.width && file.height ? { width: file.width, height: file.height } : {}),
+    ...(file.duration !== undefined ? { duration: file.duration } : {}),
+    ...(file.waveform ? { waveform: file.waveform } : {}),
   };
 }
 
@@ -118,5 +133,9 @@ export function attachmentsLabel(attachments: Attachment[] | undefined) {
       : `📎 ${attachments.length} files`;
   }
 
-  return isImage(attachments[0].mime) ? "🖼 Photo" : `📎 ${attachments[0].name}`;
+  return isImage(attachments[0].mime)
+    ? "🖼 Photo"
+    : isVoice(attachments[0])
+      ? `🎤 Voice message (${formatDuration(attachments[0].duration ?? 0)})`
+      : `📎 ${attachments[0].name}`;
 }

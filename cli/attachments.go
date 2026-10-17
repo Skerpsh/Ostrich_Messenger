@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -269,6 +270,46 @@ func saveAttachment(dir string, a attachment, data []byte) (string, error) {
 	return "", fmt.Errorf("no free file name for %s", name)
 }
 
+// isVoice: a voice message from the app (the CLI only shows it: it can
+// neither play nor record one).
+func isVoice(a attachment) bool {
+	return strings.HasPrefix(a.Mime, "audio/") && a.HasDuration
+}
+
+// formatDuration: "0:07", "12:30".
+func formatDuration(ms int64) string {
+	seconds := (ms + 500) / 1000
+
+	return fmt.Sprintf("%d:%02d", seconds/60, seconds%60)
+}
+
+var waveLevels = []rune("▁▂▃▄▅▆▇█")
+
+// waveform draws a voice message's loudness in at most width cells.
+func waveform(encoded string, width int) string {
+	bars, err := base64.StdEncoding.DecodeString(encoded)
+
+	if err != nil || len(bars) == 0 || width <= 0 {
+		return strings.Repeat("▁", max(0, min(width, 24)))
+	}
+
+	n := min(width, len(bars))
+	out := make([]rune, n)
+
+	for i := range n {
+		// The loudest of the bars that fall in this cell.
+		var peak byte
+
+		for _, b := range bars[i*len(bars)/n : max(i*len(bars)/n+1, (i+1)*len(bars)/n)] {
+			peak = max(peak, b)
+		}
+
+		out[i] = waveLevels[int(peak)*(len(waveLevels)-1)/255]
+	}
+
+	return string(out)
+}
+
 func isImage(mime string) bool {
 	switch mime {
 	case "image/jpeg", "image/png", "image/gif", "image/webp":
@@ -298,6 +339,8 @@ func attachmentsLabel(list []attachment) string {
 		return ""
 	case len(list) == 1 && isImage(list[0].Mime):
 		return "🖼 Photo"
+	case len(list) == 1 && isVoice(list[0]):
+		return "🎤 Voice message (" + formatDuration(list[0].Duration) + ")"
 	case len(list) == 1:
 		return "📎 " + list[0].Name
 	}
