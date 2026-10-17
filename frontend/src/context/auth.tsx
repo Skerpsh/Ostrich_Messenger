@@ -56,6 +56,9 @@ type AuthContextValue = {
     ostrichId: string,
   ) => Promise<void>;
   signUp: (username: string, password: string) => Promise<void>;
+  // Logged in by another device that scanned this one's QR code
+  // (app/link-device.tsx): the session and the account's private key.
+  signInLinked: (response: api.AuthResponse, privateKey: Uint8Array) => Promise<void>;
   // Gets the account's keys onto this device with the OstrichID.
   unlock: (ostrichId: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -215,6 +218,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await startSession(response, privateKey, formatOstrichId(ostrichId));
   };
 
+  const signInLinked = (response: api.AuthResponse, privateKey: Uint8Array) =>
+    startSession(response, privateKey, null);
+
   const unlock = async (ostrichIdInput: string) => {
     if (state.status !== "signedIn") {
       return;
@@ -318,6 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         notice,
         signIn,
         signUp,
+        signInLinked,
         unlock,
         signOut,
         signOutEverywhere,

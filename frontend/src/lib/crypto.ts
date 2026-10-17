@@ -54,6 +54,14 @@
 // public keys; if they match on both devices, the server has not swapped
 // the keys (see safetyCode()).
 //
+// Linking a device (QR code, backend routes/device-links.ts): the new
+// device shows a one-time X25519 public key; the logged-in device answers
+// with its own one-time key and
+//   sealed = base64(nonce(24) ‖ XChaCha20-Poly1305(HKDF(X25519(…), salt
+//            link id, info "ostrich/v1 device link", 32), nonce,
+//            account private key, aad "ostrich/v1 device link" 0 link id))
+// The key comes from the scanned QR code, not from the server.
+//
 // The OstrichID is ~99 random bits, so a fast KDF is enough: it cannot be
 // guessed from the auth key or from anything the server stores.
 
@@ -70,6 +78,7 @@ const CHAT_INFO = utf8("ostrich/v1 chat");
 const SAFETY_INFO = utf8("ostrich/v1 safety");
 const ATTACHMENT_AAD = utf8("ostrich/v1 attachment");
 const GROUP_WRAP_INFO = utf8("ostrich/v1 group key-wrap");
+const LINK_INFO = "ostrich/v1 device link";
 const PREFIX_GROUP = "e3:";
 const PREFIX_INFO = "i1:";
 const MESSAGE_AAD = "ostrich/v2 message";
@@ -229,6 +238,43 @@ export function openPrivateKey(
 // base64 of the public key that belongs to a private key.
 export function publicKeyOf(privateKey: Uint8Array) {
   return toBase64(x25519.getPublicKey(privateKey));
+}
+
+// --- linking a device ---
+
+// The new device's one-time key pair; the public key goes in its QR code.
+export function newLinkKeys() {
+  const privateKey = randomBytes(32);
+  return { privateKey, publicKey: publicKeyOf(privateKey) };
+}
+
+function linkKey(ownPrivate: Uint8Array, otherPublic: string, linkId: string) {
+  const shared = x25519.getSharedSecret(ownPrivate, fromBase64(otherPublic));
+  return hkdf(sha256, shared, utf8(linkId), utf8(LINK_INFO), 32);
+}
+
+// The logged-in device: the account's private key, sealed for the new
+// device's public key (from its QR code).
+export function sealForLink(accountPrivate: Uint8Array, linkPublic: string, linkId: string) {
+  const own = randomBytes(32);
+  const nonce = randomBytes(24);
+  const sealed = xchacha20poly1305(linkKey(own, linkPublic, linkId), nonce, utf8(`${LINK_INFO}\0${linkId}`)).encrypt(
+    accountPrivate,
+  );
+
+  return { sealed: toBase64(concat(nonce, sealed)), publicKey: publicKeyOf(own) };
+}
+
+// The new device: the account's private key; throws if it was not sealed
+// for this device.
+export function openLinkSeal(linkPrivate: Uint8Array, sealerPublic: string, sealed: string, linkId: string) {
+  const data = fromBase64(sealed);
+
+  return xchacha20poly1305(
+    linkKey(linkPrivate, sealerPublic, linkId),
+    data.subarray(0, 24),
+    utf8(`${LINK_INFO}\0${linkId}`),
+  ).decrypt(data.subarray(24));
 }
 
 // --- safety code ---

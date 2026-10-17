@@ -120,7 +120,7 @@ type LoginBody = {
 };
 
 // The app a request comes from, for the list of devices.
-function clientName(request: FastifyRequest): string {
+export function clientName(request: FastifyRequest): string {
   const value = request.headers["x-ostrich-client"];
 
   return typeof value === "string" && /^[a-z]{2,16}$/.test(value)
@@ -129,14 +129,14 @@ function clientName(request: FastifyRequest): string {
 }
 
 // The account's keys as sent to its owner after logging in.
-function keysView(row: { public_key: string; encrypted_private_key: string }) {
+export function keysView(row: { public_key: string; encrypted_private_key: string }) {
   return {
     public_key: row.public_key,
     encrypted_private_key: row.encrypted_private_key,
   };
 }
 
-const USER_COLUMNS = `id, username, created_at, username_changed_at, show_presence, read_receipts, ${PROFILE_COLUMNS}`;
+export const USER_COLUMNS = `id, username, created_at, username_changed_at, show_presence, read_receipts, ${PROFILE_COLUMNS}`;
 
 // Brute-force protection for endpoints that check passwords.
 const authRateLimit = {
@@ -945,7 +945,7 @@ async function claimUsername(
   return true;
 }
 
-async function createSession(userId: string, client: string): Promise<string> {
+export async function createSession(userId: string, client: string): Promise<string> {
   const token = crypto.randomBytes(32).toString("hex");
 
   await db.query(

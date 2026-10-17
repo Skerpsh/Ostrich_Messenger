@@ -46,10 +46,13 @@
 - 🛡 **Safety codes**: compare 40 digits with a contact to make sure nobody swapped your keys
 - ⚠️ **Key change warnings**: sending is paused until you confirm a contact's new key
 - 👁 Optional online status and read receipts, blocking, per-device sessions with remote log out
+- 📲 **Log in with a QR code**: a logged-in device scans it and sends the account's key encrypted for the new device only
 
 **Messaging**
 - 💬 Direct chats, **groups** of up to 50 members with roles, **invite links** and join requests
 - 📎 Encrypted **files and photos** (up to 10 per message, 25 MB each) with upload progress and a photo viewer
+- 🎤 Encrypted **voice messages** with a waveform, seeking and playback speed
+- 🔗 **Link previews** made by the sender's phone and sent inside the encrypted message, so the server never sees the link
 - ↩️ Replies, forwarding, editing, deleting, **reactions with any emoji**, pinned messages
 - 🔖 **Saved messages**, @mentions, formatting, search in a chat or across all chats
 - ⌨️ Typing indicators, read receipts, unread counters, jump to the first unread message
@@ -60,6 +63,7 @@
 - 📱 **iOS and Android** apps from the same code, with push notifications
 - 🖥 Full-featured **terminal client** with mouse support, QR codes and offline cache
 - 🌗 Light and dark themes with an accent color
+- ⌨️ Keyboard shortcuts in the web app (Ctrl/⌘ K, Alt ↑/↓, ↑ to edit, Esc)
 
 ## Clients
 

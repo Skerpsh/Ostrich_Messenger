@@ -17,6 +17,11 @@ export const inviteLink = (token: string) => `${WEB_URL}/chats/join/${token}`;
 export const profileLink = (username: string) => `${WEB_URL}/chats/u/${encodeURIComponent(username)}`;
 
 const SAFETY_PREFIX = "ostrich-safety:";
+const LOGIN_PREFIX = "ostrich-login:";
+
+// The text of the QR code a new device shows to be logged in
+// (app/link-device.tsx): the link's id and the device's one-time key.
+export const loginQr = (id: string, publicKey: string) => `${LOGIN_PREFIX}${id}:${publicKey}`;
 
 // The text of a safety code's QR code.
 export const safetyQr = (code: string[]) => SAFETY_PREFIX + code.join("");
@@ -24,7 +29,8 @@ export const safetyQr = (code: string[]) => SAFETY_PREFIX + code.join("");
 export type ScannedLink =
   | { kind: "join"; token: string }
   | { kind: "user"; username: string }
-  | { kind: "safety"; code: string };
+  | { kind: "safety"; code: string }
+  | { kind: "login"; id: string; publicKey: string };
 
 export function parseLink(text: string): ScannedLink | null {
   const value = text.trim();
@@ -32,6 +38,11 @@ export function parseLink(text: string): ScannedLink | null {
   if (value.startsWith(SAFETY_PREFIX)) {
     const code = value.slice(SAFETY_PREFIX.length);
     return /^\d{40}$/.test(code) ? { kind: "safety", code } : null;
+  }
+
+  if (value.startsWith(LOGIN_PREFIX)) {
+    const login = /^([0-9a-f-]{36}):([A-Za-z0-9+/]{43}=)$/.exec(value.slice(LOGIN_PREFIX.length));
+    return login ? { kind: "login", id: login[1], publicKey: login[2] } : null;
   }
 
   // Any address ending in /chats/join/… or /chats/u/… (also another

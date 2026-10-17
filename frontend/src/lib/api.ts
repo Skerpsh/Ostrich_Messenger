@@ -232,6 +232,39 @@ async function request<T>(
   return data as T;
 }
 
+// --- logging in with a QR code (backend routes/device-links.ts) ---
+
+export type DeviceLink = { id: string; secret: string; expires_at: string };
+
+export function createDeviceLink() {
+  return request<DeviceLink>("POST", "/api/device-links", { body: {} });
+}
+
+export type DeviceLinkSession =
+  | { status: "pending" }
+  | (AuthResponse & {
+      status: "approved";
+      keys: AccountKeys;
+      sealed_key: string;
+      sealer_public_key: string;
+    });
+
+export function deviceLinkSession(id: string, secret: string) {
+  return request<DeviceLinkSession>("POST", `/api/device-links/${id}/session`, { body: { secret } });
+}
+
+// What kind of device asks, for the device approving it.
+export function getDeviceLink(token: string, id: string) {
+  return request<{ client: string; created_at: string }>("GET", `/api/device-links/${id}`, { token });
+}
+
+export function approveDeviceLink(token: string, id: string, sealed: { sealed: string; publicKey: string }) {
+  return request<{ message: string }>("POST", `/api/device-links/${id}/approve`, {
+    token,
+    body: { sealed_key: sealed.sealed, public_key: sealed.publicKey },
+  });
+}
+
 // authKey is derived from the OstrichID. Accounts from before end-to-end
 // encryption answer 409 "upgrade_required" and are logged in again with
 // the raw OstrichID and new keys (upgrade).

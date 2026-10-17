@@ -7,6 +7,7 @@ import { db, isPgError, PG_INVALID_TEXT } from "./database.js";
 import { metrics } from "./metrics.js";
 
 import authRoutes from "./routes/auth.js";
+import deviceLinksRoutes from "./routes/device-links.js";
 import usersRoutes from "./routes/users.js";
 import chatsRoutes from "./routes/chats.js";
 import messagesRoutes from "./routes/messages.js";
@@ -184,6 +185,7 @@ const start = async () => {
     await server.register(healthRoutes);
     await server.register(websocketRoutes);
     await server.register(authRoutes);
+    await server.register(deviceLinksRoutes);
     await server.register(usersRoutes);
     await server.register(chatsRoutes);
     await server.register(messagesRoutes);

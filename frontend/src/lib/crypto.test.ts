@@ -6,6 +6,9 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   decryptAttachment,
+  newLinkKeys,
+  openLinkSeal,
+  sealForLink,
   decryptGroupInfo,
   decryptGroupMessage,
   decryptMessage,
@@ -164,4 +167,18 @@ test("groups: a wrapped key is only for its member and epoch", () => {
     name: "x",
     photo: { id: v.message_id, key: "k", mime: "image/jpeg" },
   });
+});
+
+test("linking a device", () => {
+  const account = newLinkKeys().privateKey;
+  const device = newLinkKeys();
+  const id = "6f2b4ad0-8a3e-4c51-9d7b-1e2f3a4b5c6d";
+  const sealed = sealForLink(account, device.publicKey, id);
+
+  assert.deepEqual(openLinkSeal(device.privateKey, sealed.publicKey, sealed.sealed, id), account);
+  // Another device or link cannot open it.
+  assert.throws(() => openLinkSeal(newLinkKeys().privateKey, sealed.publicKey, sealed.sealed, id));
+  assert.throws(() =>
+    openLinkSeal(device.privateKey, sealed.publicKey, sealed.sealed, "00000000-0000-4000-8000-000000000000"),
+  );
 });

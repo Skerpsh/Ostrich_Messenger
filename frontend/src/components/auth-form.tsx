@@ -217,6 +217,16 @@ export default function AuthForm({ mode }: AuthFormProps) {
               style={styles.submit}
             />
 
+            {isRegister ? null : (
+              <Button
+                title="Log in with a QR code"
+                variant="secondary"
+                disabled={loading}
+                onPress={() => router.push("/link-device")}
+                style={styles.qrLogin}
+              />
+            )}
+
             <Button
               title={isRegister ? "I have an account" : "Create account"}
               variant="secondary"
@@ -284,6 +294,10 @@ const styles = StyleSheet.create({
 
   submit: {
     marginTop: 24,
+    marginBottom: 12,
+  },
+
+  qrLogin: {
     marginBottom: 12,
   },
 });

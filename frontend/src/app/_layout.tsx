@@ -112,6 +112,7 @@ function RootNavigator() {
           <Stack.Screen name="index" />
           <Stack.Screen name="login" />
           <Stack.Screen name="register" />
+          <Stack.Screen name="link-device" />
         </Stack.Protected>
 
         <Stack.Protected guard={mustSaveOstrichId}>

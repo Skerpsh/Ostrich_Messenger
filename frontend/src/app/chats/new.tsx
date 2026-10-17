@@ -170,6 +170,12 @@ export default function NewChatScreen() {
               return true;
             }
 
+            if (link?.kind === "login") {
+              setScanning(false);
+              setError("That code logs in a new device: Settings → Devices → Link a device.");
+              return true;
+            }
+
             if (link?.kind === "safety") {
               setScanning(false);
               setMode("chat");

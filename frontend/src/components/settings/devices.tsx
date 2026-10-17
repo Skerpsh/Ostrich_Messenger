@@ -7,6 +7,7 @@ import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { endSession, getSessions, type Session } from "@/lib/api";
 import { formatChatDate, formatDate } from "@/lib/format";
+import { LinkDeviceRow } from "./link-device";
 import { Divider, Section, styles } from "./ui";
 
 const CLIENT_NAMES: Record<string, { name: string; icon: IconName }> = {
@@ -17,6 +18,8 @@ const CLIENT_NAMES: Record<string, { name: string; icon: IconName }> = {
   windows: { name: "Windows", icon: "laptop-outline" },
   cli: { name: "Terminal (CLI)", icon: "terminal-outline" },
 };
+
+const clientName = (client: string) => CLIENT_NAMES[client]?.name ?? "an unknown app";
 
 export function DevicesSection() {
   const { withToken } = useAuth();
@@ -52,6 +55,8 @@ export function DevicesSection() {
 
   return (
     <Section title="Devices">
+      <LinkDeviceRow clientName={clientName} onLinked={() => setVersion((v) => v + 1)} />
+      <Divider />
       {sessions === null ? (
         <ActivityIndicator color={colors.muted} style={styles.loadingRow} />
       ) : (
