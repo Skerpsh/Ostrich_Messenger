@@ -21,6 +21,7 @@ import Avatar from "@/components/avatar";
 import ChatAvatar from "@/components/chat-avatar";
 import DevBadge from "@/components/dev-badge";
 import IconButton from "@/components/icon-button";
+import Welcome from "@/components/welcome";
 import { noWebOutline } from "@/components/text-field";
 import { useAuth, useCurrentUser, usePrivateKey } from "@/context/auth";
 import { useChats } from "@/context/chats";
@@ -39,6 +40,12 @@ import { useMinuteTick } from "@/lib/use-minute-tick";
 import { useStartChat } from "@/lib/use-start-chat";
 import { cleanUsername, USERNAME_RE } from "@/lib/validation";
 import { radius } from "@/theme/colors";
+
+// Focuses the search of the chats list on screen (the welcome screen on the
+// right of a wide screen asks for it).
+let focusSearch: (() => void) | null = null;
+
+export const focusChatSearch = () => focusSearch?.();
 
 // The chats list: a screen on phones, the left column on wide screens.
 export default function ChatList() {
@@ -135,6 +142,13 @@ export default function ChatList() {
   };
 
   const searchRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    focusSearch = () => searchRef.current?.focus();
+    return () => {
+      focusSearch = null;
+    };
+  }, []);
 
   // Web: Ctrl/⌘ K goes to the search, Alt ↑ / ↓ to the chat above or below.
   useKeydown((event) => {
@@ -411,7 +425,10 @@ export default function ChatList() {
                 No chats match “{query.trim()}”.
               </Text>
             )
+          ) : !wide ? (
+            <Welcome onFindFriend={() => searchRef.current?.focus()} />
           ) : (
+            // The welcome screen is on the right.
             <View style={styles.empty}>
               <Ionicons name="chatbubbles-outline" size={44} color={colors.muted} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>

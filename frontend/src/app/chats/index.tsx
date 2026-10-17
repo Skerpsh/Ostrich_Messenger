@@ -2,9 +2,11 @@ import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import ChatList from "@/components/chat-list";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import ChatList, { focusChatSearch } from "@/components/chat-list";
+import Welcome from "@/components/welcome";
 import { useCurrentUser } from "@/context/auth";
+import { useChats } from "@/context/chats";
 import { useAppTheme } from "@/context/theme";
 import { useIsWide } from "@/lib/layout";
 import { radius } from "@/theme/colors";
@@ -19,10 +21,20 @@ export default function ChatsScreen() {
 function NoChatSelected() {
   const { colors } = useAppTheme();
   const user = useCurrentUser();
+  const { chats } = useChats();
   const [copied, setCopied] = useState(false);
 
   if (!user) {
     return null;
+  }
+
+  // No chats yet: how to start.
+  if (chats?.length === 0) {
+    return (
+      <ScrollView contentContainerStyle={styles.welcome}>
+        <Welcome onFindFriend={focusChatSearch} />
+      </ScrollView>
+    );
   }
 
   const copy = async () => {
@@ -73,6 +85,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
     padding: 24,
+  },
+
+  welcome: {
+    flexGrow: 1,
+    justifyContent: "center",
   },
 
   logo: {
