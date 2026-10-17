@@ -1171,7 +1171,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
     );
   };
 
-  // Web: Enter sends, Shift+Enter makes a new line.
+  // Web: Enter sends, Shift+Enter makes a new line (more in lib/keys.ts).
   const onKeyPress = (
     event: NativeSyntheticEvent<TextInputKeyPressEventData>,
   ) => {
@@ -1199,12 +1199,31 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       send();
     }
 
-    if (Platform.OS === "web" && nativeEvent.key === "Escape" && (replyTo || editing)) {
-      event.preventDefault();
-      setReplyTo(null);
+    // ↑ in an empty field edits the last message sent from here or elsewhere.
+    if (Platform.OS === "web" && nativeEvent.key === "ArrowUp" && !draft && !editing && !replyTo) {
+      const last = [...shownMessages]
+        .reverse()
+        .find((m) => m.sender_id === user?.id && !outgoingOf(m));
+      const shown = last && textOf(last);
 
-      if (editing) {
-        cancelEdit();
+      if (last && shown && !shown.forwardedFrom && shown.status === "ok") {
+        event.preventDefault();
+        startEdit(last);
+      }
+    }
+
+    // Esc cancels a reply or an edit; with neither, it closes the chat.
+    if (Platform.OS === "web" && nativeEvent.key === "Escape") {
+      event.preventDefault();
+
+      if (replyTo || editing) {
+        setReplyTo(null);
+
+        if (editing) {
+          cancelEdit();
+        }
+      } else if (wide) {
+        router.replace("/chats");
       }
     }
   };

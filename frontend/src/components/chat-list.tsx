@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { usePathname, useRouter } from "expo-router";
@@ -32,6 +32,7 @@ import { takePendingLink } from "@/lib/links";
 import { searchMessages, snippet, type MessageMatch } from "@/lib/search";
 import { chatTitle } from "@/lib/groups";
 import { messagePreview } from "@/lib/preview";
+import { hasMod, useKeydown } from "@/lib/keys";
 import { useIsWide } from "@/lib/layout";
 import { useChatCrypto } from "@/lib/use-chat-crypto";
 import { useMinuteTick } from "@/lib/use-minute-tick";
@@ -132,6 +133,34 @@ export default function ChatList() {
     setQuery("");
     go({ pathname: "/chats/[chatId]", params: { chatId: chat.id } });
   };
+
+  const searchRef = useRef<TextInput>(null);
+
+  // Web: Ctrl/⌘ K goes to the search, Alt ↑ / ↓ to the chat above or below.
+  useKeydown((event) => {
+    if (menuFor) {
+      return false;
+    }
+
+    if (hasMod(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "k") {
+      searchRef.current?.focus();
+      return true;
+    }
+
+    if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown") && shown.length > 0) {
+      const index = shown.findIndex((chat) => chat.id === selectedId);
+      const next =
+        index < 0
+          ? event.key === "ArrowDown" ? 0 : shown.length - 1
+          : Math.max(0, Math.min(shown.length - 1, index + (event.key === "ArrowDown" ? 1 : -1)));
+
+      if (shown[next].id !== selectedId) {
+        openChat(shown[next]);
+      }
+
+      return true;
+    }
+  });
 
   const startChat = async () => {
     setStarting(true);
@@ -240,6 +269,7 @@ export default function ChatList() {
         <View style={[styles.search, { backgroundColor: colors.panelAlt }]}>
           <Ionicons name="search" size={18} color={colors.muted} />
           <TextInput
+            ref={searchRef}
             value={query}
             onChangeText={(text) => {
               setQuery(text);
@@ -251,6 +281,14 @@ export default function ChatList() {
             autoCorrect={false}
             returnKeyType="search"
             onSubmitEditing={() => (canStart ? startChat() : undefined)}
+            onKeyPress={(event) => {
+              // Web: Esc clears the search and leaves it.
+              if (Platform.OS === "web" && event.nativeEvent.key === "Escape") {
+                event.preventDefault();
+                setQuery("");
+                searchRef.current?.blur();
+              }
+            }}
             style={[styles.searchInput, { color: colors.text }, noWebOutline]}
           />
           {query ? (

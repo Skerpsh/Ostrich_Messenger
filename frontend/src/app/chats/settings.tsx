@@ -17,6 +17,7 @@ import { DevicesSection } from "@/components/settings/devices";
 import { NotificationsSection } from "@/components/settings/notifications";
 import { PrivacySection } from "@/components/settings/privacy";
 import { ProfilePhoto } from "@/components/settings/profile-photo";
+import { ShortcutsSection } from "@/components/settings/shortcuts";
 import { Divider, Row, Section, styles } from "@/components/settings/ui";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme, type ThemePreference } from "@/context/theme";
@@ -268,6 +269,8 @@ export default function SettingsScreen() {
           <NotificationsSection />
 
           <DevicesSection />
+
+          <ShortcutsSection />
 
           <Section
             title="Security"
