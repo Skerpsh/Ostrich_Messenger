@@ -85,6 +85,22 @@ func TestPayload(t *testing.T) {
 		t.Fatal("a file got a duration")
 	}
 
+	// A link preview from the app; a bad one is left out.
+	withLink := decodePayload(payloadMarker + `{"t":"see https://example.com","l":{"u":"https://example.com","t":"Example","s":"example.com",` +
+		`"i":{"i":"6f2b4ad0-8a3e-4c51-9d7b-1e2f3a4b5c6d","k":"a2V5","n":"preview.jpg","m":"image/jpeg","s":10}}}`)
+
+	if withLink.link == nil || withLink.link.Title != "Example" || withLink.link.Image == nil {
+		t.Fatalf("link preview: %+v", withLink.link)
+	}
+
+	if again := decodePayload(encodePayload(withLink)); again.link == nil || *again.link.Image != *withLink.link.Image {
+		t.Fatalf("link preview changed: %+v", again.link)
+	}
+
+	if bad := decodePayload(payloadMarker + `{"t":"x","l":{"u":"javascript:alert(1)","t":"x"}}`); bad.link != nil {
+		t.Fatal("a bad link preview was read")
+	}
+
 	// Malformed attachments are left out.
 	if got := decodePayload(payloadMarker + `{"t":"x","a":[{"i":"nope"},{"i":1}]}`); got.text != "x" || len(got.attachments) != 0 {
 		t.Fatalf("malformed attachments: %+v", got)

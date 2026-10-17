@@ -925,7 +925,14 @@ func (m *model) sendEdit(chat Chat, text string) tea.Cmd {
 	c := m.chat
 	editing := *c.editing
 	shown := m.show(chat, editing.ID, editing.SenderID, editing.Content)
-	content := encodePayload(payload{text: text, attachments: shown.attachments})
+	edited := payload{text: text, attachments: shown.attachments}
+
+	// The link preview goes if its link does.
+	if shown.link != nil && strings.Contains(text, shown.link.URL) {
+		edited.link = shown.link
+	}
+
+	content := encodePayload(edited)
 
 	encrypted, err := m.encryptFor(chat, content, editing.ID)
 	if err != nil {

@@ -29,7 +29,22 @@ export type Payload = {
   // The username a forwarded message comes from.
   forwardedFrom?: string;
   attachments?: Attachment[];
+  // A preview of the first link of the text, made by the sender's app
+  // (lib/link-preview.ts).
+  link?: LinkPreview;
 };
+
+export type LinkPreview = {
+  url: string;
+  title: string;
+  description?: string;
+  site?: string;
+  // The page's picture, encrypted and uploaded like a file.
+  image?: Attachment;
+};
+
+// What is kept of a page's texts.
+export const LINK_LIMITS = { title: 200, description: 400, site: 80 };
 
 type WireAttachment = {
   i: string;
@@ -42,12 +57,24 @@ type WireAttachment = {
   d?: number;
   v?: string;
 };
-type Wire = { t: string; f?: string; a?: WireAttachment[] };
+type WireLink = { u: string; t: string; d?: string; s?: string; i?: WireAttachment };
+type Wire = { t: string; f?: string; a?: WireAttachment[]; l?: WireLink };
+
+const wireAttachment = (a: Attachment): WireAttachment => ({
+  i: a.id,
+  k: a.key,
+  n: a.name,
+  m: a.mime,
+  s: a.size,
+  ...(a.width && a.height ? { w: a.width, h: a.height } : {}),
+  ...(a.duration !== undefined ? { d: Math.round(a.duration) } : {}),
+  ...(a.waveform ? { v: a.waveform } : {}),
+});
 
 export function encodePayload(payload: Payload): string {
   const attachments = payload.attachments ?? [];
 
-  if (!payload.forwardedFrom && attachments.length === 0) {
+  if (!payload.forwardedFrom && attachments.length === 0 && !payload.link) {
     return payload.text;
   }
 
@@ -58,16 +85,18 @@ export function encodePayload(payload: Payload): string {
   }
 
   if (attachments.length > 0) {
-    wire.a = attachments.map((a) => ({
-      i: a.id,
-      k: a.key,
-      n: a.name,
-      m: a.mime,
-      s: a.size,
-      ...(a.width && a.height ? { w: a.width, h: a.height } : {}),
-      ...(a.duration !== undefined ? { d: Math.round(a.duration) } : {}),
-      ...(a.waveform ? { v: a.waveform } : {}),
-    }));
+    wire.a = attachments.map(wireAttachment);
+  }
+
+  if (payload.link) {
+    const { url, title, description, site, image } = payload.link;
+    wire.l = {
+      u: url,
+      t: title,
+      ...(description ? { d: description } : {}),
+      ...(site ? { s: site } : {}),
+      ...(image ? { i: wireAttachment(image) } : {}),
+    };
   }
 
   return MARKER + JSON.stringify(wire);
@@ -102,8 +131,32 @@ function readAttachment(value: unknown): Attachment | null {
   };
 }
 
+const text = (value: unknown, limit: number) =>
+  typeof value === "string" && value.trim() ? value.trim().slice(0, limit) : undefined;
+
+function readLink(value: unknown): LinkPreview | null {
+  const l = value as Partial<WireLink> | null;
+  const title = text(l?.t, LINK_LIMITS.title);
+
+  if (!l || typeof l.u !== "string" || !/^https?:\/\/\S+$/i.test(l.u) || l.u.length > 2048 || !title) {
+    return null;
+  }
+
+  const description = text(l.d, LINK_LIMITS.description);
+  const site = text(l.s, LINK_LIMITS.site);
+  const image = l.i ? readAttachment(l.i) : null;
+
+  return {
+    url: l.u,
+    title,
+    ...(description ? { description } : {}),
+    ...(site ? { site } : {}),
+    ...(image && /^image\//.test(image.mime) ? { image } : {}),
+  };
+}
+
 // Anything that is not a well-formed payload is shown as text; malformed
-// attachments are left out.
+// attachments and link previews are left out.
 export function decodePayload(plain: string): Payload {
   if (!plain.startsWith(MARKER)) {
     return { text: plain };
@@ -120,10 +173,13 @@ export function decodePayload(plain: string): Payload {
       ? wire.a.map(readAttachment).filter((a): a is Attachment => a !== null)
       : [];
 
+    const link = wire.l ? readLink(wire.l) : null;
+
     return {
       text: wire.t,
       ...(typeof wire.f === "string" && wire.f ? { forwardedFrom: wire.f } : {}),
       ...(attachments.length > 0 ? { attachments } : {}),
+      ...(link ? { link } : {}),
     };
   } catch {
     return { text: plain };

@@ -222,6 +222,19 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 		content = append(content, bold(clip(label, maxInner), fg, fill))
 	}
 
+	if l := shown.link; l != nil {
+		site := l.Site
+
+		if site == "" {
+			site = l.URL
+		}
+
+		content = append(content,
+			seg("▎", fg, fill)+bold(clip("🔗 "+sanitize(site), maxInner-1), fg, fill),
+			seg("▎", fg, fill)+seg(clip(sanitize(l.Title), maxInner-1), fg, fill),
+		)
+	}
+
 	if shown.forwardedFrom != "" {
 		forwardFg := p.accent
 

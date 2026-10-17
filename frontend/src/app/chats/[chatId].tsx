@@ -75,7 +75,9 @@ import { formatPresence, previewText } from "@/lib/format";
 import { chatTitle, isGroupDistrusted } from "@/lib/groups";
 import { loadCachedMessages, saveCachedMessages } from "@/lib/local-cache";
 import { mentionedUsernames, plainText } from "@/lib/markup";
-import { encodePayload, type Attachment } from "@/lib/payload";
+import { linkImage } from "@/lib/link-preview";
+import { encodePayload, type Attachment, type LinkPreview } from "@/lib/payload";
+import { useLinkPreview } from "@/lib/use-link-preview";
 import { fromWebFile, pickDocument, pickPhoto } from "@/lib/pick-attachment";
 import { useLatest } from "@/lib/use-latest";
 import { messagePreview } from "@/lib/preview";
@@ -489,6 +491,9 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
   const showError = (e: unknown, fallback: string) =>
     setError(e instanceof Error ? e.message : fallback);
 
+  // The preview of the link being written about (phones).
+  const linkPreview = useLinkPreview(draft, picked.length === 0 && !editing);
+
   // A voice message is sent on its own, the draft and the files stay.
   const send = async (voiceNote?: PickedFile) => {
     const content = voiceNote ? "" : draft.trim();
@@ -510,8 +515,14 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       setInputHeight(INPUT_MIN_HEIGHT);
 
       try {
-        // The files stay; only the text changes.
-        const payload = encodePayload({ text: content, attachments: textOf(target).attachments });
+        // The files stay; only the text changes (and the link preview
+        // goes if its link does).
+        const { attachments: kept, link: keptLink } = textOf(target);
+        const payload = encodePayload({
+          text: content,
+          attachments: kept,
+          ...(keptLink && content.includes(keptLink.url) ? { link: keptLink } : {}),
+        });
         const updated = await withToken((t) =>
           editMessage(t, chatId, target.id, crypto.encrypt(payload, target.id)),
         );
@@ -578,11 +589,37 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       }
     }
 
+    // The link preview (phones), its picture uploaded like a file; without
+    // the picture if that fails.
+    let link: LinkPreview | undefined;
+    const preview = !voiceNote && files.length === 0 ? linkPreview.preview : null;
+
+    if (preview && content.includes(preview.url)) {
+      const { image: imageUrl, ...texts } = preview.meta;
+      link = { url: preview.url, ...texts };
+
+      if (imageUrl) {
+        setUploading(true);
+
+        try {
+          const image = await linkImage(imageUrl);
+
+          if (image) {
+            link.image = await withToken((t) => uploadAttachment(t, image));
+          }
+        } catch {
+          // Sent without it.
+        } finally {
+          setUploading(false);
+        }
+      }
+    }
+
     const id = newMessageId();
     let encrypted: string;
 
     try {
-      encrypted = crypto.encrypt(encodePayload({ text: content, attachments }), id);
+      encrypted = crypto.encrypt(encodePayload({ text: content, attachments, link }), id);
     } catch (e) {
       showError(e, "Failed to send message");
       return;
@@ -603,7 +640,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       senderId: user.id,
       content: encrypted,
       replyTo: replyTo ? replyPreview(replyTo) : null,
-      attachments: attachments.map((a) => a.id),
+      attachments: [...attachments, ...(link?.image ? [link.image] : [])].map((a) => a.id),
       ...(mentions.length ? { mentions } : {}),
     });
 
@@ -801,9 +838,15 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       (message.sender_id === user.id ? user.username : (chat?.username ?? message.sender_username));
 
     let attachments: Attachment[] = [];
+    let link = shown.link;
 
     try {
       attachments = await withToken((t) => copyAttachments(t, shown.attachments ?? []));
+
+      if (link?.image) {
+        const [image] = await withToken((t) => copyAttachments(t, [link!.image!]));
+        link = { ...link, image };
+      }
     } catch (e) {
       showError(e, "Failed to forward the files");
       return false;
@@ -815,7 +858,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
     try {
       content = encryptForChat(
         target,
-        encodePayload({ text: shown.text, forwardedFrom: from, attachments }),
+        encodePayload({ text: shown.text, forwardedFrom: from, attachments, link }),
         { id, sender_id: user.id },
         privateKey,
       );
@@ -830,7 +873,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       senderId: user.id,
       content,
       replyTo: null,
-      attachments: attachments.map((a) => a.id),
+      attachments: [...attachments, ...(link?.image ? [link.image] : [])].map((a) => a.id),
     });
 
     return true;
@@ -1787,6 +1830,27 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
                   size={18}
                   color={colors.muted}
                   onPress={() => setReplyTo(null)}
+                />
+              </View>
+            ) : null}
+
+            {linkPreview.preview ? (
+              <View style={styles.replyBar}>
+                <Ionicons name="link" size={18} color={colors.accent} />
+                <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
+                  <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
+                    {linkPreview.preview.meta.site ?? linkPreview.preview.meta.title}
+                  </Text>
+                  <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
+                    {linkPreview.preview.meta.title}
+                  </Text>
+                </View>
+                <IconButton
+                  icon="close"
+                  label="Send without the link preview"
+                  size={18}
+                  color={colors.muted}
+                  onPress={linkPreview.dismiss}
                 />
               </View>
             ) : null}

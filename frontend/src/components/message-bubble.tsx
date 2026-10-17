@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import AttachmentView from "@/components/attachment-view";
+import LinkCard from "@/components/link-card";
 import DevBadge from "@/components/dev-badge";
 import IconButton from "@/components/icon-button";
 import MarkupText from "@/components/markup-text";
@@ -221,6 +222,7 @@ export default function MessageBubble({
               {text.text}
             </Text>
           )}
+          {text.status === "ok" && text.link ? <LinkCard link={text.link} own={own} /> : null}
           {message.reactions.length > 0 ? (
             <View style={styles.reactions}>
               {groupReactions(message.reactions, ownId).map(({ emoji, count, mine }) => (

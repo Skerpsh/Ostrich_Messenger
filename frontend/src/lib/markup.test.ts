@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { mentionedUsernames, parseMarkup, plainText } from "./markup.ts";
 import { readFileSync } from "node:fs";
 import { decodePayload, encodePayload } from "./payload.ts";
+import { firstLink, parseMeta } from "./link-meta.ts";
 
 test("formatting", () => {
   assert.deepEqual(parseMarkup("a **b** c"), [
@@ -115,4 +116,29 @@ test("mentions", () => {
   }
 
   assert.deepEqual(mentionedUsernames("@Bob and @bob"), ["bob"]);
+});
+
+test("link previews", () => {
+  assert.equal(firstLink("see https://example.com/a?b=1, ok"), "https://example.com/a?b=1");
+  assert.equal(firstLink("no links"), null);
+
+  const html = `<html><head><title>Fallback</title>
+    <meta property="og:title" content="Tom &amp; Jerry">
+    <meta content='A &quot;cat&quot; and a mouse' name="description">
+    <meta property="og:image" content="/img/cover.png">
+    </head></html>`;
+
+  assert.deepEqual(parseMeta(html, "https://www.example.com/page"), {
+    title: "Tom & Jerry",
+    description: 'A "cat" and a mouse',
+    site: "example.com",
+    image: "https://www.example.com/img/cover.png",
+  });
+  assert.equal(parseMeta("<p>no title</p>", "https://example.com"), null);
+  assert.equal(parseMeta(`<title>x</title><meta property="og:image" content="javascript:alert(1)">`, "https://a.b")?.image, undefined);
+
+  // Sent inside the message; a bad one is left out.
+  const link = { url: "https://example.com", title: "Example", site: "example.com" };
+  assert.deepEqual(decodePayload(encodePayload({ text: "https://example.com", link })).link, link);
+  assert.equal(decodePayload('\u001eostrich1:{"t":"x","l":{"u":"javascript:alert(1)","t":"x"}}').link, undefined);
 });

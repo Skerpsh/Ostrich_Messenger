@@ -212,6 +212,18 @@ func (m *model) forward(from Chat, message Message, target Chat) tea.Cmd {
 
 	return task(func() func(*model) tea.Cmd {
 		attachments, err := copyAttachments(token, shown.attachments)
+		link := shown.link
+
+		// The link preview's picture is copied too.
+		if err == nil && link != nil && link.Image != nil {
+			var images []attachment
+
+			if images, err = copyAttachments(token, []attachment{*link.Image}); err == nil {
+				copied := *link
+				copied.Image = &images[0]
+				link = &copied
+			}
+		}
 
 		return func(m *model) tea.Cmd {
 			if err != nil {
@@ -223,7 +235,7 @@ func (m *model) forward(from Chat, message Message, target Chat) tea.Cmd {
 			}
 
 			id := newMessageID()
-			content, err := m.encryptFor(target, encodePayload(payload{text: shown.text, forwardedFrom: origin, attachments: attachments}), id)
+			content, err := m.encryptFor(target, encodePayload(payload{text: shown.text, forwardedFrom: origin, attachments: attachments, link: link}), id)
 			if err != nil {
 				return m.showToast(err.Error(), true)
 			}
@@ -232,6 +244,10 @@ func (m *model) forward(from Chat, message Message, target Chat) tea.Cmd {
 
 			for _, a := range attachments {
 				ids = append(ids, a.ID)
+			}
+
+			if link != nil && link.Image != nil {
+				ids = append(ids, link.Image.ID)
 			}
 
 			return tea.Batch(m.queueMessage(target.ID, id, content, nil, ids), m.openChat(target))

@@ -39,6 +39,23 @@ type payload struct {
 	// The username a forwarded message comes from.
 	forwardedFrom string
 	attachments   []attachment
+	// A preview of the text's first link, made by the sender's phone.
+	link *linkPreview
+}
+
+// linkPreview: the page's title, description, site and picture (an
+// attachment, not among the message's files).
+type linkPreview struct {
+	URL, Title, Description, Site string
+	Image                         *attachment
+}
+
+type wireLink struct {
+	U string          `json:"u"`
+	T string          `json:"t"`
+	D string          `json:"d,omitempty"`
+	S string          `json:"s,omitempty"`
+	I *wireAttachment `json:"i,omitempty"`
 }
 
 type wireAttachment struct {
@@ -57,28 +74,59 @@ type payloadWire struct {
 	T string           `json:"t"`
 	F string           `json:"f,omitempty"`
 	A []wireAttachment `json:"a,omitempty"`
+	L *wireLink        `json:"l,omitempty"`
+}
+
+func toWire(a attachment) wireAttachment {
+	w := wireAttachment{I: a.ID, K: a.Key, N: a.Name, M: a.Mime, S: a.Size, V: a.Waveform}
+
+	if a.Width > 0 && a.Height > 0 {
+		w.W, w.H = a.Width, a.Height
+	}
+
+	if a.HasDuration {
+		d := a.Duration
+		w.D = &d
+	}
+
+	return w
+}
+
+// fromWire: false if the attachment is malformed.
+func fromWire(a wireAttachment) (attachment, bool) {
+	if !attachmentIDRE.MatchString(a.I) || a.K == "" {
+		return attachment{}, false
+	}
+
+	item := attachment{
+		ID: a.I, Key: a.K, Name: a.N, Mime: a.M, Size: a.S, Width: a.W, Height: a.H, Waveform: a.V,
+	}
+
+	if a.D != nil && *a.D >= 0 {
+		item.HasDuration, item.Duration = true, *a.D
+	}
+
+	return item, true
 }
 
 func encodePayload(p payload) string {
-	if p.forwardedFrom == "" && len(p.attachments) == 0 {
+	if p.forwardedFrom == "" && len(p.attachments) == 0 && p.link == nil {
 		return p.text
 	}
 
 	wire := payloadWire{T: p.text, F: p.forwardedFrom}
 
 	for _, a := range p.attachments {
-		w := wireAttachment{I: a.ID, K: a.Key, N: a.Name, M: a.Mime, S: a.Size, V: a.Waveform}
+		wire.A = append(wire.A, toWire(a))
+	}
 
-		if a.HasDuration {
-			d := a.Duration
-			w.D = &d
+	if l := p.link; l != nil {
+		wire.L = &wireLink{U: l.URL, T: l.Title, D: l.Description, S: l.Site}
+
+		if l.Image != nil {
+			image := toWire(*l.Image)
+			wire.L.I = &image
 		}
-
-		if a.Width > 0 && a.Height > 0 {
-			w.W, w.H = a.Width, a.Height
-		}
-
-		wire.A = append(wire.A, w)
 	}
 
 	data, _ := json.Marshal(wire)
@@ -100,6 +148,7 @@ func decodePayload(plain string) payload {
 		T *string           `json:"t"`
 		F string            `json:"f"`
 		A []json.RawMessage `json:"a"`
+		L *wireLink         `json:"l"`
 	}
 
 	if json.Unmarshal([]byte(rest), &wire) != nil || wire.T == nil {
@@ -111,20 +160,45 @@ func decodePayload(plain string) payload {
 	for _, raw := range wire.A {
 		var a wireAttachment
 
-		if json.Unmarshal(raw, &a) != nil || !attachmentIDRE.MatchString(a.I) || a.K == "" {
+		if json.Unmarshal(raw, &a) != nil {
 			continue
 		}
 
-		item := attachment{
-			ID: a.I, Key: a.K, Name: a.N, Mime: a.M, Size: a.S, Width: a.W, Height: a.H, Waveform: a.V,
+		if item, ok := fromWire(a); ok {
+			p.attachments = append(p.attachments, item)
 		}
-
-		if a.D != nil && *a.D >= 0 {
-			item.HasDuration, item.Duration = true, *a.D
-		}
-
-		p.attachments = append(p.attachments, item)
 	}
 
+	p.link = readLink(wire.L)
+
 	return p
+}
+
+var linkURLRE = regexp.MustCompile(`(?i)^https?://\S+$`)
+
+// readLink: nil unless the preview is well-formed, like the app's.
+func readLink(l *wireLink) *linkPreview {
+	if l == nil || !linkURLRE.MatchString(l.U) || len(l.U) > 2048 || strings.TrimSpace(l.T) == "" {
+		return nil
+	}
+
+	clip := func(s string, n int) string {
+		s = strings.TrimSpace(s)
+
+		if r := []rune(s); len(r) > n {
+			return string(r[:n])
+		}
+
+		return s
+	}
+
+	link := &linkPreview{URL: l.U, Title: clip(l.T, 200), Description: clip(l.D, 400), Site: clip(l.S, 80)}
+
+	if l.I != nil {
+		if image, ok := fromWire(*l.I); ok && strings.HasPrefix(image.Mime, "image/") {
+			link.Image = &image
+		}
+	}
+
+	return link
 }
