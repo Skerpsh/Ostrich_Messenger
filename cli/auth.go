@@ -51,8 +51,10 @@ type authState struct {
 	err     string
 	// E.g. "session expired".
 	notice string
-	// Logging in with a QR code instead (qrlogin.go).
-	qr *qrLogin
+	// Logging in with a QR code instead (qrlogin.go), and how many codes
+	// have been made (answers for older ones are ignored).
+	qr      *qrLogin
+	qrRound int
 }
 
 // newInput is a text input in the app's style.

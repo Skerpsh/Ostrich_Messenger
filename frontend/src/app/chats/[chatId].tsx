@@ -842,14 +842,22 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
 
     try {
       attachments = await withToken((t) => copyAttachments(t, shown.attachments ?? []));
-
-      if (link?.image) {
-        const [image] = await withToken((t) => copyAttachments(t, [link!.image!]));
-        link = { ...link, image };
-      }
     } catch (e) {
       showError(e, "Failed to forward the files");
       return false;
+    }
+
+    // The preview's picture is copied too; without it if that fails (it
+    // may be gone from the server).
+    if (link?.image) {
+      const { image, ...rest } = link;
+
+      try {
+        const [copy] = await withToken((t) => copyAttachments(t, [image]));
+        link = { ...rest, image: copy };
+      } catch {
+        link = rest;
+      }
     }
 
     const id = newMessageId();
@@ -1238,7 +1246,11 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
   ) => {
     const nativeEvent = event.nativeEvent as TextInputKeyPressEventData & {
       shiftKey?: boolean;
+      altKey?: boolean;
+      ctrlKey?: boolean;
+      metaKey?: boolean;
     };
+    const modified = nativeEvent.shiftKey || nativeEvent.altKey || nativeEvent.ctrlKey || nativeEvent.metaKey;
 
     // Enter or Tab takes the first @mention suggestion.
     if (
@@ -1261,7 +1273,8 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
     }
 
     // ↑ in an empty field edits the last message sent from here or elsewhere.
-    if (Platform.OS === "web" && nativeEvent.key === "ArrowUp" && !draft && !editing && !replyTo) {
+    // (Alt ↑ is the chat above, components/chat-list.tsx.)
+    if (Platform.OS === "web" && nativeEvent.key === "ArrowUp" && !modified && !draft && !editing && !replyTo) {
       const last = [...shownMessages]
         .reverse()
         .find((m) => m.sender_id === user?.id && !outgoingOf(m));

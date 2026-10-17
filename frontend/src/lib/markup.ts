@@ -27,6 +27,10 @@ type Rule = {
   lead?: boolean;
 };
 
+
+// A web address, as made a link (and given a preview, link-meta.ts).
+export const LINK_RE = /\bhttps?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]}'"]/i;
+
 const RULES: Rule[] = [
   { re: /```\n?([\s\S]+?)\n?```/, style: () => ({ code: true }), inner: false },
   { re: /`([^`\n]+)`/, style: () => ({ code: true }), inner: false },
@@ -45,7 +49,7 @@ const RULES: Rule[] = [
     lead: true,
   },
   {
-    re: /\bhttps?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]}'"]/i,
+    re: LINK_RE,
     style: (match) => ({ link: match[0] }),
     inner: false,
   },

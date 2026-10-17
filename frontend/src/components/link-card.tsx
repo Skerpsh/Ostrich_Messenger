@@ -42,6 +42,9 @@ export default function LinkCard({ link, own }: { link: LinkPreview; own: boolea
     };
   }, [image, withToken]);
 
+  // The address's own host, not the name the sender's app put in: that
+  // is what the card opens.
+  const host = hostOf(link.url);
   const fg = own ? colors.onAccent : colors.text;
   const accent = own ? colors.onAccent : colors.accent;
   const ratio = image?.width && image.height ? image.width / image.height : 1.91;
@@ -50,18 +53,16 @@ export default function LinkCard({ link, own }: { link: LinkPreview; own: boolea
     <Pressable
       onPress={() => Linking.openURL(link.url)}
       accessibilityRole="link"
-      accessibilityLabel={`${link.title}, ${link.site ?? link.url}`}
+      accessibilityLabel={`${link.title}, ${host}`}
       style={({ hovered, pressed }) => [
         styles.card,
         { borderLeftColor: accent, backgroundColor: own ? "rgba(0, 0, 0, 0.12)" : colors.panelAlt },
         (hovered || pressed) && styles.pressed,
       ]}
     >
-      {link.site ? (
-        <Text numberOfLines={1} style={[styles.site, { color: accent }]}>
-          {link.site}
-        </Text>
-      ) : null}
+      <Text numberOfLines={1} style={[styles.site, { color: accent }]}>
+        {link.site && link.site.toLowerCase() !== host ? `${link.site} · ${host}` : host}
+      </Text>
       <Text numberOfLines={2} style={[styles.title, { color: fg }]}>
         {link.title}
       </Text>
@@ -79,6 +80,14 @@ export default function LinkCard({ link, own }: { link: LinkPreview; own: boolea
       ) : null}
     </Pressable>
   );
+}
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }
 
 const styles = StyleSheet.create({

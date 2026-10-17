@@ -148,7 +148,7 @@ func decodePayload(plain string) payload {
 		T *string           `json:"t"`
 		F string            `json:"f"`
 		A []json.RawMessage `json:"a"`
-		L *wireLink         `json:"l"`
+		L json.RawMessage   `json:"l"`
 	}
 
 	if json.Unmarshal([]byte(rest), &wire) != nil || wire.T == nil {
@@ -169,16 +169,25 @@ func decodePayload(plain string) payload {
 		}
 	}
 
-	p.link = readLink(wire.L)
+	// Read on its own, so a malformed preview does not lose the message.
+	if len(wire.L) > 0 {
+		var l wireLink
+
+		if json.Unmarshal(wire.L, &l) == nil {
+			p.link = readLink(&l, p.text)
+		}
+	}
 
 	return p
 }
 
 var linkURLRE = regexp.MustCompile(`(?i)^https?://\S+$`)
 
-// readLink: nil unless the preview is well-formed, like the app's.
-func readLink(l *wireLink) *linkPreview {
-	if l == nil || !linkURLRE.MatchString(l.U) || len(l.U) > 2048 || strings.TrimSpace(l.T) == "" {
+// readLink: nil unless the preview is well-formed and of a link in the
+// message's text (it must not lead elsewhere than the text shows), like
+// the app's.
+func readLink(l *wireLink, text string) *linkPreview {
+	if l == nil || !linkURLRE.MatchString(l.U) || len(l.U) > 2048 || !strings.Contains(text, l.U) || strings.TrimSpace(l.T) == "" {
 		return nil
 	}
 

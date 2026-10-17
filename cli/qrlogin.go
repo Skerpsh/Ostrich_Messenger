@@ -67,11 +67,9 @@ func postPublic(path string, v, out any) error {
 
 // startQRLogin makes a new link and shows its code.
 func (m *model) startQRLogin() tea.Cmd {
-	round := 1
-
-	if m.auth.qr != nil {
-		round = m.auth.qr.round + 1
-	}
+	// Only ever goes up, so nothing from a closed code acts on a new one.
+	m.auth.qrRound++
+	round := m.auth.qrRound
 
 	private, public := newLinkKeys()
 	m.auth.qr = &qrLogin{round: round, private: private}

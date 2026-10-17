@@ -370,9 +370,6 @@ func (m model) textOf(chat Chat, messageID, senderID, content string) string {
 	return shown.text
 }
 
-// isLegacyMessage tells an "e1" message (older clients): it is bound to the
-// chat only, so the server could have moved it to another sender or sent
-// it again.
 // --- logging in with a QR code ---
 
 // The other end of linking a device (frontend/src/lib/crypto.ts,
@@ -419,6 +416,9 @@ func openLinkSeal(linkPrivate []byte, sealerPublic, sealed, linkID string) ([]by
 	return aead.Open(nil, data[:chacha20poly1305.NonceSizeX], data[chacha20poly1305.NonceSizeX:], aad)
 }
 
+// isLegacyMessage tells an "e1" message (older clients): it is bound to the
+// chat only, so the server could have moved it to another sender or sent
+// it again.
 func isLegacyMessage(content string) bool {
 	return strings.HasPrefix(content, messagePrefixV1)
 }

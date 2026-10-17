@@ -111,10 +111,11 @@ export function useVoiceRecorder({
 
     busy.current = true;
     const duration = Math.min(VOICE_MAX_MS, recorder.getStatus().durationMillis || state.durationMillis);
+    let uri: string | null = null;
 
     try {
       await stop();
-      const uri = recorder.uri;
+      uri = recorder.uri;
 
       if (!uri || duration < VOICE_MIN_MS) {
         return;
@@ -127,14 +128,18 @@ export function useVoiceRecorder({
       }
 
       const bytes = await readUri(uri);
-      // The recording is not encrypted: it does not stay on the device.
-      removeUri(uri);
       const { mime, name } = voiceFile(type);
 
       onDone({ bytes, mime, name, duration, waveform: encodeWaveform(levels.current) });
     } catch (e) {
       onError(e instanceof Error ? e.message : "Failed to record the voice message");
     } finally {
+      // The recording is not encrypted: it does not stay on the device,
+      // whether it was sent or not.
+      if (uri) {
+        removeUri(uri);
+      }
+
       busy.current = false;
     }
   };

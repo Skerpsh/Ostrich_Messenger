@@ -214,15 +214,17 @@ func (m *model) forward(from Chat, message Message, target Chat) tea.Cmd {
 		attachments, err := copyAttachments(token, shown.attachments)
 		link := shown.link
 
-		// The link preview's picture is copied too.
+		// The link preview's picture is copied too; without it if that
+		// fails (it may be gone from the server).
 		if err == nil && link != nil && link.Image != nil {
-			var images []attachment
+			copied := *link
+			copied.Image = nil
 
-			if images, err = copyAttachments(token, []attachment{*link.Image}); err == nil {
-				copied := *link
+			if images, imageErr := copyAttachments(token, []attachment{*link.Image}); imageErr == nil {
 				copied.Image = &images[0]
-				link = &copied
 			}
+
+			link = &copied
 		}
 
 		return func(m *model) tea.Cmd {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +27,13 @@ export default function LinkDeviceScreen() {
   const [error, setError] = useState<string | null>(null);
   // Bumped for a new code.
   const [round, setRound] = useState(0);
+  // A new function on every render of the auth context; the code must not
+  // change with it.
+  const signIn = useRef(signInLinked);
+
+  useEffect(() => {
+    signIn.current = signInLinked;
+  });
 
   useEffect(() => {
     let current = true;
@@ -50,7 +57,7 @@ export default function LinkDeviceScreen() {
           }
 
           // The navigator moves on to the chats on its own.
-          await signInLinked(answer, privateKey);
+          await signIn.current(answer, privateKey);
           return;
         }
       } catch (e) {
@@ -89,7 +96,7 @@ export default function LinkDeviceScreen() {
       current = false;
       clearTimeout(timer);
     };
-  }, [round, signInLinked]);
+  }, [round]);
 
   return (
     <View style={styles.screen}>

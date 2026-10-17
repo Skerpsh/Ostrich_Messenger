@@ -134,11 +134,20 @@ function readAttachment(value: unknown): Attachment | null {
 const text = (value: unknown, limit: number) =>
   typeof value === "string" && value.trim() ? value.trim().slice(0, limit) : undefined;
 
-function readLink(value: unknown): LinkPreview | null {
+// Only a preview of a link in the message's text: the card opens its url,
+// so it must not lead somewhere the text does not show.
+function readLink(value: unknown, messageText: string): LinkPreview | null {
   const l = value as Partial<WireLink> | null;
   const title = text(l?.t, LINK_LIMITS.title);
 
-  if (!l || typeof l.u !== "string" || !/^https?:\/\/\S+$/i.test(l.u) || l.u.length > 2048 || !title) {
+  if (
+    !l ||
+    typeof l.u !== "string" ||
+    !/^https?:\/\/\S+$/i.test(l.u) ||
+    l.u.length > 2048 ||
+    !messageText.includes(l.u) ||
+    !title
+  ) {
     return null;
   }
 
@@ -173,7 +182,7 @@ export function decodePayload(plain: string): Payload {
       ? wire.a.map(readAttachment).filter((a): a is Attachment => a !== null)
       : [];
 
-    const link = wire.l ? readLink(wire.l) : null;
+    const link = wire.l ? readLink(wire.l, wire.t) : null;
 
     return {
       text: wire.t,

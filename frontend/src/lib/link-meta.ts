@@ -2,9 +2,11 @@
 // or else its <title> and description. Used by link-preview.ts; no
 // network here, so it can be tested.
 
-// The first web address in a message (the same as markup.ts finds).
+import { LINK_RE } from "./markup.ts";
+
+// The first web address in a message (the first link markup.ts shows).
 export function firstLink(text: string): string | null {
-  const match = /\bhttps?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]}'"]/i.exec(text);
+  const match = LINK_RE.exec(text);
   return match ? match[0] : null;
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -223,10 +224,15 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 	}
 
 	if l := shown.link; l != nil {
-		site := l.Site
+		// The address's own host, not only the name the sender's app put in.
+		site := l.URL
 
-		if site == "" {
-			site = l.URL
+		if u, err := url.Parse(l.URL); err == nil && u.Hostname() != "" {
+			site = strings.TrimPrefix(u.Hostname(), "www.")
+		}
+
+		if l.Site != "" && !strings.EqualFold(l.Site, site) {
+			site = l.Site + " · " + site
 		}
 
 		content = append(content,

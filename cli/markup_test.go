@@ -101,6 +101,15 @@ func TestPayload(t *testing.T) {
 		t.Fatal("a bad link preview was read")
 	}
 
+	if other := decodePayload(payloadMarker + `{"t":"https://bank.example","l":{"u":"https://evil.example","t":"Bank"}}`); other.link != nil {
+		t.Fatal("a preview of a link not in the text was read")
+	}
+
+	// A malformed preview loses only itself.
+	if got := decodePayload(payloadMarker + `{"t":"hi","l":"oops"}`); got.text != "hi" || got.link != nil {
+		t.Fatalf("malformed preview: %+v", got)
+	}
+
 	// Malformed attachments are left out.
 	if got := decodePayload(payloadMarker + `{"t":"x","a":[{"i":"nope"},{"i":1}]}`); got.text != "x" || len(got.attachments) != 0 {
 		t.Fatalf("malformed attachments: %+v", got)

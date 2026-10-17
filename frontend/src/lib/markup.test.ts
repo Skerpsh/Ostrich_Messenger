@@ -141,4 +141,9 @@ test("link previews", () => {
   const link = { url: "https://example.com", title: "Example", site: "example.com" };
   assert.deepEqual(decodePayload(encodePayload({ text: "https://example.com", link })).link, link);
   assert.equal(decodePayload('\u001eostrich1:{"t":"x","l":{"u":"javascript:alert(1)","t":"x"}}').link, undefined);
+  // Not a link of the text: a card could lead elsewhere than the text shows.
+  assert.equal(
+    decodePayload('\u001eostrich1:{"t":"https://bank.example","l":{"u":"https://evil.example","t":"Bank"}}').link,
+    undefined,
+  );
 });
