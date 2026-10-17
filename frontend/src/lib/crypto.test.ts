@@ -182,3 +182,10 @@ test("linking a device", () => {
     openLinkSeal(device.privateKey, sealed.publicKey, sealed.sealed, "00000000-0000-4000-8000-000000000000"),
   );
 });
+
+test("linking a device: the CLI's vector", () => {
+  const l = v.device_link;
+  const key = openLinkSeal(fromBase64(l.device_private_key), l.sealer_public_key, l.sealed_key, l.link_id);
+
+  assert.equal(toBase64(key), l.account_private_key);
+});

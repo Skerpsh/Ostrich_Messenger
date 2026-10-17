@@ -35,5 +35,13 @@
   "group_key_wrapped_for_b": "G3EdtKQiYUr4+0h6nEI8/hq0fq8XE9SJxKbk+zWTu3ugUKty162i6OkDyuUOvdhZm1FNXrF7GPcIc7kUlU/mttBk65cnQPPs",
   "group_text": "Hello group 👋",
   "group_message": "e3:3:BQrbRWSMQgOde0Mx7IRSa4lrwoOHE4ku1zgl9xcvfoN3NZdmX2DRXjlGwGU0vUBAjaSL4mL+aeI=",
-  "group_info": "i1:3:omaqRvbD3uLfMceCneLhBko8UEDJoxxkIj6glb+sOyP2cXre+egO6gKUZuBoBtYAaI51wxzooRy8Th7Yv5zRdEbhmgM="
+  "group_info": "i1:3:omaqRvbD3uLfMceCneLhBko8UEDJoxxkIj6glb+sOyP2cXre+egO6gKUZuBoBtYAaI51wxzooRy8Th7Yv5zRdEbhmgM=",
+  "device_link": {
+    "link_id": "6f2b4ad0-8a3e-4c51-9d7b-1e2f3a4b5c6d",
+    "device_private_key": "FTOVK/PBgNeYNL3QOBtTp7VLJP+F0b9y+33vOUrvLyc=",
+    "sealer_public_key": "SfWAl3L/1zSeZQlUkJR+z81rfENagvImG1orA72k5gU=",
+    "sealed_key": "C1XuqvpPsGUttcdS6mwuF4XEqSyj9m5XBVpC7Foc24oaaEkADBLz2SoRYjbmd8y+imt8K3YYitaF2CPXy5RPy8n+5VbGQ67o",
+    "account_private_key": "UGrazyusoMPh+ur7gn9cCP3M2etLQhOGDkofwt6XC/8=",
+    "account_public_key": "gXdoQ1DXUrKHTJyN2c5t4VFJ/I96K4bzRHBWyn1IBT8="
+  }
 }

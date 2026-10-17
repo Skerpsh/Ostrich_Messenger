@@ -373,6 +373,52 @@ func (m model) textOf(chat Chat, messageID, senderID, content string) string {
 // isLegacyMessage tells an "e1" message (older clients): it is bound to the
 // chat only, so the server could have moved it to another sender or sent
 // it again.
+// --- logging in with a QR code ---
+
+// The other end of linking a device (frontend/src/lib/crypto.ts,
+// sealForLink): a logged-in app scans this terminal's QR code and sends
+// the account's private key sealed for the one-time key in it.
+const linkInfo = "ostrich/v1 device link"
+
+// newLinkKeys is the one-time key pair whose public key goes in the QR code.
+func newLinkKeys() (private []byte, public string) {
+	private = randomBytes(curve25519.ScalarSize)
+	public, err := publicKeyOf(private)
+	if err != nil {
+		panic(err)
+	}
+
+	return private, public
+}
+
+// openLinkSeal returns the account's private key; an error if it was not
+// sealed for this terminal.
+func openLinkSeal(linkPrivate []byte, sealerPublic, sealed, linkID string) ([]byte, error) {
+	sealer, err := base64.StdEncoding.DecodeString(sealerPublic)
+	if err != nil {
+		return nil, errors.New("invalid key")
+	}
+
+	data, err := base64.StdEncoding.DecodeString(sealed)
+	if err != nil || len(data) < chacha20poly1305.NonceSizeX {
+		return nil, errors.New("invalid key")
+	}
+
+	shared, err := curve25519.X25519(linkPrivate, sealer)
+	if err != nil {
+		return nil, err
+	}
+
+	aead, err := chacha20poly1305.NewX(hkdf32(shared, []byte(linkID), []byte(linkInfo)))
+	if err != nil {
+		return nil, err
+	}
+
+	aad := []byte(linkInfo + "\x00" + linkID)
+
+	return aead.Open(nil, data[:chacha20poly1305.NonceSizeX], data[chacha20poly1305.NonceSizeX:], aad)
+}
+
 func isLegacyMessage(content string) bool {
 	return strings.HasPrefix(content, messagePrefixV1)
 }

@@ -29,6 +29,13 @@ type cryptoVectors struct {
 	TextE1               string   `json:"text_e1"`
 	MessageE1            string   `json:"message_e1"`
 	SafetyCode           []string `json:"safety_code"`
+	DeviceLink           struct {
+		LinkID            string `json:"link_id"`
+		DevicePrivateKey  string `json:"device_private_key"`
+		SealerPublicKey   string `json:"sealer_public_key"`
+		SealedKey         string `json:"sealed_key"`
+		AccountPrivateKey string `json:"account_private_key"`
+	} `json:"device_link"`
 }
 
 func loadVectors(t *testing.T) (cryptoVectors, []byte, []byte) {
@@ -312,5 +319,27 @@ func TestGroupCrypto(t *testing.T) {
 
 	if info, ok := decryptGroupInfo(encryptGroupInfo(groupInfo{Name: "x", Photo: &groupPhoto{ID: "i", Key: "k", Mime: "image/png"}}, key, 1, v.GroupID), one, v.GroupID); !ok || info.Photo == nil || info.Photo.Mime != "image/png" {
 		t.Fatalf("info round trip: %+v", info)
+	}
+}
+
+// A key sealed by the app for a terminal logging in with a QR code.
+func TestDeviceLink(t *testing.T) {
+	v, _, _ := loadVectors(t)
+	l := v.DeviceLink
+	device, _ := base64.StdEncoding.DecodeString(l.DevicePrivateKey)
+
+	key, err := openLinkSeal(device, l.SealerPublicKey, l.SealedKey, l.LinkID)
+	if err != nil || base64.StdEncoding.EncodeToString(key) != l.AccountPrivateKey {
+		t.Fatalf("sealed key not opened: %v", err)
+	}
+
+	other, _ := newLinkKeys()
+
+	if _, err := openLinkSeal(other, l.SealerPublicKey, l.SealedKey, l.LinkID); err == nil {
+		t.Fatal("another terminal opened the key")
+	}
+
+	if _, err := openLinkSeal(device, l.SealerPublicKey, l.SealedKey, "00000000-0000-4000-8000-000000000000"); err == nil {
+		t.Fatal("the key opened for another link")
 	}
 }

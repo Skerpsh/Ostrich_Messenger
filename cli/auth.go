@@ -51,6 +51,8 @@ type authState struct {
 	err     string
 	// E.g. "session expired".
 	notice string
+	// Logging in with a QR code instead (qrlogin.go).
+	qr *qrLogin
 }
 
 // newInput is a text input in the app's style.
@@ -148,7 +150,17 @@ func (m *model) updateAuthKey(msg tea.KeyMsg) tea.Cmd {
 		return nil
 	}
 
+	if a.qr != nil {
+		return m.updateQRLoginKey(msg)
+	}
+
 	switch msg.String() {
+	case "ctrl+l":
+		if !a.register {
+			return m.startQRLogin()
+		}
+
+		return nil
 	case "tab":
 		a.setMode(!a.register)
 		return nil
@@ -193,7 +205,13 @@ func (m *model) updateAuthMouse(msg tea.MouseMsg) tea.Cmd {
 		return nil
 	}
 
+	if a.qr != nil {
+		return m.updateQRLoginMouse(msg)
+	}
+
 	switch {
+	case clicked(msg, "auth:qr"):
+		return m.startQRLogin()
 	case clicked(msg, "auth:login"):
 		a.setMode(false)
 	case clicked(msg, "auth:register"):
@@ -437,6 +455,10 @@ func (m model) inputBox(view string, focused bool, w int) string {
 }
 
 func (m model) authView() string {
+	if m.auth.qr != nil {
+		return m.qrLoginView()
+	}
+
 	p := m.pal
 	a := m.auth
 	w := authCardWidth(m.width)
@@ -519,6 +541,10 @@ func (m model) authView() string {
 
 	lines = append(lines, zone.Mark("auth:submit", m.button(label, inner, true, !a.loading)))
 
+	if !a.register {
+		lines = append(lines, "", zone.Mark("auth:qr", m.button("Log in with a QR code (Ctrl+L)", inner, false, !a.loading)))
+	}
+
 	header := []string{
 		center(bold(logo[0], p.accent, p.bg), w, p.bg),
 		center(bold(logo[1], p.accent, p.bg), w, p.bg),
@@ -529,7 +555,7 @@ func (m model) authView() string {
 
 	block := strings.Join(header, "\n") + "\n" + m.card(lines, w)
 
-	return m.screen(block, "Tab Log in / Create account   ↑↓ Field   Ctrl+R Remember me   Enter Next / Submit   Esc Quit")
+	return m.screen(block, "Tab Log in / Create account   ↑↓ Field   Ctrl+R Remember me   Ctrl+L QR code   Enter Next / Submit   Esc Quit")
 }
 
 func (m model) ostrichIDView() string {
