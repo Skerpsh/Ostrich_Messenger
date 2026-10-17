@@ -69,7 +69,7 @@
 
 | Client | Built with | Where to get it |
 |---|---|---|
-| **Web** | Expo + React Native Web | [62.238.111.55.nip.io](https://62.238.111.55.nip.io), installable as an app from the browser |
+| **Web** | Expo + React Native Web | [ostrich-messenger.online](https://ostrich-messenger.online), installable as an app from the browser |
 | **iOS / Android** | Expo (React Native) | Build from [`frontend/`](frontend) with Expo / EAS, see [Mobile apps](#mobile-apps) |
 | **Terminal** | Go + Bubble Tea | [One-line install](#terminal-client-cli) or the [latest release](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) |
 
@@ -77,7 +77,7 @@ All clients use the same account, the same chats and the same encryption.
 
 ## Quick start for users
 
-1. Open the [web app](https://62.238.111.55.nip.io) or install the [CLI](#terminal-client-cli).
+1. Open the [web app](https://ostrich-messenger.online) or install the [CLI](#terminal-client-cli).
 2. **Create an account** with a `@username` and a password.
 3. **Save your OstrichID.** It is shown **once**. Keep it in a password manager or on paper.
    You need it to log in on a new device. Nobody, including the server owner, can recover it for you.
@@ -85,12 +85,20 @@ All clients use the same account, the same chats and the same encryption.
 5. Optional: open the chat's **safety code** and compare the 40 digits with your contact
    in person or over another channel. If they match, your conversation cannot be read by the server.
 
+**Logging in on another device.** Either enter your username, password and OstrichID, or
+choose **Log in with a QR code** (`Ctrl+L` in the CLI) and scan the code with a device where you
+are already logged in: **Settings → Devices → Link a device**. Only scan codes shown on your own
+devices.
+
 > [!IMPORTANT]
 > Lose your OstrichID and you lose access to your messages on new devices. This is the
 > price of the server knowing nothing about them.
 
 To install the web app, use the browser's **Install app** / **Add to Home Screen** option.
 It keeps working offline and sends messages when it is back online.
+
+In the web app, **Settings → Keyboard shortcuts** lists the keys: `Ctrl/⌘ K` search chats,
+`Alt ↑/↓` previous / next chat, `↑` edit your last message, `Esc` cancel or close the chat.
 
 ## Terminal client (CLI)
 
@@ -126,9 +134,13 @@ in a narrow terminal. The keyboard and the mouse both work.
 
 | Where | Keys |
 |---|---|
+| Login screen | `Tab` log in / create account · `Ctrl+L` log in with a QR code · `Ctrl+R` remember me |
 | Chats list | `↑↓` move · `Enter` open · `/` search · `n` new chat · `m` chat menu · `s` settings · `t` theme · `q` quit |
 | Chat | `Enter` send · `Alt+Enter` new line · `Ctrl+A` attach a file · `↑` choose a message · `Ctrl+F` search · `Ctrl+K` safety code · `Esc` back |
 | Chosen message | `r` reply · `e` edit · `d` delete · `c` copy · `1`–`8` react · `Enter` more |
+
+Voice messages are shown with their waveform and length; play them in the web or mobile app.
+Link previews are shown as text.
 
 The full key reference, the "Remember me" option, where sessions and the cache are stored and
 other details are in [`cli/README.md`](cli/README.md).
@@ -136,6 +148,7 @@ other details are in [`cli/README.md`](cli/README.md).
 | Environment variable | Purpose |
 |---|---|
 | `OSTRICH_SERVER` | Use another backend, e.g. `http://localhost:3000` |
+| `OSTRICH_WEB` | The web app's address for invite and profile links (default: Ostrich's site, or `OSTRICH_SERVER` when set) |
 | `OSTRICH_NO_UPDATE_CHECK=1` | Do not check for a newer release at start |
 
 ## How the encryption works
@@ -160,11 +173,20 @@ flowchart LR
 - **Direct chats.** Both sides derive the same chat key from X25519 and HKDF. Every message is
   encrypted with XChaCha20-Poly1305. The chat, sender and message ids are bound in as associated
   data, so the server cannot move, replay or reattribute messages.
-- **Files.** Each file has its own random key, which travels inside the encrypted message.
+- **Files and voice messages.** Each file has its own random key, which travels inside the
+  encrypted message. A voice message is an audio file, plus its length and waveform.
+- **Link previews.** The sender's phone loads the page (so that site sees the sender's IP
+  address) and puts its title, description and a small picture inside the encrypted message. The
+  server never sees the link. The web app only shows previews: browsers cannot load other sites.
+  A preview is shown only for a link that is in the message's text.
 - **Groups.** A random group key is wrapped separately for every member. A new key epoch starts
   whenever someone leaves or is removed. The group name and photo are encrypted too.
 - **Safety codes.** 40 digits computed from both public keys. If the codes match on both devices,
   the server has not substituted a key.
+- **Logging in with a QR code.** The new device shows a one-time X25519 public key in its QR
+  code. The device that scans it sends the account's private key encrypted for that key, so the
+  server only relays ciphertext. The session goes to the device that holds the link's secret,
+  which is not in the code, so seeing the code is not enough to log in.
 
 **What the server can see:** usernames, who talks to whom and when, message sizes, profile photos,
 and IP addresses. **What it cannot see:** message text, files, group names and photos, your
@@ -265,7 +287,9 @@ npx eas-cli build --platform android --profile preview   # installable APK
 npx eas-cli build --platform ios --profile production
 ```
 
-Set `EXPO_PUBLIC_API_URL` to your server's address for the build.
+For your own server, set `EXPO_PUBLIC_API_URL` to its address for the build, and
+`EXPO_PUBLIC_WEB_URL` too if the web app is on another address (it is used for invite and
+profile links). The apps ask for the camera (QR codes) and the microphone (voice messages).
 
 ### Useful commands
 
@@ -391,7 +415,10 @@ cd /opt/ostrich && ops/deploy.sh --no-backup && systemctl reload caddy
 ```
 
 Open `https://chat.example.com`. For the CLI, run it with
-`OSTRICH_SERVER=https://chat.example.com ostrich`.
+`OSTRICH_SERVER=https://chat.example.com ostrich`. The web app and the API share one address
+here, so links need no extra setting. If you serve the web app from another domain, see
+`EXPO_PUBLIC_WEB_URL` and `OSTRICH_WEB` in [Configuration](#configuration), and add that origin to
+`CORS_ORIGINS`.
 
 Next steps: [daily backups](#backups) and [monitoring](#monitoring).
 
@@ -422,8 +449,13 @@ Client settings:
 
 | Client | Variable | Default |
 |---|---|---|
-| Web / mobile | `EXPO_PUBLIC_API_URL` (in `frontend/.env.local`, at build time) | `https://62.238.111.55.nip.io` |
-| CLI | `OSTRICH_SERVER` | `https://62.238.111.55.nip.io` |
+| Web / mobile | `EXPO_PUBLIC_API_URL` (in `frontend/.env.local`, at build time): the API | `https://62.238.111.55.nip.io` |
+| Mobile | `EXPO_PUBLIC_WEB_URL` (at build time): the web app, for links | `https://ostrich-messenger.online`, or the API's address when `EXPO_PUBLIC_API_URL` is set |
+| CLI | `OSTRICH_SERVER`: the API | `https://62.238.111.55.nip.io` |
+| CLI | `OSTRICH_WEB`: the web app, for links | `https://ostrich-messenger.online`, or `OSTRICH_SERVER` when that is set |
+
+The official setup serves the API at `62.238.111.55.nip.io` and the web app at
+`ostrich-messenger.online`. The web app always makes links to the address it was opened from.
 
 ## Operations: deploys, backups and monitoring
 
@@ -484,7 +516,7 @@ so the clients cannot drift apart.
 ## Releasing the CLI
 
 ```bash
-git tag v1.2.0 && git push origin v1.2.0
+git tag v1.2.0 && git push origin v1.2.0   # the next version after the latest release
 ```
 
 The [Release CLI](.github/workflows/release-cli.yml) workflow tests the CLI and builds it for

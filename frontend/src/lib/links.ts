@@ -5,11 +5,19 @@ import { getItem, removeItem, setItem } from "./storage";
 // Links into Ostrich: an invite to a group, a user's profile; and what a
 // scanned QR code says (one of those, or a safety code).
 
-// Where the web app is: this page on the web; set for the apps
-// (EXPO_PUBLIC_WEB_URL), the API's address otherwise.
+// Ostrich's own web app, for the apps built for the default server.
+const DEFAULT_WEB_URL = "https://ostrich-messenger.online";
+
+// Where the web app is: this page on the web; for the apps
+// EXPO_PUBLIC_WEB_URL, else Ostrich's site for the default server or the
+// server's own address for another one (where Caddy serves both).
 export const WEB_URL = (
   process.env.EXPO_PUBLIC_WEB_URL ||
-  (Platform.OS === "web" && typeof location !== "undefined" ? location.origin : API_URL)
+  (Platform.OS === "web" && typeof location !== "undefined"
+    ? location.origin
+    : process.env.EXPO_PUBLIC_API_URL
+      ? API_URL
+      : DEFAULT_WEB_URL)
 ).replace(/\/+$/, "");
 
 export const inviteLink = (token: string) => `${WEB_URL}/chats/join/${token}`;

@@ -17,10 +17,20 @@ import (
 // in), profile links, and QR codes of them drawn in the terminal; the same
 // as the app's (frontend/src/lib/links.ts).
 
-// webURL is the web app's address, for links (OSTRICH_WEB).
-var webURL = strings.TrimRight(envOr("OSTRICH_WEB", defaultWebURL), "/")
+// webURL is the web app's address, for links: OSTRICH_WEB, else Ostrich's
+// site for the default server or the server's own address for another one
+// (where Caddy serves both).
+var webURL = strings.TrimRight(envOr("OSTRICH_WEB", defaultWebFor(serverURL)), "/")
 
-const defaultWebURL = "https://62.238.111.55.nip.io"
+const defaultWebURL = "https://ostrich-messenger.online"
+
+func defaultWebFor(server string) string {
+	if server == defaultServerURL {
+		return defaultWebURL
+	}
+
+	return server
+}
 
 func inviteLink(token string) string { return webURL + "/chats/join/" + token }
 
