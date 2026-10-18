@@ -17,6 +17,7 @@ export type LinkState = "new" | "connecting" | "connected" | "disconnected" | "f
 // What both platforms' WebRTC have in common, as far as calls use it.
 export type TrackLike = { enabled: boolean; stop: () => void };
 export type StreamLike = { getTracks: () => TrackLike[] };
+type StatsLike = { forEach: (each: (stat: Record<string, unknown>) => void) => void };
 type DescriptionLike = { type: string; sdp?: string };
 export type PeerLike = {
   localDescription: DescriptionLike | null;
@@ -30,13 +31,33 @@ export type PeerLike = {
   addIceCandidate: (candidate: Candidate) => Promise<void>;
   addTrack: (track: TrackLike, stream: StreamLike) => unknown;
   addEventListener: (type: string, listener: (event: never) => void) => void;
+  getStats: () => Promise<StatsLike>;
   close: () => void;
+};
+
+// How the call's audio goes, for the call screen; null: not known (yet,
+// or on this browser).
+export type CallStats = {
+  // Straight between the devices, or through the TURN server.
+  route: "direct" | "relay" | null;
+  // To the other device, or to the TURN server when relayed.
+  protocol: "udp" | "tcp" | null;
+  // There and back, in ms.
+  roundTrip: number | null;
+  // How long received audio waits before it plays, in ms.
+  buffer: number | null;
+  // Loudness, 0…1.
+  micLevel: number | null;
+  peerLevel: number | null;
 };
 
 type Handlers = {
   // A network address of this device, for the other side.
   onCandidate: (candidate: Candidate) => void;
   onState: (state: LinkState) => void;
+  // The browser did not let the other side's audio play (Safari): a tap
+  // on the call screen starts it (playAgain).
+  onPlayback: (playing: boolean) => void;
 };
 
 // Older browsers have only the ICE state.
@@ -59,6 +80,10 @@ export class CallConnection {
   // The other side's addresses that came before its description.
   private early: Candidate[] = [];
   private closed = false;
+  private remote: StreamLike | null = null;
+  // The last received audio energy, for its loudness when the browser
+  // does not give it.
+  private energy: { total: number; duration: number } | null = null;
 
   private constructor(
     private peer: PeerLike,
@@ -88,7 +113,8 @@ export class CallConnection {
     });
 
     peer.addEventListener("track", (event: { streams: StreamLike[] }) => {
-      webrtc.playRemote(event.streams[0] ?? null);
+      connection.remote = event.streams[0] ?? null;
+      connection.playAgain(handlers.onPlayback);
     });
 
     const onState = () => {
@@ -157,6 +183,120 @@ export class CallConnection {
     };
   }
 
+  // Plays the other side's audio (again: in a tap, after the browser did
+  // not let it).
+  playAgain(onPlayback: (playing: boolean) => void) {
+    if (!this.remote) {
+      return;
+    }
+
+    webrtc.playRemote(this.remote).then((playing) => {
+      if (!this.closed) {
+        onPlayback(playing);
+      }
+    });
+  }
+
+  async stats(): Promise<CallStats> {
+    const stats: CallStats = {
+      route: null,
+      protocol: null,
+      roundTrip: null,
+      buffer: null,
+      micLevel: webrtc.micLevel(),
+      peerLevel: null,
+    };
+
+    let report: StatsLike;
+
+    try {
+      report = await this.peer.getStats();
+    } catch {
+      return stats;
+    }
+
+    const byId = new Map<string, Record<string, unknown>>();
+    let selectedId: string | null = null;
+    const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
+
+    report.forEach((stat) => {
+      byId.set(stat.id as string, stat);
+
+      if (stat.type === "transport" && typeof stat.selectedCandidatePairId === "string") {
+        selectedId = stat.selectedCandidatePairId;
+      }
+    });
+
+    let pair: Record<string, unknown> | undefined;
+    let remoteRoundTrip: number | null = null;
+
+    for (const stat of byId.values()) {
+      switch (stat.type) {
+        case "candidate-pair":
+          // Firefox marks the pair in use itself.
+          if (stat.id === selectedId || (!selectedId && stat.selected === true)) {
+            pair = stat;
+          }
+          break;
+
+        case "inbound-rtp": {
+          if (stat.kind !== "audio") {
+            break;
+          }
+
+          const delay = num(stat.jitterBufferDelay);
+          const emitted = num(stat.jitterBufferEmittedCount);
+          stats.buffer = delay !== null && emitted ? Math.round((delay / emitted) * 1000) : null;
+          stats.peerLevel = num(stat.audioLevel) ?? this.levelFromEnergy(stat);
+          break;
+        }
+
+        case "media-source":
+          if (stat.kind === "audio") {
+            stats.micLevel ??= num(stat.audioLevel);
+          }
+          break;
+
+        case "remote-inbound-rtp":
+          remoteRoundTrip ??= num(stat.roundTripTime);
+          break;
+      }
+    }
+
+    if (pair) {
+      const local = byId.get(pair.localCandidateId as string);
+      const remote = byId.get(pair.remoteCandidateId as string);
+      const relayed = local?.candidateType === "relay" || remote?.candidateType === "relay";
+      const protocol = relayed && local?.candidateType === "relay" ? local.relayProtocol : local?.protocol;
+
+      stats.route = relayed ? "relay" : "direct";
+      stats.protocol = protocol === "udp" || protocol === "tcp" ? protocol : null;
+      remoteRoundTrip = num(pair.currentRoundTripTime) ?? remoteRoundTrip;
+    }
+
+    stats.roundTrip = remoteRoundTrip === null ? null : Math.round(remoteRoundTrip * 1000);
+
+    return stats;
+  }
+
+  private levelFromEnergy(stat: Record<string, unknown>) {
+    const total = stat.totalAudioEnergy;
+    const duration = stat.totalSamplesDuration;
+
+    if (typeof total !== "number" || typeof duration !== "number") {
+      return null;
+    }
+
+    const last = this.energy;
+    this.energy = { total, duration };
+
+    if (!last || duration <= last.duration) {
+      return null;
+    }
+
+    return Math.sqrt((total - last.total) / (duration - last.duration));
+  }
+
   setMuted(muted: boolean) {
     for (const track of this.microphone.getTracks()) {
       track.enabled = !muted;
@@ -175,6 +315,7 @@ export class CallConnection {
     }
 
     this.peer.close();
+    this.remote = null;
     webrtc.playRemote(null);
   }
 }

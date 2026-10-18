@@ -8,6 +8,7 @@ import IconButton, { type IconName } from "@/components/icon-button";
 import { useCalls } from "@/context/calls";
 import { useAppTheme } from "@/context/theme";
 import { formatDuration } from "@/lib/attachments";
+import type { CallStats } from "@/lib/call-connection";
 import type { CallView, HandshakeView } from "@/lib/calls";
 import { phraseEmoji, phraseText, type Phrase } from "@/lib/handshake";
 import { useIsWide } from "@/lib/layout";
@@ -86,6 +87,10 @@ export default function CallScreen() {
             <Text style={[styles.chipText, { color: colors.muted }]}>@{call.chat.username} is muted</Text>
           </View>
         ) : null}
+        {call.audioBlocked && call.phase !== "ended" ? <PlayAudio username={call.chat.username ?? "…"} /> : null}
+        {call.phase === "active" || call.phase === "reconnecting" ? (
+          <Quality username={call.chat.username ?? "…"} muted={call.muted} />
+        ) : null}
 
         {call.handshake && (call.phase === "active" || call.phase === "reconnecting") ? (
           <Handshake handshake={call.handshake} username={call.chat.username ?? "…"} />
@@ -114,6 +119,97 @@ function statusText(call: CallView, now: number) {
     case "ended":
       return call.endText ?? "Call ended";
   }
+}
+
+// The browser held the other side's audio back (Safari): a tap plays it.
+function PlayAudio({ username }: { username: string }) {
+  const { playAudio } = useCalls();
+  const { colors } = useAppTheme();
+
+  return (
+    <Pressable
+      onPress={playAudio}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.playAudio, { backgroundColor: colors.accent, opacity: pressed ? 0.8 : 1 }]}
+    >
+      <Ionicons name="volume-high" size={18} color="#ffffff" />
+      <Text style={styles.playAudioText}>Tap to hear @{username}</Text>
+    </Pressable>
+  );
+}
+
+// How loud each side is, and how the audio goes: shows whether the
+// microphone works and why there is a delay.
+function Quality({ username, muted }: { username: string; muted: boolean }) {
+  const { stats: getStats } = useCalls();
+  const { colors } = useAppTheme();
+  const [stats, setStats] = useState<CallStats | null>(null);
+
+  useEffect(() => {
+    let stopped = false;
+
+    const timer = setInterval(() => {
+      getStats().then((next) => {
+        if (!stopped) {
+          setStats(next);
+        }
+      });
+    }, 250);
+
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [getStats]);
+
+  if (!stats) {
+    return null;
+  }
+
+  const route = [
+    stats.route === "relay" ? "Through the Ostrich server" : stats.route === "direct" ? "Direct" : null,
+    stats.protocol?.toUpperCase(),
+    stats.roundTrip !== null ? `ping ${stats.roundTrip} ms` : null,
+    stats.buffer !== null ? `buffer ${stats.buffer} ms` : null,
+  ].filter(Boolean);
+
+  return (
+    <View style={styles.quality}>
+      <View style={styles.meters}>
+        {stats.micLevel !== null ? <Meter label="You" level={muted ? 0 : stats.micLevel} /> : null}
+        {stats.peerLevel !== null ? <Meter label={`@${username}`} level={stats.peerLevel} /> : null}
+      </View>
+      {route.length > 0 ? <Text style={[styles.route, { color: colors.muted }]}>{route.join(" · ")}</Text> : null}
+    </View>
+  );
+}
+
+const METER_BARS = 5;
+
+function Meter({ label, level }: { label: string; level: number }) {
+  const { colors } = useAppTheme();
+  // From -60 dB (silence) to -10 dB (loud speech).
+  const db = 20 * Math.log10(Math.max(level, 1e-6));
+  const lit = Math.round(Math.min(Math.max((db + 60) / 50, 0), 1) * METER_BARS);
+
+  return (
+    <View style={styles.meter} accessibilityLabel={`${label}: ${lit > 0 ? "sound" : "silence"}`}>
+      <Text numberOfLines={1} style={[styles.meterLabel, { color: colors.muted }]}>
+        {label}
+      </Text>
+      <View style={styles.meterBars}>
+        {Array.from({ length: METER_BARS }, (_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.meterBar,
+              { height: 6 + i * 3, backgroundColor: i < lit ? colors.online : colors.line },
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
 }
 
 function Controls({ call }: { call: CallView }) {
@@ -466,6 +562,62 @@ const styles = StyleSheet.create({
 
   chipText: {
     fontSize: 12,
+  },
+
+  playAudio: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+  },
+
+  playAudioText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+
+  quality: {
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+  },
+
+  meters: {
+    flexDirection: "row",
+    gap: 24,
+  },
+
+  meter: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+    maxWidth: 160,
+  },
+
+  meterLabel: {
+    flexShrink: 1,
+    fontSize: 12,
+  },
+
+  meterBars: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 2,
+  },
+
+  meterBar: {
+    width: 4,
+    borderRadius: 2,
+  },
+
+  route: {
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
+    textAlign: "center",
   },
 
   controls: {

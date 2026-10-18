@@ -15,6 +15,7 @@ import { useOutbox } from "@/context/outbox";
 import { useRealtime } from "@/context/realtime";
 import { getIceServers, type Chat } from "@/lib/api";
 import { formatDuration } from "@/lib/attachments";
+import type { CallStats } from "@/lib/call-connection";
 import { CallSession, type CallView } from "@/lib/calls";
 import { newMessageId } from "@/lib/crypto";
 import type { Phrase } from "@/lib/handshake";
@@ -22,6 +23,7 @@ import { checkPeerKey } from "@/lib/known-keys";
 import { encodePayload, type CallEntry } from "@/lib/payload";
 import { encryptForChat } from "@/lib/use-chat-crypto";
 import { useLatest } from "@/lib/use-latest";
+import { webrtc } from "@/lib/webrtc";
 
 // The call of this device (one at a time, see lib/calls.ts), on top of
 // every screen: incoming calls ring wherever the user is.
@@ -41,6 +43,9 @@ type CallsValue = {
   toggleMute: () => void;
   toggleSpeaker: () => void;
   pickPhrase: (phrase: Phrase | null) => void;
+  // In a tap: plays the other side's audio the browser held back.
+  playAudio: () => void;
+  stats: () => Promise<CallStats | null>;
 };
 
 const CallsContext = createContext<CallsValue | null>(null);
@@ -231,6 +236,9 @@ export function CallsProvider({ children }: { children: ReactNode }) {
 
   const startCall = useCallback(
     async (chat: Chat) => {
+      // Still in the click (Safari plays the call's audio only then).
+      webrtc.unlockAudio();
+
       const deps = depsRef.current;
       const blocker = callBlocker(chat);
 
@@ -270,12 +278,20 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     setMinimized,
     callBlocker,
     startCall,
-    accept: () => active()?.accept(),
+    accept: () => {
+      webrtc.unlockAudio();
+      active()?.accept();
+    },
     decline: () => active()?.decline(),
     hangUp: () => active()?.hangUp(),
     toggleMute: () => active()?.toggleMute(),
     toggleSpeaker: () => active()?.toggleSpeaker(),
     pickPhrase: (phrase) => active()?.pick(phrase),
+    playAudio: () => {
+      webrtc.unlockAudio();
+      active()?.playAudio();
+    },
+    stats: async () => (await active()?.stats()) ?? null,
   };
 
   return (

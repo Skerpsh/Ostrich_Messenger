@@ -3,51 +3,137 @@ import type { PeerLike, StreamLike } from "./call-connection";
 // The browser's WebRTC, and call sounds made with Web Audio (no files to
 // load). The apps' is lib/webrtc.ts.
 
-// Plays the other side's audio; one call at a time.
+// Call sounds, the microphone's meter, Safari's unlocking.
+let context: AudioContext | null = null;
+
+// Plays the other side's audio; one call at a time. An element in the
+// page, started once by a click (unlockAudio): Safari plays later sound
+// only through an element started that way.
 let remoteAudio: HTMLAudioElement | null = null;
+// The microphone's loudness, for the call screen.
+let micMeter: { analyser: AnalyserNode; source: MediaStreamAudioSourceNode; samples: Float32Array<ArrayBuffer> } | null =
+  null;
+
+function audioElement() {
+  if (!remoteAudio) {
+    remoteAudio = document.createElement("audio");
+    remoteAudio.autoplay = true;
+    remoteAudio.setAttribute("playsinline", "");
+    remoteAudio.style.display = "none";
+    document.body.appendChild(remoteAudio);
+  }
+
+  return remoteAudio;
+}
+
+function audioContext() {
+  try {
+    context ??= new AudioContext();
+  } catch {
+    return null;
+  }
+
+  return context;
+}
 
 export const webrtc = {
   createPeer: (config: object) => new RTCPeerConnection(config as RTCConfiguration) as unknown as PeerLike,
 
-  getMicrophone: () =>
-    navigator.mediaDevices.getUserMedia({
+  getMicrophone: async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       video: false,
-    }) as unknown as Promise<StreamLike>,
+    });
 
-  playRemote: (stream: StreamLike | null) => {
+    const audio = audioContext();
+
+    if (audio) {
+      const analyser = audio.createAnalyser();
+      analyser.fftSize = 512;
+      const source = audio.createMediaStreamSource(stream);
+      source.connect(analyser);
+      micMeter?.source.disconnect();
+      micMeter = { analyser, source, samples: new Float32Array(analyser.fftSize) };
+    }
+
+    return stream as unknown as StreamLike;
+  },
+
+  // In the click that calls or answers: lets the page play the call later.
+  unlockAudio: () => {
+    const audio = audioContext();
+    audio?.resume().catch(() => {});
+
+    const element = audioElement();
+
+    if (!element.srcObject && audio) {
+      // Something silent to start the element with.
+      element.srcObject = audio.createMediaStreamDestination().stream;
+    }
+
+    element.play().catch(() => {});
+  },
+
+  // False when the browser did not let it play (a tap on the call screen
+  // starts it: playRemote again).
+  playRemote: async (stream: StreamLike | null) => {
     if (!stream) {
       if (remoteAudio) {
         remoteAudio.srcObject = null;
-        remoteAudio = null;
       }
-      return;
+
+      micMeter?.source.disconnect();
+      micMeter = null;
+      return true;
     }
 
-    remoteAudio ??= new Audio();
-    remoteAudio.autoplay = true;
-    remoteAudio.srcObject = stream as unknown as MediaStream;
-    // Started by a click (call or answer), so the browser allows it.
-    remoteAudio.play().catch(() => {});
+    const element = audioElement();
+
+    if (element.srcObject !== (stream as unknown as MediaStream)) {
+      element.srcObject = stream as unknown as MediaStream;
+    }
+
+    context?.resume().catch(() => {});
+
+    try {
+      await element.play();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  // 0…1, or null when unknown.
+  micLevel: () => {
+    if (!micMeter) {
+      return null;
+    }
+
+    micMeter.analyser.getFloatTimeDomainData(micMeter.samples);
+    let sum = 0;
+
+    for (const sample of micMeter.samples) {
+      sum += sample * sample;
+    }
+
+    return Math.sqrt(sum / micMeter.samples.length);
   },
 };
 
 // --- sounds ---
 
-let context: AudioContext | null = null;
 let tone: { stop: () => void } | null = null;
 
 // Beeps of `frequencies` (played together) for `on` ms every `every` ms.
 function repeatTone(frequencies: number[], on: number[], every: number, volume: number) {
   stopTone();
 
-  try {
-    context ??= new AudioContext();
-  } catch {
+  const audio = audioContext();
+
+  if (!audio) {
     return;
   }
 
-  const audio = context;
   // A ringtone before any click on the page may stay silent: browsers
   // start audio only after the user has interacted with it.
   audio.resume().catch(() => {});

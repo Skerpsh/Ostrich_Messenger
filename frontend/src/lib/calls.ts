@@ -52,6 +52,9 @@ export type CallView = {
   muted: boolean;
   speaker: boolean;
   peerMuted: boolean;
+  // The browser did not let the other side's audio play: a tap starts it
+  // (playAudio).
+  audioBlocked: boolean;
   handshake: HandshakeView | null;
   // Phase "ended": what happened, e.g. "Declined".
   endText?: string;
@@ -172,6 +175,7 @@ export class CallSession {
       muted: false,
       speaker: false,
       peerMuted: false,
+      audioBlocked: false,
       handshake: null,
     };
   }
@@ -250,6 +254,11 @@ export class CallSession {
     const connection = await CallConnection.open(servers, {
       onCandidate: (candidate) => this.queueCandidate(candidate),
       onState: (state) => this.linkChanged(state),
+      onPlayback: (playing) => {
+        if (this.view.audioBlocked === playing && !this.ended) {
+          this.update({ audioBlocked: !playing });
+        }
+      },
     });
 
     if (this.ended) {
@@ -361,6 +370,20 @@ export class CallSession {
     const speaker = !this.view.speaker;
     callSounds.speaker(speaker);
     this.update({ speaker });
+  }
+
+  // In a tap: the other side's audio, after the browser held it back.
+  playAudio() {
+    this.connection?.playAgain((playing) => {
+      if (!this.ended) {
+        this.update({ audioBlocked: !playing });
+      }
+    });
+  }
+
+  // How the audio goes (call-connection.ts), null before it connects.
+  async stats() {
+    return this.connection && this.view.connectedAt ? this.connection.stats() : null;
   }
 
   // The handshake: the sentence chosen as the other's (null: none of them).

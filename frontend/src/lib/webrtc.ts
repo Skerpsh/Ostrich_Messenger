@@ -13,7 +13,10 @@ export const webrtc = {
   getMicrophone: () => mediaDevices.getUserMedia({ audio: true, video: false }) as unknown as Promise<StreamLike>,
 
   // The apps play the other side's audio on their own.
-  playRemote: (_stream: StreamLike | null) => {},
+  unlockAudio: () => {},
+  playRemote: async (_stream: StreamLike | null) => true,
+  // From the call's statistics instead (call-connection.ts).
+  micLevel: (): number | null => null,
 };
 
 // Whether InCallManager runs (start() routes the audio for a call).
