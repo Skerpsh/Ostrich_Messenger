@@ -343,3 +343,40 @@ func TestDeviceLink(t *testing.T) {
 		t.Fatal("the key opened for another link")
 	}
 }
+
+// A call entry written by the app (testdata/crypto-vectors.json).
+func TestCallEntryVector(t *testing.T) {
+	data, err := os.ReadFile("../testdata/crypto-vectors.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var v struct {
+		Payload string `json:"payload_call"`
+	}
+
+	if err := json.Unmarshal(data, &v); err != nil {
+		t.Fatal(err)
+	}
+
+	p := decodePayload(v.Payload)
+
+	if p.call == nil || p.call.ID != "0d9f8e7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f" || p.call.Outcome != "answered" || p.call.Duration != 252000 {
+		t.Fatalf("call: %+v", p.call)
+	}
+
+	if got := encodePayload(p); got != v.Payload {
+		t.Fatalf("written back differently:\n%s\n%s", got, v.Payload)
+	}
+
+	if got := callText(*p.call, false); got != "📞 Incoming call · 4:12" {
+		t.Fatalf("text: %q", got)
+	}
+
+	// Malformed: the text alone.
+	broken := decodePayload(payloadMarker + `{"t":"📞 Missed call","c":{"i":"0d9f8e7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f","o":"lost"}}`)
+
+	if broken.call != nil || broken.text != "📞 Missed call" {
+		t.Fatalf("broken: %+v", broken)
+	}
+}

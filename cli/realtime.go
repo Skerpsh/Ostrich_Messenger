@@ -299,6 +299,13 @@ func (m *model) handleEvent(event WSMessage) tea.Cmd {
 	case "chats_changed":
 		return m.loadChats()
 
+	case "call_incoming":
+		if call := event.Call; call != nil {
+			if i := m.findChat(call.ChatID); i >= 0 {
+				return m.showToast("📞 @"+sanitize(m.chatName(m.chats[i]))+" is calling: answer in the web or mobile app", false)
+			}
+		}
+
 	case "error":
 		return m.showToast("Server: "+event.Error, true)
 	}

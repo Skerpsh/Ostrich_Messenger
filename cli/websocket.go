@@ -39,6 +39,13 @@ type WSMessage struct {
 
 	// "profile" events.
 	IsDeveloper bool `json:"isDeveloper,omitempty"`
+
+	// "call_incoming": calls are answered in the web or mobile app.
+	Call *struct {
+		ID       string `json:"id"`
+		ChatID   string `json:"chatId"`
+		CallerID string `json:"callerId"`
+	} `json:"call,omitempty"`
 }
 
 // connectWebSocket opens the session's websocket connection. While it is

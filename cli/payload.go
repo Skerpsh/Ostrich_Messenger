@@ -41,6 +41,23 @@ type payload struct {
 	attachments   []attachment
 	// A preview of the text's first link, made by the sender's phone.
 	link *linkPreview
+	// The chat's entry for a call, sent by the caller's app; text says the
+	// same for clients that do not know it.
+	call *callEntry
+}
+
+// callEntry: "answered" (with how long, in milliseconds), "missed" or
+// "declined".
+type callEntry struct {
+	ID       string
+	Outcome  string
+	Duration int64
+}
+
+type wireCall struct {
+	I string `json:"i"`
+	O string `json:"o"`
+	D *int64 `json:"d,omitempty"`
 }
 
 // linkPreview: the page's title, description, site and picture (an
@@ -75,6 +92,7 @@ type payloadWire struct {
 	F string           `json:"f,omitempty"`
 	A []wireAttachment `json:"a,omitempty"`
 	L *wireLink        `json:"l,omitempty"`
+	C *wireCall        `json:"c,omitempty"`
 }
 
 func toWire(a attachment) wireAttachment {
@@ -110,7 +128,7 @@ func fromWire(a wireAttachment) (attachment, bool) {
 }
 
 func encodePayload(p payload) string {
-	if p.forwardedFrom == "" && len(p.attachments) == 0 && p.link == nil {
+	if p.forwardedFrom == "" && len(p.attachments) == 0 && p.link == nil && p.call == nil {
 		return p.text
 	}
 
@@ -126,6 +144,15 @@ func encodePayload(p payload) string {
 		if l.Image != nil {
 			image := toWire(*l.Image)
 			wire.L.I = &image
+		}
+	}
+
+	if c := p.call; c != nil {
+		wire.C = &wireCall{I: c.ID, O: c.Outcome}
+
+		if c.Outcome == "answered" {
+			d := c.Duration
+			wire.C.D = &d
 		}
 	}
 
@@ -149,6 +176,7 @@ func decodePayload(plain string) payload {
 		F string            `json:"f"`
 		A []json.RawMessage `json:"a"`
 		L json.RawMessage   `json:"l"`
+		C json.RawMessage   `json:"c"`
 	}
 
 	if json.Unmarshal([]byte(rest), &wire) != nil || wire.T == nil {
@@ -178,7 +206,38 @@ func decodePayload(plain string) payload {
 		}
 	}
 
+	if len(wire.C) > 0 {
+		var c wireCall
+
+		if json.Unmarshal(wire.C, &c) == nil && attachmentIDRE.MatchString(c.I) &&
+			(c.O == "answered" || c.O == "missed" || c.O == "declined") {
+			p.call = &callEntry{ID: c.I, Outcome: c.O}
+
+			if c.D != nil && *c.D >= 0 {
+				p.call.Duration = *c.D
+			}
+		}
+	}
+
 	return p
+}
+
+// callText: the call entry from this user's side, like the app's.
+func callText(c callEntry, own bool) string {
+	switch {
+	case c.Outcome == "answered" && own:
+		return "📞 Outgoing call · " + formatDuration(c.Duration)
+	case c.Outcome == "answered":
+		return "📞 Incoming call · " + formatDuration(c.Duration)
+	case c.Outcome == "declined" && own:
+		return "📞 Declined"
+	case c.Outcome == "declined":
+		return "📞 Declined call"
+	case own:
+		return "📞 No answer"
+	default:
+		return "📞 Missed call"
+	}
 }
 
 var linkURLRE = regexp.MustCompile(`(?i)^https?://\S+$`)

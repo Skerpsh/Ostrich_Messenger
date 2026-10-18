@@ -272,6 +272,7 @@ type shownMessage struct {
 	forwardedFrom string
 	attachments   []attachment
 	link          *linkPreview
+	call          *callEntry
 }
 
 // show decrypts a message and reads its payload (text, forward); text
@@ -285,5 +286,5 @@ func (m model) show(chat Chat, messageID, senderID, content string) shownMessage
 
 	p := decodePayload(text)
 
-	return shownMessage{text: p.text, status: status, forwardedFrom: p.forwardedFrom, attachments: p.attachments, link: p.link}
+	return shownMessage{text: p.text, status: status, forwardedFrom: p.forwardedFrom, attachments: p.attachments, link: p.link, call: p.call}
 }

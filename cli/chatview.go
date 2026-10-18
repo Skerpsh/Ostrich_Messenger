@@ -252,6 +252,8 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 	}
 
 	switch {
+	case status == decryptOK && shown.call != nil:
+		content = append(content, bold(clip(callText(*shown.call, own), maxInner), fg, fill))
 	case status == decryptOK && strings.TrimSpace(text) == "" && len(shown.attachments) > 0:
 		// Only files.
 	case status == decryptOK:
