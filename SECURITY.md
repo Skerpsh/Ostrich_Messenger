@@ -25,7 +25,9 @@ happy to credit you in the release notes if you want.
 Especially interesting:
 
 - anything that lets the **server** or a network attacker read, change,
-  reorder, replay or forge messages, files or group data;
+  reorder, replay or forge messages, files or group data, or listen in on a
+  call without the Ostrich handshake noticing
+  ([`frontend/src/lib/handshake.ts`](frontend/src/lib/handshake.ts));
 - weaknesses in the encryption scheme
   ([`frontend/src/lib/crypto.ts`](frontend/src/lib/crypto.ts),
   [`cli/crypto.go`](cli/crypto.go)) or differences between the two
@@ -35,8 +37,9 @@ Especially interesting:
 
 Known limitations, by design:
 
-- The server sees metadata: who talks to whom, when, message sizes, IP
-  addresses and profile photos.
+- The server sees metadata: who talks to whom, when (calls included),
+  message sizes, IP addresses and profile photos. A call that goes straight
+  between the devices shows each one the other's IP address.
 - Inside a group, members share the group key, so a member working with the
   server could make a message look like another member's.
 - Without comparing safety codes, the first key a client sees for a contact

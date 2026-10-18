@@ -261,9 +261,9 @@ rsync -a root@SERVER:/opt/ostrich/backend/data/attachments/ ostrich-attachments/
 
 Calls go straight between the two devices when they can reach each other.
 Behind strict NATs and firewalls (some mobile networks, offices) they
-cannot, and the audio has to go through a TURN server: without one such
-calls connect but stay silent. The audio stays encrypted end to end on the
-way; the TURN server only passes packets it cannot read.
+cannot, and the audio and video have to go through a TURN server: without
+one such calls connect but stay silent. They stay encrypted end to end on
+the way; the TURN server only passes packets it cannot read.
 
 [`turnserver.conf`](turnserver.conf) sets up coturn on the same server. The
 backend gives each app a TURN login for 6 hours, made with a secret that
@@ -288,9 +288,9 @@ ufw allow 3478 && ufw allow 49152:49352/udp
 ```
 
 The monitoring bot watches the `coturn` service, and its reports count
-calls (started and answered). The relayed audio shows in the server's
-network traffic: about 50 kbit/s each way for every call that needs the
-relay.
+calls (started and answered). Relayed calls show in the server's network
+traffic, each way for every call that needs the relay: about 50 kbit/s for
+audio, 1–2 Mbit/s with video.
 
 To check it: open
 [Trickle ICE](https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/),

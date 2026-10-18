@@ -41,7 +41,7 @@
 ## Features
 
 **Privacy**
-- 🔐 **End-to-end encryption** of messages, files, group names and group photos (X25519 + XChaCha20-Poly1305 + HKDF-SHA256)
+- 🔐 **End-to-end encryption** of messages, files, calls, group names and group photos (X25519 + XChaCha20-Poly1305 + HKDF-SHA256)
 - 🪪 **OstrichID**: a 20-character recovery key, created on your device and never sent to the server
 - 🛡 **Safety codes**: compare 40 digits with a contact to make sure nobody swapped your keys
 - ⚠️ **Key change warnings**: sending is paused until you confirm a contact's new key
@@ -208,8 +208,8 @@ flowchart LR
   which is not in the code, so seeing the code is not enough to log in.
 
 **What the server can see:** usernames, who talks to whom and when (calls included), message
-sizes, profile photos, and IP addresses. **What it cannot see:** message text, files, group names and photos, your
-OstrichID or your private key.
+sizes, profile photos, and IP addresses. **What it cannot see:** message text, files, what is
+said and shown in calls, group names and photos, your OstrichID or your private key.
 
 > [!NOTE]
 > Ostrich has not had an independent security audit. Read
@@ -231,7 +231,7 @@ flowchart TB
     B1 & B2 -.->|optional| R[(Redis)]
     B1 & B2 --> FS[("Encrypted files<br/>on disk")]
     B1 -->|push| EXPO["Expo push service"]
-    W & M -.->|"call audio, when direct fails"| TURN["coturn<br/>TURN relay"]
+    W & M -.->|"call audio and video,<br/>when direct fails"| TURN["coturn<br/>TURN relay"]
     MON["Monitoring bot"] -->|reports and alerts| TG["Telegram"]
     MON --> B1
 ```
@@ -309,8 +309,8 @@ npx eas-cli build --platform ios --profile production
 
 For your own server, set `EXPO_PUBLIC_API_URL` to its address for the build, and
 `EXPO_PUBLIC_WEB_URL` too if the web app is on another address (it is used for invite and
-profile links). The apps ask for the camera (QR codes) and the microphone (voice messages and
-calls). Calls need a development or store build: `react-native-webrtc` does not run in Expo Go.
+profile links). The apps ask for the camera (QR codes and video calls) and the microphone (voice
+messages and calls). Calls need a development or store build: `react-native-webrtc` does not run in Expo Go.
 
 ### Useful commands
 
