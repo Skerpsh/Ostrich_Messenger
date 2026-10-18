@@ -71,7 +71,8 @@ export default function MessageBubble({
   // A photo of the message was tapped.
   onOpenPhoto?: (attachment: Attachment) => void;
   // A call entry was tapped: call back.
-  onCall?: () => void;
+  // Calls back (video: as a video call).
+  onCall?: (video: boolean) => void;
   // Choosing messages: whether this one is chosen (undefined: not
   // choosing); a tap chooses it or not.
   selected?: boolean;
@@ -325,7 +326,7 @@ export default function MessageBubble({
 
 // Reactions as chips: emoji, how many, whether one is yours.
 // "Outgoing call · 4:12", "Missed call": tapping it calls back.
-function CallEntryView({ entry, own, onCall }: { entry: CallEntry; own: boolean; onCall?: () => void }) {
+function CallEntryView({ entry, own, onCall }: { entry: CallEntry; own: boolean; onCall?: (video: boolean) => void }) {
   const { colors } = useAppTheme();
   const missed = entry.outcome !== "answered";
   const color = own ? colors.onAccent : missed ? colors.danger : colors.text;
@@ -335,7 +336,7 @@ function CallEntryView({ entry, own, onCall }: { entry: CallEntry; own: boolean;
 
   return (
     <Pressable
-      onPress={onCall}
+      onPress={() => onCall?.(entry.video === true)}
       disabled={!onCall}
       accessibilityRole={onCall ? "button" : undefined}
       accessibilityLabel={onCall ? `${label}. Call back` : label}
@@ -347,7 +348,11 @@ function CallEntryView({ entry, own, onCall }: { entry: CallEntry; own: boolean;
           { backgroundColor: own ? "rgba(0, 0, 0, 0.14)" : missed ? "rgba(255, 107, 107, 0.14)" : colors.panelAlt },
         ]}
       >
-        <Ionicons name={missed ? "call-outline" : "call"} size={18} color={color} />
+        <Ionicons
+          name={entry.video ? (missed ? "videocam-outline" : "videocam") : missed ? "call-outline" : "call"}
+          size={18}
+          color={color}
+        />
       </View>
       <View>
         <Text style={[styles.callLabel, { color }]}>{label}</Text>

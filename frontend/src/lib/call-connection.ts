@@ -6,7 +6,9 @@ import { webrtc } from "./webrtc";
 // gives the platform's parts. The devices talk directly, or through the
 // TURN server when they cannot; either way the audio is encrypted between
 // them (DTLS-SRTP) with certificates whose fingerprints the encrypted
-// offer and answer carry (lib/crypto.ts).
+// offer and answer carry (lib/crypto.ts). Every call has a video line
+// from the start, so a camera turned on or off later only changes what
+// it sends (no new offer).
 
 export type IceServer = { urls: string[]; username?: string; credential?: string };
 
@@ -15,8 +17,15 @@ export type Candidate = { candidate: string; sdpMid: string | null; sdpMLineInde
 export type LinkState = "new" | "connecting" | "connected" | "disconnected" | "failed" | "closed";
 
 // What both platforms' WebRTC have in common, as far as calls use it.
-export type TrackLike = { enabled: boolean; stop: () => void };
-export type StreamLike = { getTracks: () => TrackLike[] };
+export type TrackLike = { kind?: string; enabled: boolean; stop: () => void };
+// toURL: the apps' streams, for showing them (RTCView).
+export type StreamLike = { getTracks: () => TrackLike[]; toURL?: () => string };
+type TransceiverLike = {
+  direction: string;
+  sender: { replaceTrack: (track: TrackLike | null) => Promise<void> };
+  receiver: { track: TrackLike | null };
+};
+export type Facing = "user" | "environment";
 type StatsLike = { forEach: (each: (stat: Record<string, unknown>) => void) => void };
 type DescriptionLike = { type: string; sdp?: string };
 export type PeerLike = {
@@ -30,6 +39,8 @@ export type PeerLike = {
   setRemoteDescription: (description: DescriptionLike) => Promise<void>;
   addIceCandidate: (candidate: Candidate) => Promise<void>;
   addTrack: (track: TrackLike, stream: StreamLike) => unknown;
+  addTransceiver: (kind: "video", init: { direction: string; streams: StreamLike[] }) => TransceiverLike;
+  getTransceivers: () => TransceiverLike[];
   addEventListener: (type: string, listener: (event: never) => void) => void;
   getStats: () => Promise<StatsLike>;
   close: () => void;
@@ -58,6 +69,8 @@ type Handlers = {
   // The browser did not let the other side's audio play (Safari): a tap
   // on the call screen starts it (playAgain).
   onPlayback: (playing: boolean) => void;
+  // The other side's video (shown only while it says its camera is on).
+  onRemoteVideo: (stream: StreamLike) => void;
 };
 
 // Older browsers have only the ICE state.
@@ -81,6 +94,9 @@ export class CallConnection {
   private early: Candidate[] = [];
   private closed = false;
   private remote: StreamLike | null = null;
+  // The video line, and the camera it sends (none: nothing is sent).
+  private video: TransceiverLike | null = null;
+  private camera: TrackLike | null = null;
   // The last received audio energy, for its loudness when the browser
   // does not give it.
   private energy: { total: number; duration: number } | null = null;
@@ -112,7 +128,12 @@ export class CallConnection {
       }
     });
 
-    peer.addEventListener("track", (event: { streams: StreamLike[] }) => {
+    peer.addEventListener("track", (event: { track: TrackLike; streams: StreamLike[] }) => {
+      if (event.track.kind === "video") {
+        handlers.onRemoteVideo(event.streams[0] ?? webrtc.streamOf(event.track));
+        return;
+      }
+
       connection.remote = event.streams[0] ?? null;
       connection.playAgain(handlers.onPlayback);
     });
@@ -132,6 +153,11 @@ export class CallConnection {
   // The caller: a new offer (again with new addresses after a network
   // change: iceRestart), set as this side's description.
   async offer(iceRestart = false) {
+    if (!this.video) {
+      this.video = this.peer.addTransceiver("video", { direction: "sendrecv", streams: [this.microphone] });
+      await this.video.sender.replaceTrack(this.camera);
+    }
+
     const offer = await this.peer.createOffer(iceRestart ? { iceRestart } : undefined);
     await this.peer.setLocalDescription(offer);
 
@@ -141,6 +167,17 @@ export class CallConnection {
   // The callee: the answer to the caller's offer.
   async answer(offerSdp: string) {
     await this.setRemote({ type: "offer", sdp: offerSdp });
+
+    // The caller's video line, to send this side's camera on too (none:
+    // an older app without video).
+    if (!this.video) {
+      this.video = this.peer.getTransceivers().find((t) => t.receiver.track?.kind === "video") ?? null;
+
+      if (this.video) {
+        this.video.direction = "sendrecv";
+        await this.video.sender.replaceTrack(this.camera);
+      }
+    }
 
     const answer = await this.peer.createAnswer();
     await this.peer.setLocalDescription(answer);
@@ -297,6 +334,17 @@ export class CallConnection {
     return Math.sqrt((total - last.total) / (duration - last.duration));
   }
 
+  // Whether the other side's app can take video.
+  get canSendVideo() {
+    return Boolean(this.video);
+  }
+
+  // The camera to send, or null for none.
+  async setCamera(track: TrackLike | null) {
+    this.camera = track;
+    await this.video?.sender.replaceTrack(track);
+  }
+
   setMuted(muted: boolean) {
     for (const track of this.microphone.getTracks()) {
       track.enabled = !muted;
@@ -316,6 +364,7 @@ export class CallConnection {
 
     this.peer.close();
     this.remote = null;
+    this.camera = null;
     webrtc.playRemote(null);
   }
 }

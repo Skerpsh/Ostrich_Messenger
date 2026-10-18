@@ -114,6 +114,10 @@ test("call entries", () => {
   });
   assert.equal(encodePayload(payload), v.payload_call);
 
+  const video = decodePayload(v.payload_video_call);
+  assert.deepEqual(video.call, { id: "0d9f8e7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f", outcome: "missed", video: true });
+  assert.equal(encodePayload(video), v.payload_video_call);
+
   // Malformed: shown as the text alone.
   const broken = '\u001eostrich1:{"t":"📞 Missed call","c":{"i":"0d9f8e7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f","o":"lost"}}';
   assert.deepEqual(decodePayload(broken), { text: "📞 Missed call" });

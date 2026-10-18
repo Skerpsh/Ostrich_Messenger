@@ -44,6 +44,8 @@ export type CallEntry = {
   outcome: CallOutcome;
   // Answered calls: how long they lasted, in milliseconds.
   duration?: number;
+  // Started as a video call.
+  video?: boolean;
 };
 
 export type LinkPreview = {
@@ -70,7 +72,7 @@ type WireAttachment = {
   v?: string;
 };
 type WireLink = { u: string; t: string; d?: string; s?: string; i?: WireAttachment };
-type WireCall = { i: string; o: CallOutcome; d?: number };
+type WireCall = { i: string; o: CallOutcome; d?: number; v?: boolean };
 type Wire = { t: string; f?: string; a?: WireAttachment[]; l?: WireLink; c?: WireCall };
 
 const wireAttachment = (a: Attachment): WireAttachment => ({
@@ -113,8 +115,13 @@ export function encodePayload(payload: Payload): string {
   }
 
   if (payload.call) {
-    const { id, outcome, duration } = payload.call;
-    wire.c = { i: id, o: outcome, ...(duration !== undefined ? { d: Math.round(duration) } : {}) };
+    const { id, outcome, duration, video } = payload.call;
+    wire.c = {
+      i: id,
+      o: outcome,
+      ...(duration !== undefined ? { d: Math.round(duration) } : {}),
+      ...(video ? { v: true } : {}),
+    };
   }
 
   return MARKER + JSON.stringify(wire);
@@ -195,6 +202,7 @@ function readCall(value: unknown): CallEntry | null {
     id: c.i,
     outcome: c.o,
     ...(typeof c.d === "number" && Number.isFinite(c.d) && c.d >= 0 ? { duration: c.d } : {}),
+    ...(c.v === true ? { video: true } : {}),
   };
 }
 

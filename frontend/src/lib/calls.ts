@@ -1,5 +1,12 @@
 import type { Chat } from "./api";
-import { CallConnection, type Candidate, type IceServer, type LinkState } from "./call-connection";
+import {
+  CallConnection,
+  type Candidate,
+  type Facing,
+  type IceServer,
+  type LinkState,
+  type StreamLike,
+} from "./call-connection";
 import { decryptCallSignal, encryptCallSignal, newMessageId, type CallRef } from "./crypto";
 import {
   commitment,
@@ -11,17 +18,19 @@ import {
 } from "./handshake";
 import type { CallEntry, CallOutcome } from "./payload";
 import type { CallCommand, CallEvent } from "./realtime";
-import { callSounds } from "./webrtc";
+import { callSounds, webrtc } from "./webrtc";
 
-// One-to-one audio calls in direct chats. The backend (calls.ts) passes
+// One-to-one audio and video calls in direct chats. The backend (calls.ts) passes
 // the signals between the two devices; they are encrypted for the other
 // member (crypto.ts):
-//   offer    {k "offer", sdp, commit, t}  in call_start: the caller's
+//   offer    {k "offer", sdp, commit, t, v} in call_start: the caller's
 //            session description, the commitment to its handshake nonce,
-//            when it was made (old offers sent again are ignored)
+//            when it was made (old offers sent again are ignored), v: a
+//            video call
 //   answer   {k "answer", sdp, nonce}     in call_answer
 //   then, in call_signal: {k "reveal", nonce} (the caller's nonce, after
 //   the answer), {k "ice", c: [candidates]}, {k "mute", on},
+//   {k "camera", on} (the video is shown only while it is on),
 //   {k "heard", ok} (the handshake: whether the other's sentence was
 //   right), {k "reoffer"/"reanswer", sdp} (new addresses after a network
 //   change; the caller starts it).
@@ -52,6 +61,17 @@ export type CallView = {
   muted: boolean;
   speaker: boolean;
   peerMuted: boolean;
+  // Started as a video call.
+  video: boolean;
+  // This side's camera (shown while ringing too), and the other's video.
+  camera: boolean;
+  localVideo: StreamLike | null;
+  facing: Facing;
+  canSwitchCamera: boolean;
+  peerCamera: boolean;
+  remoteVideo: StreamLike | null;
+  // A short message, e.g. that the camera can't be used.
+  notice: string | null;
   // The browser did not let the other side's audio play: a tap starts it
   // (playAudio).
   audioBlocked: boolean;
@@ -61,11 +81,12 @@ export type CallView = {
 };
 
 type Signal =
-  | { k: "offer"; sdp: string; commit: string; t: number }
+  | { k: "offer"; sdp: string; commit: string; t: number; v?: boolean }
   | { k: "answer"; sdp: string; nonce: string }
   | { k: "reveal"; nonce: string }
   | { k: "ice"; c: Candidate[] }
   | { k: "mute"; on: boolean }
+  | { k: "camera"; on: boolean }
   | { k: "heard"; ok: boolean }
   | { k: "reoffer"; sdp: string }
   | { k: "reanswer"; sdp: string };
@@ -109,7 +130,7 @@ function readSignal(value: unknown): Signal | null {
   switch (s.k) {
     case "offer":
       return sdp && typeof s.commit === "string" && /^[0-9a-f]{64}$/.test(s.commit) && typeof s.t === "number"
-        ? { k: "offer", sdp, commit: s.commit, t: s.t }
+        ? { k: "offer", sdp, commit: s.commit, t: s.t, v: s.v === true }
         : null;
     case "answer":
       return sdp && typeof s.nonce === "string" && NONCE_RE.test(s.nonce) ? { k: "answer", sdp, nonce: s.nonce } : null;
@@ -130,7 +151,8 @@ function readSignal(value: unknown): Signal | null {
           }
         : null;
     case "mute":
-      return typeof s.on === "boolean" ? { k: "mute", on: s.on } : null;
+    case "camera":
+      return typeof s.on === "boolean" ? { k: s.k, on: s.on } : null;
     case "heard":
       return typeof s.ok === "boolean" ? { k: "heard", ok: s.ok } : null;
     case "reoffer":
@@ -157,13 +179,19 @@ export class CallSession {
   private keepAlive: ReturnType<typeof setInterval> | null = null;
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
   private lostTimer: ReturnType<typeof setTimeout> | null = null;
+  private noticeTimer: ReturnType<typeof setTimeout> | null = null;
   private ended = false;
+  private cameraBusy = false;
+  // Video was on screen (the screen kept on, the speaker turned on once).
+  private videoShown = false;
+  private speakerTouched = false;
 
   private constructor(
     private deps: CallDeps,
     id: string,
     chat: Chat,
     direction: "outgoing" | "incoming",
+    video: boolean,
   ) {
     seen.add(id);
     this.view = {
@@ -175,6 +203,14 @@ export class CallSession {
       muted: false,
       speaker: false,
       peerMuted: false,
+      video,
+      camera: false,
+      localVideo: null,
+      facing: "user",
+      canSwitchCamera: false,
+      peerCamera: video && direction === "incoming",
+      remoteVideo: null,
+      notice: null,
       audioBlocked: false,
       handshake: null,
     };
@@ -188,9 +224,9 @@ export class CallSession {
     return this.ended;
   }
 
-  // Calls the chat's other member.
-  static outgoing(chat: Chat, deps: CallDeps) {
-    const session = new CallSession(deps, newMessageId(), chat, "outgoing");
+  // Calls the chat's other member; video: with the camera on.
+  static outgoing(chat: Chat, deps: CallDeps, video = false) {
+    const session = new CallSession(deps, newMessageId(), chat, "outgoing", video);
     session.call();
     return session;
   }
@@ -211,16 +247,53 @@ export class CallSession {
       return null;
     }
 
-    const session = new CallSession(deps, id, chat, "incoming");
+    const session = new CallSession(deps, id, chat, "incoming", signal.v === true);
     session.offer = { sdp: signal.sdp, commit: signal.commit };
     callSounds.ringing();
+
+    // A video call: this side's camera, to see before answering with it.
+    if (session.view.video) {
+      session.startCamera();
+    }
 
     return session;
   }
 
   private update(change: Partial<CallView>) {
     this.view = { ...this.view, ...change };
+    this.videoChanged();
     this.deps.onChange(this.view);
+  }
+
+  // Video on screen: the screen stays on, and the phone's speaker is
+  // turned on (once: the user may turn it off).
+  private videoChanged() {
+    const { camera, peerCamera, remoteVideo, phase } = this.view;
+    const shown = camera || (peerCamera && Boolean(remoteVideo));
+
+    // Ended: callSounds.stop() has put everything back.
+    if (phase === "ended") {
+      this.videoShown = false;
+      return;
+    }
+
+    if (shown === this.videoShown) {
+      return;
+    }
+
+    this.videoShown = shown;
+    callSounds.video(shown);
+
+    if (shown && !this.speakerTouched && !this.view.speaker && callSounds.canUseSpeaker) {
+      callSounds.speaker(true);
+      this.view = { ...this.view, speaker: true };
+    }
+  }
+
+  private notify(notice: string) {
+    clearTimeout(this.noticeTimer ?? undefined);
+    this.update({ notice });
+    this.noticeTimer = setTimeout(() => this.update({ notice: null }), 4000);
   }
 
   private ref(senderId: string): CallRef {
@@ -252,6 +325,11 @@ export class CallSession {
     }
 
     const connection = await CallConnection.open(servers, {
+      onRemoteVideo: (remoteVideo) => {
+        if (!this.ended) {
+          this.update({ remoteVideo });
+        }
+      },
       onCandidate: (candidate) => this.queueCandidate(candidate),
       onState: (state) => this.linkChanged(state),
       onPlayback: (playing) => {
@@ -267,11 +345,66 @@ export class CallSession {
     }
 
     this.connection = connection;
+    await connection.setCamera(this.cameraTrack());
     return connection;
+  }
+
+  private cameraTrack() {
+    return this.view.localVideo?.getTracks()[0] ?? null;
+  }
+
+  // Turns this side's camera on (false if it can't be used).
+  private async startCamera() {
+    if (this.cameraBusy || this.view.camera) {
+      return this.view.camera;
+    }
+
+    this.cameraBusy = true;
+
+    try {
+      const stream = await webrtc.getCamera(this.view.facing);
+
+      if (this.ended) {
+        stopStream(stream);
+        return false;
+      }
+
+      await this.connection?.setCamera(stream.getTracks()[0] ?? null);
+      this.update({ camera: true, localVideo: stream });
+      this.signal({ k: "camera", on: true });
+
+      webrtc.cameraCount().then((count) => {
+        if (!this.ended && count > 1 !== this.view.canSwitchCamera) {
+          this.update({ canSwitchCamera: count > 1 });
+        }
+      });
+
+      return true;
+    } catch (e) {
+      this.notify(cameraError(e));
+      return false;
+    } finally {
+      this.cameraBusy = false;
+    }
+  }
+
+  private stopCamera() {
+    if (!this.view.localVideo) {
+      return;
+    }
+
+    stopStream(this.view.localVideo);
+    this.connection?.setCamera(null).catch(() => {});
+    this.update({ camera: false, localVideo: null });
+    this.signal({ k: "camera", on: false });
   }
 
   private async call() {
     callSounds.calling();
+
+    if (this.view.video) {
+      await this.startCamera();
+    }
 
     let sdp: string;
 
@@ -292,7 +425,7 @@ export class CallSession {
       return;
     }
 
-    const data = this.seal({ k: "offer", sdp, commit: commitment(this.nonce), t: Date.now() });
+    const data = this.seal({ k: "offer", sdp, commit: commitment(this.nonce), t: Date.now(), v: this.view.video });
 
     if (!this.deps.send({ type: "call_start", chatId: this.view.chat.id, callId: this.id, data })) {
       this.finish("You're offline");
@@ -302,13 +435,21 @@ export class CallSession {
     this.ringTimer = setTimeout(() => this.hangUp(), RING_MS);
   }
 
-  async accept() {
+  // video: with this side's camera on.
+  async accept(video = false) {
     if (this.view.direction !== "incoming" || this.view.phase !== "incoming" || !this.offer) {
       return;
     }
 
     callSounds.connected();
     this.update({ phase: "connecting" });
+
+    if (!video) {
+      this.stopCamera();
+    } else if (!this.view.camera) {
+      // The preview did not start (e.g. the camera was not allowed yet).
+      this.startCamera();
+    }
 
     let sdp: string;
 
@@ -336,6 +477,7 @@ export class CallSession {
     }
 
     this.becameAnswered();
+    this.signal({ k: "camera", on: this.view.camera });
   }
 
   decline() {
@@ -366,7 +508,33 @@ export class CallSession {
     this.signal({ k: "mute", on: muted });
   }
 
+  async toggleCamera() {
+    if (this.view.camera) {
+      this.stopCamera();
+    } else {
+      await this.startCamera();
+    }
+  }
+
+  // Front ↔ back (phones).
+  async switchCamera() {
+    if (!this.view.camera || this.cameraBusy) {
+      return;
+    }
+
+    const facing: Facing = this.view.facing === "user" ? "environment" : "user";
+
+    // Phones open one camera at a time: the old one goes first.
+    if (this.view.localVideo) {
+      stopStream(this.view.localVideo);
+    }
+
+    this.update({ camera: false, localVideo: null, facing });
+    await this.startCamera();
+  }
+
   toggleSpeaker() {
+    this.speakerTouched = true;
     const speaker = !this.view.speaker;
     callSounds.speaker(speaker);
     this.update({ speaker });
@@ -435,6 +603,7 @@ export class CallSession {
         }
 
         this.signal({ k: "reveal", nonce: this.nonce });
+        this.signal({ k: "camera", on: this.view.camera });
         this.tryHandshake();
         return;
       }
@@ -487,6 +656,10 @@ export class CallSession {
 
       case "mute":
         this.update({ peerMuted: signal.on });
+        return;
+
+      case "camera":
+        this.update({ peerCamera: signal.on });
         return;
 
       case "heard": {
@@ -686,12 +859,17 @@ export class CallSession {
 
     this.ended = true;
 
-    for (const timer of [this.ringTimer, this.candidatesTimer, this.restartTimer, this.lostTimer]) {
+    for (const timer of [this.ringTimer, this.candidatesTimer, this.restartTimer, this.lostTimer, this.noticeTimer]) {
       clearTimeout(timer ?? undefined);
     }
 
     clearInterval(this.keepAlive ?? undefined);
     this.connection?.close();
+
+    if (this.view.localVideo) {
+      stopStream(this.view.localVideo);
+    }
+
     callSounds.stop();
 
     if (this.view.direction === "outgoing" && outcome) {
@@ -700,11 +878,12 @@ export class CallSession {
       this.deps.postEntry(this.view.chat, {
         id: this.id,
         outcome,
+        ...(this.view.video ? { video: true } : {}),
         ...(outcome === "answered" ? { duration: connectedAt ? Date.now() - connectedAt : 0 } : {}),
       });
     }
 
-    this.update({ phase: "ended", endText });
+    this.update({ phase: "ended", endText, camera: false, localVideo: null, remoteVideo: null, notice: null });
   }
 }
 
@@ -718,14 +897,32 @@ function microphoneError(e: unknown) {
       : "Couldn't start the call";
 }
 
+function cameraError(e: unknown) {
+  const name = (e as { name?: string } | null)?.name;
+
+  return name === "NotAllowedError" || name === "SecurityError"
+    ? "Ostrich can't use the camera: allow it in the settings"
+    : name === "NotFoundError"
+      ? "No camera found"
+      : "The camera is busy or not available";
+}
+
+function stopStream(stream: StreamLike) {
+  for (const track of stream.getTracks()) {
+    track.stop();
+  }
+}
+
 // What the chat shows for a call entry, from this user's side.
 export function callEntryText(entry: CallEntry, own: boolean) {
+  const kind = entry.video ? "video call" : "call";
+
   switch (entry.outcome) {
     case "answered":
-      return own ? "Outgoing call" : "Incoming call";
+      return own ? `Outgoing ${kind}` : `Incoming ${kind}`;
     case "declined":
-      return own ? "Declined" : "Declined call";
+      return own ? "Declined" : `Declined ${kind}`;
     default:
-      return own ? "No answer" : "Missed call";
+      return own ? "No answer" : `Missed ${kind}`;
   }
 }

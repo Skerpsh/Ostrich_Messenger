@@ -1,6 +1,6 @@
 import InCallManager from "react-native-incall-manager";
-import { mediaDevices, RTCPeerConnection } from "react-native-webrtc";
-import type { PeerLike, StreamLike } from "./call-connection";
+import { MediaStream, mediaDevices, RTCPeerConnection } from "react-native-webrtc";
+import type { Facing, PeerLike, StreamLike, TrackLike } from "./call-connection";
 
 // The apps' WebRTC (react-native-webrtc, in development and store builds,
 // not in Expo Go) and call sounds (react-native-incall-manager: the system
@@ -11,6 +11,24 @@ export const webrtc = {
   createPeer: (config: object) => new RTCPeerConnection(config) as unknown as PeerLike,
 
   getMicrophone: () => mediaDevices.getUserMedia({ audio: true, video: false }) as unknown as Promise<StreamLike>,
+
+  getCamera: (facing: Facing) =>
+    mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: facing, width: 1280, height: 720, frameRate: 30 },
+    }) as unknown as Promise<StreamLike>,
+
+  cameraCount: async () => {
+    try {
+      const devices = (await mediaDevices.enumerateDevices()) as { kind: string }[];
+      return devices.filter((device) => device.kind === "videoinput").length;
+    } catch {
+      return 1;
+    }
+  },
+
+  // A track that came without a stream, for showing it.
+  streamOf: (track: TrackLike) => new MediaStream([track as never]) as unknown as StreamLike,
 
   // The apps play the other side's audio on their own.
   unlockAudio: () => {},
@@ -52,7 +70,20 @@ export const callSounds = {
     InCallManager.setForceSpeakerphoneOn(on);
   },
 
+  // Video on screen: the screen stays on, and the proximity sensor (which
+  // turns it off at the ear) is off.
+  video(on: boolean) {
+    InCallManager.setKeepScreenOn(on);
+
+    if (on) {
+      InCallManager.stopProximitySensor();
+    } else {
+      InCallManager.startProximitySensor();
+    }
+  },
+
   stop() {
+    InCallManager.setKeepScreenOn(false);
     InCallManager.stopRingtone();
     InCallManager.stopRingback();
 

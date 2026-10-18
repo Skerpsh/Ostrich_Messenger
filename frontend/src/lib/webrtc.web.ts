@@ -1,4 +1,4 @@
-import type { PeerLike, StreamLike } from "./call-connection";
+import type { Facing, PeerLike, StreamLike, TrackLike } from "./call-connection";
 
 // The browser's WebRTC, and call sounds made with Web Audio (no files to
 // load). The apps' is lib/webrtc.ts.
@@ -58,6 +58,23 @@ export const webrtc = {
 
     return stream as unknown as StreamLike;
   },
+
+  getCamera: (facing: Facing) =>
+    navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+    }) as unknown as Promise<StreamLike>,
+
+  cameraCount: async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter((device) => device.kind === "videoinput").length;
+    } catch {
+      return 1;
+    }
+  },
+
+  streamOf: (track: TrackLike) => new MediaStream([track as unknown as MediaStreamTrack]) as unknown as StreamLike,
 
   // In the click that calls or answers: lets the page play the call later.
   unlockAudio: () => {
@@ -181,6 +198,13 @@ function repeatTone(frequencies: number[], on: number[], every: number, volume: 
   };
 }
 
+let wakeLock: Promise<WakeLockSentinel | null> | null = null;
+
+function releaseWakeLock() {
+  wakeLock?.then((lock) => lock?.release()).catch(() => {});
+  wakeLock = null;
+}
+
 function stopTone() {
   tone?.stop();
   tone = null;
@@ -205,7 +229,20 @@ export const callSounds = {
 
   speaker(_on: boolean) {},
 
+  // Video on screen: the screen stays on.
+  video(on: boolean) {
+    if (!on) {
+      releaseWakeLock();
+      return;
+    }
+
+    if (!wakeLock && "wakeLock" in navigator) {
+      wakeLock = navigator.wakeLock.request("screen").catch(() => null);
+    }
+  },
+
   stop() {
     stopTone();
+    releaseWakeLock();
   },
 };

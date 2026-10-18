@@ -493,7 +493,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
   const showError = (e: unknown, fallback: string) =>
     setError(e instanceof Error ? e.message : fallback);
 
-  const startCall = async () => {
+  const startCall = async (video = false) => {
     if (!chat) {
       return;
     }
@@ -504,7 +504,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
       return;
     }
 
-    const problem = await calls.startCall(chat);
+    const problem = await calls.startCall(chat, video);
 
     if (problem) {
       setError(problem);
@@ -1450,7 +1450,15 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
           chat ? (
             <>
               {chat.type === "direct" ? (
-                <IconButton icon="call-outline" label={`Call @${chat.username}`} size={20} onPress={startCall} />
+                <>
+                  <IconButton
+                    icon="videocam-outline"
+                    label={`Video call @${chat.username}`}
+                    size={20}
+                    onPress={() => startCall(true)}
+                  />
+                  <IconButton icon="call-outline" label={`Call @${chat.username}`} size={20} onPress={() => startCall()} />
+                </>
               ) : null}
               <IconButton icon="search" label="Search in chat" size={20} onPress={openSearch} />
               <IconButton

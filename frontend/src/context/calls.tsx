@@ -35,13 +35,17 @@ type CallsValue = {
   setMinimized: (minimized: boolean) => void;
   // Why a call cannot start in this chat, or null.
   callBlocker: (chat: Chat) => string | null;
-  // Returns an error to show, or null when the call has started.
-  startCall: (chat: Chat) => Promise<string | null>;
-  accept: () => void;
+  // Returns an error to show, or null when the call has started; video:
+  // with the camera on.
+  startCall: (chat: Chat, video?: boolean) => Promise<string | null>;
+  // video: with the camera on.
+  accept: (video: boolean) => void;
   decline: () => void;
   hangUp: () => void;
   toggleMute: () => void;
   toggleSpeaker: () => void;
+  toggleCamera: () => void;
+  switchCamera: () => void;
   pickPhrase: (phrase: Phrase | null) => void;
   // In a tap: plays the other side's audio the browser held back.
   playAudio: () => void;
@@ -57,13 +61,15 @@ const ENDED_SHOWN_MS = 1800;
 
 // The entry's text for clients that do not know call entries.
 function entryFallback(entry: CallEntry) {
+  const [icon, kind] = entry.video ? ["🎥", "video call"] : ["📞", "call"];
+
   switch (entry.outcome) {
     case "answered":
-      return `📞 Call, ${formatDuration(entry.duration ?? 0)}`;
+      return `${icon} ${entry.video ? "Video call" : "Call"}, ${formatDuration(entry.duration ?? 0)}`;
     case "declined":
-      return "📞 Declined call";
+      return `${icon} Declined ${kind}`;
     default:
-      return "📞 Missed call";
+      return `${icon} Missed ${kind}`;
   }
 }
 
@@ -181,7 +187,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
 
           onChange = track(session);
           setCall(session.view);
-          notifyIncoming(chat);
+          notifyIncoming(chat, session.view.video);
         })();
       }),
     [subscribeCalls, depsRef, chatsRef, reload, track],
@@ -235,7 +241,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startCall = useCallback(
-    async (chat: Chat) => {
+    async (chat: Chat, video = false) => {
       // Still in the click (Safari plays the call's audio only then).
       webrtc.unlockAudio();
 
@@ -263,7 +269,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
       }
 
       let onChange: (view: CallView) => void = () => {};
-      const session = CallSession.outgoing(chat, { ...deps, onChange: (view) => onChange(view) });
+      const session = CallSession.outgoing(chat, { ...deps, onChange: (view) => onChange(view) }, video);
       onChange = track(session);
       setCall(session.view);
 
@@ -278,14 +284,16 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     setMinimized,
     callBlocker,
     startCall,
-    accept: () => {
+    accept: (video) => {
       webrtc.unlockAudio();
-      active()?.accept();
+      active()?.accept(video);
     },
     decline: () => active()?.decline(),
     hangUp: () => active()?.hangUp(),
     toggleMute: () => active()?.toggleMute(),
     toggleSpeaker: () => active()?.toggleSpeaker(),
+    toggleCamera: () => active()?.toggleCamera(),
+    switchCamera: () => active()?.switchCamera(),
     pickPhrase: (phrase) => active()?.pick(phrase),
     playAudio: () => {
       webrtc.unlockAudio();
@@ -316,7 +324,7 @@ export function useCalls() {
 
 // Web: a notification when the tab is in the background (the apps ring
 // only while open in this version).
-function notifyIncoming(chat: Chat) {
+function notifyIncoming(chat: Chat, video: boolean) {
   if (
     Platform.OS !== "web" ||
     typeof document === "undefined" ||
@@ -327,7 +335,7 @@ function notifyIncoming(chat: Chat) {
     return;
   }
 
-  const notification = new Notification(`@${chat.username} is calling`, {
+  const notification = new Notification(`@${chat.username} is ${video ? "video " : ""}calling`, {
     body: "Open Ostrich to answer",
     tag: `call-${chat.id}`,
     icon: "/favicon.ico",

@@ -52,7 +52,7 @@
 - 💬 Direct chats, **groups** of up to 50 members with roles, **invite links** and join requests
 - 📎 Encrypted **files and photos** (up to 10 per message, 25 MB each) with upload progress and a photo viewer
 - 🎤 Encrypted **voice messages** with a waveform, seeking and playback speed
-- 📞 **Audio calls**, peer to peer and end-to-end encrypted, with the **Ostrich handshake** to make sure nobody is listening in
+- 📞 **Audio and video calls**, peer to peer and end-to-end encrypted, with the **Ostrich handshake** to make sure nobody is listening in
 - 🔗 **Link previews** made by the sender's phone and sent inside the encrypted message, so the server never sees the link
 - ↩️ Replies, forwarding, editing, deleting, **reactions with any emoji**, pinned messages
 - 🔖 **Saved messages**, @mentions, formatting, search in a chat or across all chats
@@ -98,11 +98,13 @@ devices.
 To install the web app, use the browser's **Install app** / **Add to Home Screen** option.
 It keeps working offline and sends messages when it is back online.
 
-**Calls.** Press the 📞 button at the top of a direct chat. Calls ring while Ostrich is open (a
+**Calls.** Press 📞 or 🎥 at the top of a direct chat. Calls ring while Ostrich is open (a
 browser tab, or the app in the foreground); the chat gets an entry for every call, missed ones
-too. During a call, open the **Ostrich handshake**: each of you reads a silly sentence aloud
-("Sleepy flamingo juggles cacti") and picks the other's among four. If both find it, nobody is in
-the middle of the call.
+too. A video call shows your camera before you answer, with or without it; the camera can be
+turned on and off in any call, and the videos shown one in a corner or side by side. During a
+call, open the **Ostrich handshake**: each of you reads a silly sentence aloud ("Sleepy flamingo
+juggles cacti") and picks the other's among four. If both find it, nobody is in the middle of the
+call.
 
 In the web app, **Settings → Keyboard shortcuts** lists the keys: `Ctrl/⌘ K` search chats,
 `Alt ↑/↓` previous / next chat, `↑` edit your last message, `Esc` cancel or close the chat.
@@ -190,14 +192,14 @@ flowchart LR
   A preview is shown only for a link that is in the message's text.
 - **Groups.** A random group key is wrapped separately for every member. A new key epoch starts
   whenever someone leaves or is removed. The group name and photo are encrypted too.
-- **Calls.** The audio goes straight between the two devices (WebRTC), or through the TURN server
-  when they cannot reach each other, encrypted with DTLS-SRTP either way. The offer and answer
-  that set the call up carry the fingerprints of the call's certificates, and they are themselves
-  encrypted for the other member, so the server cannot swap them to listen in. The **Ostrich
-  handshake** checks even that: both devices turn the two fingerprints into two sentences, each
-  person reads theirs aloud and picks the other's among four. The caller commits to its part of
-  the input before seeing the callee's, so someone in the middle gets a single 1-in-a-million
-  try. Details in [`frontend/src/lib/handshake.ts`](frontend/src/lib/handshake.ts).
+- **Calls.** The audio and video go straight between the two devices (WebRTC), or through the TURN
+  server when they cannot reach each other, encrypted with DTLS-SRTP either way. The offer and
+  answer that set the call up carry the fingerprints of the call's certificates, and they are
+  themselves encrypted for the other member, so the server cannot swap them to listen in. The
+  **Ostrich handshake** checks even that: both devices turn the two fingerprints into two sentences,
+  each person reads theirs aloud and picks the other's among four. The caller commits to its part of
+  the input before seeing the callee's, so someone in the middle gets a single 1-in-a-million try.
+  Details in [`frontend/src/lib/handshake.ts`](frontend/src/lib/handshake.ts).
 - **Safety codes.** 40 digits computed from both public keys. If the codes match on both devices,
   the server has not substituted a key.
 - **Logging in with a QR code.** The new device shows a one-time X25519 public key in its QR
