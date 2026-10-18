@@ -36,6 +36,22 @@ export type ChatEvent =
   | { type: "pinned_message"; chatId: string; message: LastMessage | null }
   | { type: "chats_changed" };
 
+// Calls (context/calls.tsx); `data` is an encrypted signal (crypto.ts).
+export type CallEvent =
+  | { type: "call_incoming"; call: { id: string; chatId: string; callerId: string }; data: string }
+  | { type: "call_answered"; callId: string; data: string }
+  | { type: "call_signal"; callId: string; data: string }
+  | { type: "call_ended"; callId: string; reason: string }
+  | { type: "call_error"; callId: string; error: string; code: string };
+
+// What the app sends about calls (backend calls.ts).
+export type CallCommand =
+  | { type: "call_start"; chatId: string; callId: string; data: string }
+  | { type: "call_answer" | "call_signal"; callId: string; data: string }
+  | { type: "call_decline" | "call_hangup" | "call_keepalive" | "call_resume"; callId: string };
+
+const CALL_EVENTS = new Set(["call_incoming", "call_answered", "call_signal", "call_ended", "call_error"]);
+
 const CHAT_EVENTS = new Set([
   "typing",
   "message_updated",
@@ -56,6 +72,7 @@ type Handlers = {
   onProfile: (event: ProfileEvent) => void;
   onEvent: (event: ChatEvent) => void;
   onPresence: (event: PresenceEvent) => void;
+  onCall: (event: CallEvent) => void;
   onError: (error: string) => void;
   // Web only: a single-use ticket for the websocket URL, so the session
   // token never appears in URLs.
@@ -123,10 +140,18 @@ export class RealtimeConnection {
     this.send({ type: "typing", chatId });
   }
 
+  // False if it could not be sent (not connected).
+  call(command: CallCommand) {
+    return this.send(command);
+  }
+
   private send(payload: unknown) {
     if (this.ready && this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(payload));
+      return true;
     }
+
+    return false;
   }
 
   private async open() {
@@ -261,6 +286,8 @@ export class RealtimeConnection {
         default:
           if (data.type && CHAT_EVENTS.has(data.type)) {
             this.handlers.onEvent(data as ChatEvent);
+          } else if (data.type && CALL_EVENTS.has(data.type)) {
+            this.handlers.onCall(data as CallEvent);
           }
       }
     };

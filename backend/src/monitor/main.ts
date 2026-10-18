@@ -64,7 +64,7 @@ const collectOptions: Omit<CollectOptions, "counts" | "logMinutes"> = {
   // Several processes (ostrich@3001 ...): all their addresses.
   backendUrls: list(process.env.MONITOR_BACKEND_URLS, ["http://127.0.0.1:3000"]).map((url) => url.replace(/\/+$/, "")),
   monitorSecret: process.env.MONITOR_SECRET || undefined,
-  services: list(process.env.MONITOR_SERVICES, ["ostrich*", "postgresql*", "redis*", "caddy*"]),
+  services: list(process.env.MONITOR_SERVICES, ["ostrich*", "postgresql*", "redis*", "caddy*", "coturn*"]),
   backupDir: process.env.BACKUP_DIR || "/var/backups/ostrich",
   recentMinutes: REPORT_MINUTES,
 };
@@ -124,6 +124,8 @@ function addCounters(to: BackendCounters, add: BackendCounters) {
   to.serverErrors += add.serverErrors;
   to.rateLimited += add.rateLimited;
   to.failedLogins += add.failedLogins;
+  to.callsStarted = (to.callsStarted ?? 0) + (add.callsStarted ?? 0);
+  to.callsAnswered = (to.callsAnswered ?? 0) + (add.callsAnswered ?? 0);
 }
 
 // What each process counted since the last check (all of it after a
@@ -147,6 +149,8 @@ function takeCounters(snapshot: Snapshot) {
       serverErrors: now.serverErrors - from.serverErrors,
       rateLimited: now.rateLimited - from.rateLimited,
       failedLogins: now.failedLogins - from.failedLogins,
+      callsStarted: (now.callsStarted ?? 0) - (from.callsStarted ?? 0),
+      callsAnswered: (now.callsAnswered ?? 0) - (from.callsAnswered ?? 0),
     });
 
     lastCounters.set(instanceId, { ...now });

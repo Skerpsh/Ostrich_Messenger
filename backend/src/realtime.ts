@@ -43,13 +43,16 @@ function send(socket: WebSocket, data: string) {
 // --- sessions ---
 
 // The session each socket was opened with, so sockets can be closed when
-// their session ends (logout, password change, expiry).
+// their session ends (logout, password change, expiry), and the socket's
+// id, to send to that one socket (calls go to the device that answered).
 type SocketSession = {
   userId: string;
   tokenHash: string;
+  socketId: string;
 };
 
 const socketSessions = new Map<WebSocket, SocketSession>();
+const socketsById = new Map<string, WebSocket>();
 
 // Close code for "session ended": clients must not reconnect with the
 // same token.
@@ -57,9 +60,16 @@ export const WS_CLOSE_SESSION_ENDED = 4001;
 
 export function trackSession(socket: WebSocket, session: SocketSession) {
   socketSessions.set(socket, session);
+  socketsById.set(session.socketId, socket);
 }
 
 export function untrackSession(socket: WebSocket) {
+  const session = socketSessions.get(socket);
+
+  if (session) {
+    socketsById.delete(session.socketId);
+  }
+
   socketSessions.delete(socket);
 }
 
@@ -112,6 +122,15 @@ export function listenForEvents() {
           sendToUser(userId, event.data);
         }
         break;
+
+      case "deliver_socket": {
+        const socket = socketsById.get(event.socketId);
+
+        if (socket) {
+          send(socket, event.data);
+        }
+        break;
+      }
 
       case "close":
         closeSessions((session) =>
@@ -211,6 +230,16 @@ async function deliver(userIds: string[], payload: unknown) {
 // Sends to all sockets of one user (their devices).
 export function sendToUserSockets(userId: string, payload: unknown) {
   deliver([userId], payload).catch((error) => log.error(error, "failed to send an event"));
+}
+
+// Sends to one socket, on whichever process has it.
+export async function sendToSocket(socketId: string, payload: unknown) {
+  await sharedState().publish({ type: "deliver_socket", socketId, data: JSON.stringify(payload) });
+}
+
+// Sends to all sockets of these users (their devices).
+export function sendToUsers(userIds: string[], payload: unknown) {
+  return deliver(userIds, payload);
 }
 
 // Sends to everyone who shares a chat with the user and to the user's own

@@ -32,6 +32,18 @@ export type Payload = {
   // A preview of the first link of the text, made by the sender's app
   // (lib/link-preview.ts).
   link?: LinkPreview;
+  // The chat's entry for a call, sent by the caller's app when it ends
+  // (lib/calls.ts); `text` says the same for clients that do not know it.
+  call?: CallEntry;
+};
+
+export type CallOutcome = "answered" | "missed" | "declined";
+
+export type CallEntry = {
+  id: string;
+  outcome: CallOutcome;
+  // Answered calls: how long they lasted, in milliseconds.
+  duration?: number;
 };
 
 export type LinkPreview = {
@@ -58,7 +70,8 @@ type WireAttachment = {
   v?: string;
 };
 type WireLink = { u: string; t: string; d?: string; s?: string; i?: WireAttachment };
-type Wire = { t: string; f?: string; a?: WireAttachment[]; l?: WireLink };
+type WireCall = { i: string; o: CallOutcome; d?: number };
+type Wire = { t: string; f?: string; a?: WireAttachment[]; l?: WireLink; c?: WireCall };
 
 const wireAttachment = (a: Attachment): WireAttachment => ({
   i: a.id,
@@ -74,7 +87,7 @@ const wireAttachment = (a: Attachment): WireAttachment => ({
 export function encodePayload(payload: Payload): string {
   const attachments = payload.attachments ?? [];
 
-  if (!payload.forwardedFrom && attachments.length === 0 && !payload.link) {
+  if (!payload.forwardedFrom && attachments.length === 0 && !payload.link && !payload.call) {
     return payload.text;
   }
 
@@ -97,6 +110,11 @@ export function encodePayload(payload: Payload): string {
       ...(site ? { s: site } : {}),
       ...(image ? { i: wireAttachment(image) } : {}),
     };
+  }
+
+  if (payload.call) {
+    const { id, outcome, duration } = payload.call;
+    wire.c = { i: id, o: outcome, ...(duration !== undefined ? { d: Math.round(duration) } : {}) };
   }
 
   return MARKER + JSON.stringify(wire);
@@ -164,6 +182,22 @@ function readLink(value: unknown, messageText: string): LinkPreview | null {
   };
 }
 
+const OUTCOMES = new Set<string>(["answered", "missed", "declined"]);
+
+function readCall(value: unknown): CallEntry | null {
+  const c = value as Partial<WireCall> | null;
+
+  if (!c || typeof c.i !== "string" || !UUID_RE.test(c.i) || typeof c.o !== "string" || !OUTCOMES.has(c.o)) {
+    return null;
+  }
+
+  return {
+    id: c.i,
+    outcome: c.o,
+    ...(typeof c.d === "number" && Number.isFinite(c.d) && c.d >= 0 ? { duration: c.d } : {}),
+  };
+}
+
 // Anything that is not a well-formed payload is shown as text; malformed
 // attachments and link previews are left out.
 export function decodePayload(plain: string): Payload {
@@ -183,12 +217,14 @@ export function decodePayload(plain: string): Payload {
       : [];
 
     const link = wire.l ? readLink(wire.l, wire.t) : null;
+    const call = wire.c ? readCall(wire.c) : null;
 
     return {
       text: wire.t,
       ...(typeof wire.f === "string" && wire.f ? { forwardedFrom: wire.f } : {}),
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(link ? { link } : {}),
+      ...(call ? { call } : {}),
     };
   } catch {
     return { text: plain };

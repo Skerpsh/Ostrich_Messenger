@@ -17,6 +17,8 @@ import {
 } from "@/lib/api";
 import {
   RealtimeConnection,
+  type CallCommand,
+  type CallEvent,
   type ConnectionStatus,
   type ChatEvent,
   type PresenceEvent,
@@ -53,6 +55,12 @@ type RealtimeContextValue = {
   subscribeEvents: (listener: EventListener) => () => void;
   // "typing…" in the chat, for the other member.
   sendTyping: (chatId: string) => void;
+  // Calls (context/calls.tsx): their events, and sending; false if not
+  // connected.
+  subscribeCalls: (listener: (event: CallEvent) => void) => () => void;
+  sendCall: (command: CallCommand) => boolean;
+  // Mobile: keeps the connection open in the background while true.
+  holdConnection: (hold: boolean) => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -69,6 +77,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const connectionRef = useRef<RealtimeConnection | null>(null);
   const listenersRef = useRef(new Map<string, Set<ChatListener>>());
   const eventListenersRef = useRef(new Set<EventListener>());
+  const callListenersRef = useRef(new Set<(event: CallEvent) => void>());
+  // A call keeps the connection in the background; when it ends there,
+  // releaseRef closes it.
+  const heldRef = useRef(false);
+  const releaseRef = useRef(() => {});
 
   useEffect(() => {
     if (!token) {
@@ -77,6 +90,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
     const listeners = listenersRef.current;
     const eventListeners = eventListenersRef.current;
+    const callListeners = callListenersRef.current;
 
     const connection = new RealtimeConnection(token, {
       onStatus: setStatus,
@@ -114,6 +128,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           ...current,
           [userId]: { online, lastSeenAt },
         })),
+      onCall: (event) => {
+        for (const listener of callListeners) {
+          listener(event);
+        }
+      },
       // Errors only concern single requests (e.g. joining a chat that
       // does not exist); screens show their own REST errors.
       onError: () => {},
@@ -136,19 +155,27 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
     connection.start();
 
-    // Mobile: go offline in the background, reconnect when back.
+    // Mobile: go offline in the background, reconnect when back; not
+    // during a call (holdConnection), which still needs its signals.
     const subscription =
       Platform.OS === "web"
         ? null
         : AppState.addEventListener("change", (appState) => {
             if (appState === "active") {
               connection.start();
-            } else if (appState === "background") {
+            } else if (appState === "background" && !heldRef.current) {
               connection.stop();
             }
           });
 
+    releaseRef.current = () => {
+      if (AppState.currentState === "background") {
+        connection.stop();
+      }
+    };
+
     return () => {
+      releaseRef.current = () => {};
       subscription?.remove();
       connection.stop();
       connectionRef.current = null;
@@ -209,6 +236,28 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     connectionRef.current?.typing(chatId);
   }, []);
 
+  const subscribeCalls = useCallback((listener: (event: CallEvent) => void) => {
+    callListenersRef.current.add(listener);
+
+    return () => {
+      callListenersRef.current.delete(listener);
+    };
+  }, []);
+
+  const sendCall = useCallback(
+    (command: CallCommand) => connectionRef.current?.call(command) ?? false,
+    [],
+  );
+
+  const holdConnection = useCallback((hold: boolean) => {
+    const was = heldRef.current;
+    heldRef.current = hold;
+
+    if (was && !hold) {
+      releaseRef.current();
+    }
+  }, []);
+
   return (
     <RealtimeContext
       value={{
@@ -218,6 +267,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         subscribeChat,
         subscribeEvents,
         sendTyping,
+        subscribeCalls,
+        sendCall,
+        holdConnection,
       }}
     >
       {children}

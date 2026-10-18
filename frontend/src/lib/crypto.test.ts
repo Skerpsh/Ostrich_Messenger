@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
+  decryptCallSignal,
+  encryptCallSignal,
   decryptAttachment,
   newLinkKeys,
   openLinkSeal,
@@ -188,4 +190,18 @@ test("linking a device: the CLI's vector", () => {
   const key = openLinkSeal(fromBase64(l.device_private_key), l.sealer_public_key, l.sealed_key, l.link_id);
 
   assert.equal(toBase64(key), l.account_private_key);
+});
+
+test("call signals: read by the other member, bound to the call and sender", () => {
+  const ref = { chatId: "chat-1", callId: "call-1", senderId: "ann" };
+  const sealed = encryptCallSignal({ k: "offer", sdp: "v=0" }, ref, privateA, publicKeyOf(privateB));
+
+  assert.match(sealed, /^c1:[A-Za-z0-9+/]+={0,2}$/);
+  assert.deepEqual(decryptCallSignal(sealed, ref, privateB, publicKeyOf(privateA)), { k: "offer", sdp: "v=0" });
+
+  for (const other of [{ callId: "call-2" }, { senderId: "bob" }, { chatId: "chat-2" }]) {
+    assert.equal(decryptCallSignal(sealed, { ...ref, ...other }, privateB, publicKeyOf(privateA)), null);
+  }
+
+  assert.equal(decryptCallSignal("e2:" + sealed.slice(3), ref, privateB, publicKeyOf(privateA)), null);
 });

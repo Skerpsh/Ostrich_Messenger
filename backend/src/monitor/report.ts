@@ -296,6 +296,9 @@ export function report(snapshot: Snapshot, limits: Thresholds, recentMinutes: nu
     const { requests, serverErrors, rateLimited, failedLogins } = extras.traffic;
     details.push(`Requests: ${number(requests)} / ${recentMinutes} min · 5xx: ${number(serverErrors)} · 429: ${number(rateLimited)}`);
     details.push(`Failed logins: ${number(failedLogins)} / ${recentMinutes} min`);
+    details.push(
+      `Calls: ${number(extras.traffic.callsStarted ?? 0)} / ${recentMinutes} min · answered: ${number(extras.traffic.callsAnswered ?? 0)}`,
+    );
   }
 
   const logs = snapshot.logErrors;
@@ -462,6 +465,9 @@ export function dailySummary(day: DaySummary) {
       `🌐 Requests: ${short(day.traffic.requests)} · 5xx: ${number(day.traffic.serverErrors)} · 429: ${number(day.traffic.rateLimited)}`,
     );
     lines.push(`🔑 Failed logins: ${number(day.traffic.failedLogins)}`);
+    lines.push(
+      `📞 Calls: ${number(day.traffic.callsStarted ?? 0)} · answered: ${number(day.traffic.callsAnswered ?? 0)}`,
+    );
   }
 
   const trouble = [`⚠️ Log errors: ${day.logErrors ? number(day.logErrors.count) : "—"}`, `crashes: ${day.crashes}`];

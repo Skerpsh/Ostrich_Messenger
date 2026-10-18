@@ -33,6 +33,7 @@ import SafetyCode from "@/components/safety-code";
 import { RecordButton, RecordingBar, useVoiceRecorder } from "@/components/voice-recorder";
 import { noWebOutline } from "@/components/text-field";
 import { useAuth, useCurrentUser, usePrivateKey } from "@/context/auth";
+import { useCalls } from "@/context/calls";
 import { useChats } from "@/context/chats";
 import { outgoingAsMessage, useOutbox, type Outgoing } from "@/context/outbox";
 import { usePresence, useRealtime } from "@/context/realtime";
@@ -144,6 +145,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
   } = useChats();
   const outbox = useOutbox();
   const privateKey = usePrivateKey();
+  const calls = useCalls();
   useMinuteTick();
 
   // Who the chat is with comes from the server's chats list, never from the
@@ -490,6 +492,24 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
 
   const showError = (e: unknown, fallback: string) =>
     setError(e instanceof Error ? e.message : fallback);
+
+  const startCall = async () => {
+    if (!chat) {
+      return;
+    }
+
+    if (keyChanged) {
+      setError(`@${chat.username}'s security key has changed: compare the safety code first`);
+      setShowSafetyCode(true);
+      return;
+    }
+
+    const problem = await calls.startCall(chat);
+
+    if (problem) {
+      setError(problem);
+    }
+  };
 
   // The preview of the link being written about (phones).
   const linkPreview = useLinkPreview(draft, picked.length === 0 && !editing);
@@ -1429,6 +1449,9 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
         right={
           chat ? (
             <>
+              {chat.type === "direct" ? (
+                <IconButton icon="call-outline" label={`Call @${chat.username}`} size={20} onPress={startCall} />
+              ) : null}
               <IconButton icon="search" label="Search in chat" size={20} onPress={openSearch} />
               <IconButton
                 icon="ellipsis-vertical"
@@ -1667,6 +1690,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
                     onReact={(emoji) => react(item.message, emoji)}
                     onError={setError}
                     onOpenPhoto={(attachment) => setViewing(attachment.id)}
+                    onCall={chat?.type === "direct" ? startCall : undefined}
                     selected={selected && !outgoingOf(item.message) ? selected.has(item.message.id) : undefined}
                     onToggle={() => toggleChosen(item.message)}
                   />

@@ -12,6 +12,7 @@ import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { Platform } from "react-native";
 import { AuthProvider, useAuth } from "@/context/auth";
+import { CallsProvider } from "@/context/calls";
 import { ChatsProvider } from "@/context/chats";
 import { OutboxProvider } from "@/context/outbox";
 import { RealtimeProvider } from "@/context/realtime";
@@ -30,7 +31,9 @@ export default function RootLayout() {
         <RealtimeProvider>
           <ChatsProvider>
             <OutboxProvider>
-              <RootNavigator />
+              <CallsProvider>
+                <RootNavigator />
+              </CallsProvider>
             </OutboxProvider>
           </ChatsProvider>
         </RealtimeProvider>

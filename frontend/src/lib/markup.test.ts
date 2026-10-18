@@ -102,6 +102,23 @@ test("payloads with attachments", () => {
   assert.deepEqual(decodePayload(broken), { text: "x" });
 });
 
+test("call entries", () => {
+  const v = JSON.parse(
+    readFileSync(new URL("../../../testdata/crypto-vectors.json", import.meta.url), "utf8"),
+  );
+  const payload = decodePayload(v.payload_call);
+
+  assert.deepEqual(payload, {
+    text: "📞 Call, 4:12",
+    call: { id: "0d9f8e7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f", outcome: "answered", duration: 252000 },
+  });
+  assert.equal(encodePayload(payload), v.payload_call);
+
+  // Malformed: shown as the text alone.
+  const broken = '\u001eostrich1:{"t":"📞 Missed call","c":{"i":"0d9f8e7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f","o":"lost"}}';
+  assert.deepEqual(decodePayload(broken), { text: "📞 Missed call" });
+});
+
 // The same cases as the CLI's (cli/markup_test.go).
 test("mentions", () => {
   const { mentions } = JSON.parse(

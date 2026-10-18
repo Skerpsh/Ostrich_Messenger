@@ -62,6 +62,17 @@
 //            account private key, aad "ostrich/v1 device link" 0 link id))
 // The key comes from the scanned QR code, not from the server.
 //
+// Calls (lib/calls.ts): the devices' signals (the offer, the answer,
+// network candidates) are encrypted like messages, with a key of their own:
+//   call key = HKDF(X25519(own private, other's public), salt chat id,
+//              info "ostrich/v1 call", 32)
+//   signal   = "c1:" + base64(nonce(24) ‖ XChaCha20-Poly1305(call key, nonce,
+//              JSON, aad "ostrich/v1 call signal" 0 chat 0 call 0 sender))
+// The offer and the answer carry the fingerprints of the certificates the
+// call's audio is encrypted with (WebRTC's DTLS-SRTP), so the server cannot
+// put itself in the middle of a call without swapping the account keys,
+// which the safety code and the call's handshake (lib/handshake.ts) show.
+//
 // The OstrichID is ~99 random bits, so a fast KDF is enough: it cannot be
 // guessed from the auth key or from anything the server stores.
 
@@ -79,6 +90,8 @@ const SAFETY_INFO = utf8("ostrich/v1 safety");
 const ATTACHMENT_AAD = utf8("ostrich/v1 attachment");
 const GROUP_WRAP_INFO = utf8("ostrich/v1 group key-wrap");
 const LINK_INFO = "ostrich/v1 device link";
+const CALL_INFO = utf8("ostrich/v1 call");
+const PREFIX_CALL = "c1:";
 const PREFIX_GROUP = "e3:";
 const PREFIX_INFO = "i1:";
 const MESSAGE_AAD = "ostrich/v2 message";
@@ -91,13 +104,13 @@ function utf8(text: string) {
 
 // The apps install crypto.getRandomValues (crypto-polyfill.ts); browsers
 // and Node have it.
-function randomBytes(length: number) {
+export function randomBytes(length: number) {
   const bytes = new Uint8Array(length);
   globalThis.crypto.getRandomValues(bytes);
   return bytes;
 }
 
-function toHex(bytes: Uint8Array) {
+export function toHex(bytes: Uint8Array) {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
@@ -396,6 +409,64 @@ export function decryptMessage(
     return { status: "ok", text: new TextDecoder().decode(plain) };
   } catch {
     return { status: "error", text: UNREADABLE };
+  }
+}
+
+// --- calls ---
+
+// What a call's signal is bound to: the server can neither move it to
+// another call nor send it back to the device that sent it.
+export type CallRef = {
+  chatId: string;
+  callId: string;
+  senderId: string;
+};
+
+function callAad({ chatId, callId, senderId }: CallRef) {
+  return utf8(`ostrich/v1 call signal\0${chatId}\0${callId}\0${senderId}`);
+}
+
+function callKey(privateKey: Uint8Array, peerPublicKey: string, chatId: string) {
+  const shared = x25519.getSharedSecret(privateKey, fromBase64(peerPublicKey));
+  return hkdf(sha256, shared, utf8(chatId), CALL_INFO, 32);
+}
+
+export function encryptCallSignal(
+  value: unknown,
+  ref: CallRef,
+  privateKey: Uint8Array,
+  peerPublicKey: string,
+): string {
+  const nonce = randomBytes(24);
+  const sealed = xchacha20poly1305(callKey(privateKey, peerPublicKey, ref.chatId), nonce, callAad(ref)).encrypt(
+    utf8(JSON.stringify(value)),
+  );
+
+  return PREFIX_CALL + toBase64(concat(nonce, sealed));
+}
+
+// The signal, or null if it is not one sent for this call by `senderId`.
+export function decryptCallSignal(
+  data: string,
+  ref: CallRef,
+  privateKey: Uint8Array,
+  peerPublicKey: string,
+): unknown {
+  if (!data.startsWith(PREFIX_CALL)) {
+    return null;
+  }
+
+  try {
+    const bytes = fromBase64(data.slice(PREFIX_CALL.length));
+    const plain = xchacha20poly1305(
+      callKey(privateKey, peerPublicKey, ref.chatId),
+      bytes.subarray(0, 24),
+      callAad(ref),
+    ).decrypt(bytes.subarray(24));
+
+    return JSON.parse(new TextDecoder().decode(plain));
+  } catch {
+    return null;
   }
 }
 

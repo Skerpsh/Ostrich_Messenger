@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import type { Redis } from "ioredis";
 
 // What the backend's processes share: events for the websockets, who is
-// connected, websocket tickets and failed logins. One process keeps it in
+// connected, websocket tickets, failed logins and calls (calls.ts). One process keeps it in
 // memory (the default); several processes, on one server or more, share
 // it through Redis (REDIS_URL), each with its own sockets.
 
@@ -10,6 +10,9 @@ import type { Redis } from "ioredis";
 export type ClusterEvent =
   // `data` to all sockets of these users.
   | { type: "deliver"; userIds: string[]; data: string }
+  // `data` to one socket (realtime.ts gives each an id), e.g. a call's
+  // signals to the device that answered it.
+  | { type: "deliver_socket"; socketId: string; data: string }
   // Close the sockets of a session, or of a user (except one session).
   | { type: "close"; tokenHash?: string; userId?: string; keepTokenHash?: string };
 
@@ -51,6 +54,15 @@ export interface SharedState {
   addFailure(key: string, windowMs: number): Promise<void>;
   clearFailures(key: string): Promise<void>;
 
+  // Values that expire (calls). claimValue() sets one only if it is not
+  // there and tells whether it did: of two claims at once, one wins.
+  getValue(key: string): Promise<string | null>;
+  setValue(key: string, value: string, ms: number): Promise<void>;
+  claimValue(key: string, value: string, ms: number): Promise<boolean>;
+  // Keeps them for `ms` more (missing ones stay missing).
+  extendValues(keys: string[], ms: number): Promise<void>;
+  deleteValues(keys: string[]): Promise<void>;
+
   // On shutdown: this process's sockets are gone.
   close(): Promise<void>;
 }
@@ -66,6 +78,7 @@ export class MemoryState implements SharedState {
   private leaving = new Map<string, number>();
   private tickets = new Map<string, { tokenHash: string; expiresAt: number }>();
   private failed = new Map<string, { count: number; resetAt: number }>();
+  private values = new Map<string, { value: string; expiresAt: number }>();
 
   async publish(event: ClusterEvent) {
     for (const handler of this.handlers) {
@@ -186,6 +199,61 @@ export class MemoryState implements SharedState {
     this.failed.delete(key);
   }
 
+  private liveValue(key: string) {
+    const entry = this.values.get(key);
+
+    if (entry && entry.expiresAt <= Date.now()) {
+      this.values.delete(key);
+      return undefined;
+    }
+
+    return entry;
+  }
+
+  async getValue(key: string) {
+    return this.liveValue(key)?.value ?? null;
+  }
+
+  async setValue(key: string, value: string, ms: number) {
+    const now = Date.now();
+
+    // Drop expired values so the map cannot grow without bound.
+    if (this.values.size >= 10_000) {
+      for (const [other, entry] of this.values) {
+        if (entry.expiresAt <= now) {
+          this.values.delete(other);
+        }
+      }
+    }
+
+    this.values.set(key, { value, expiresAt: now + ms });
+  }
+
+  async claimValue(key: string, value: string, ms: number) {
+    if (this.liveValue(key)) {
+      return false;
+    }
+
+    await this.setValue(key, value, ms);
+    return true;
+  }
+
+  async extendValues(keys: string[], ms: number) {
+    for (const key of keys) {
+      const entry = this.liveValue(key);
+
+      if (entry) {
+        entry.expiresAt = Date.now() + ms;
+      }
+    }
+  }
+
+  async deleteValues(keys: string[]) {
+    for (const key of keys) {
+      this.values.delete(key);
+    }
+  }
+
   async close() {}
 }
 
@@ -206,6 +274,7 @@ const sessionSocketsKey = (tokenHash: string) => `${PREFIX}sockets:session:${tok
 const leavingKey = (userId: string) => `${PREFIX}leaving:${userId}`;
 const ticketKey = (ticket: string) => `${PREFIX}ticket:${ticket}`;
 const failedKey = (key: string) => `${PREFIX}failed-login:${key}`;
+const valueKey = (key: string) => `${PREFIX}value:${key}`;
 
 // Socket counts are kept per process in a hash (field: process id), so a
 // dead process's sockets can be left out.
@@ -500,6 +569,38 @@ export class RedisState implements SharedState {
 
   async clearFailures(key: string) {
     await this.redis.del(failedKey(key));
+  }
+
+  async getValue(key: string) {
+    return this.redis.get(valueKey(key));
+  }
+
+  async setValue(key: string, value: string, ms: number) {
+    await this.redis.set(valueKey(key), value, "PX", ms);
+  }
+
+  async claimValue(key: string, value: string, ms: number) {
+    return (await this.redis.set(valueKey(key), value, "PX", ms, "NX")) === "OK";
+  }
+
+  async extendValues(keys: string[], ms: number) {
+    if (keys.length === 0) {
+      return;
+    }
+
+    const pipeline = this.redis.pipeline();
+
+    for (const key of keys) {
+      pipeline.pexpire(valueKey(key), ms);
+    }
+
+    await pipeline.exec();
+  }
+
+  async deleteValues(keys: string[]) {
+    if (keys.length > 0) {
+      await this.redis.del(...keys.map(valueKey));
+    }
   }
 
   async close() {

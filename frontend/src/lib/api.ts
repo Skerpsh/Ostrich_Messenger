@@ -365,6 +365,15 @@ export async function getWsTicket(token: string) {
   return ticket;
 }
 
+// STUN/TURN servers for a call, with a TURN login that expires.
+export async function getIceServers(token: string) {
+  const { iceServers } = await request<{
+    iceServers: { urls: string[]; username?: string; credential?: string }[];
+  }>("GET", "/api/calls/ice-servers", { token, timeoutMs: 5_000 });
+
+  return iceServers;
+}
+
 export async function getMe(token: string) {
   const { user } = await request<{ user: User }>("GET", "/api/auth/me", {
     token,

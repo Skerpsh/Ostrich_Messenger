@@ -97,6 +97,33 @@ function behaves(name: string, make: () => Promise<SharedState>, makeOther: (fir
     await a.close();
     await b.close();
   });
+
+  test(`${name}: values expire and are claimed once`, async () => {
+    const a = await make();
+    const b = await makeOther(a);
+
+    assert.equal(await a.claimValue("k1", "first", 1000), true);
+    assert.equal(await b.claimValue("k1", "second", 1000), false);
+    assert.equal(await b.getValue("k1"), "first");
+
+    await b.setValue("k1", "changed", 1000);
+    assert.equal(await a.getValue("k1"), "changed");
+
+    await a.setValue("k2", "short", 20);
+    await b.extendValues(["k2", "missing"], 1000);
+    await wait(40);
+    assert.equal(await a.getValue("k2"), "short");
+    assert.equal(await a.getValue("missing"), null);
+
+    await a.deleteValues(["k1", "k2"]);
+    assert.equal(await b.getValue("k1"), null);
+    assert.equal(await b.claimValue("k1", "again", 10), true);
+    await wait(30);
+    assert.equal(await a.getValue("k1"), null);
+
+    await a.close();
+    await b.close();
+  });
 }
 
 behaves("memory", async () => new MemoryState(), async (first) => first);

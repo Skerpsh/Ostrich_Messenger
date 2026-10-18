@@ -1,6 +1,20 @@
+import crypto from "node:crypto";
 import { FastifyInstance } from "fastify";
 import type { WebSocket } from "ws";
 import { MAX_ATTACHMENTS_PER_MESSAGE } from "../attachments.js";
+import {
+  answerCall,
+  CALL_ERRORS,
+  declineCall,
+  hangUp,
+  isCallSignal,
+  keepCallAlive,
+  relaySignal,
+  resumeCall,
+  socketClosed,
+  startCall,
+  type CallSide,
+} from "../calls.js";
 import { isChatMember } from "../database.js";
 import {
   findSessionByHash,
@@ -60,12 +74,18 @@ type ClientMessage = {
   replyTo?: unknown;
   attachments?: unknown;
   mentions?: unknown;
+  callId?: unknown;
+  data?: unknown;
 };
 
 // Protocol (JSON messages):
 //   client -> server: join {chatId}, leave {chatId},
 //                     message {chatId, id?, content, replyTo?, attachments?, mentions?},
-//                     typing {chatId}
+//                     typing {chatId},
+//                     calls (calls.ts): call_start {chatId, callId, data},
+//                     call_answer {callId, data}, call_decline {callId},
+//                     call_hangup {callId}, call_signal {callId, data},
+//                     call_keepalive {callId}, call_resume {callId}
 //   server -> client: connected, joined {chatId}, left {chatId},
 //                     message {message}, read {chatId, userId, lastReadAt},
 //                     profile {userId, username, avatarId, isDeveloper},
@@ -74,7 +94,11 @@ type ClientMessage = {
 //                     reactions {chatId, messageId, reactions},
 //                     chat_deleted {chatId}, chats_changed,
 //                     pinned_message {chatId, message},
-//                     presence {userId, online, lastSeenAt}, error {error}
+//                     presence {userId, online, lastSeenAt},
+//                     call_incoming {call: {id, chatId, callerId}, data},
+//                     call_answered {callId, data}, call_signal {callId, data},
+//                     call_ended {callId, reason},
+//                     call_error {callId, error, code}, error {error}
 //
 // "message" and "read" events of all the user's chats are sent to all their
 // sockets. "join" answers with "joined" (clients reload the chat's history
@@ -165,6 +189,80 @@ export default async function websocketRoutes(server: FastifyInstance) {
 
       const validId = (id: unknown): id is string =>
         typeof id === "string" && UUID_RE.test(id);
+
+      // This socket, as a side of a call.
+      const side: CallSide = {
+        userId: user.id,
+        tokenHash: session.tokenHash,
+        socketId: crypto.randomUUID(),
+      };
+
+      // Call signals the call is over for (or never was) get this, so the
+      // app stops waiting.
+      const callGone = (callId: string) => send({ type: "call_ended", callId, reason: "hangup" });
+
+      const handleCall = async (data: ClientMessage) => {
+        const { callId } = data;
+
+        if (!validId(callId)) {
+          sendError("Valid callId is required");
+          return;
+        }
+
+        switch (data.type) {
+          case "call_start": {
+            if (!validId(data.chatId) || !isCallSignal(data.data)) {
+              sendError("chatId and data are required");
+              return;
+            }
+
+            const result = await startCall(side, data.chatId, callId, data.data);
+
+            if ("error" in result) {
+              send({ type: "call_error", callId, error: CALL_ERRORS[result.error], code: result.error });
+            }
+            return;
+          }
+
+          case "call_answer":
+            if (!isCallSignal(data.data)) {
+              sendError("data is required");
+            } else if (!(await answerCall(side, callId, data.data))) {
+              send({ type: "call_ended", callId, reason: "answered_elsewhere" });
+            }
+            return;
+
+          case "call_signal":
+            if (!isCallSignal(data.data)) {
+              sendError("data is required");
+            } else if (!(await relaySignal(side, callId, data.data))) {
+              callGone(callId);
+            }
+            return;
+
+          case "call_decline":
+            await declineCall(side, callId);
+            return;
+
+          case "call_hangup":
+            await hangUp(side, callId);
+            return;
+
+          case "call_keepalive":
+            if (!(await keepCallAlive(side, callId))) {
+              callGone(callId);
+            }
+            return;
+
+          case "call_resume":
+            if (!(await resumeCall(side, callId))) {
+              callGone(callId);
+            }
+            return;
+        }
+
+        sendError("Unknown message type");
+      };
 
       const handle = async (data: ClientMessage) => {
         if (data.type === "join") {
@@ -300,6 +398,11 @@ export default async function websocketRoutes(server: FastifyInstance) {
           return;
         }
 
+        if (typeof data.type === "string" && data.type.startsWith("call_")) {
+          await handleCall(data);
+          return;
+        }
+
         sendError("Unknown message type");
       };
 
@@ -377,11 +480,13 @@ export default async function websocketRoutes(server: FastifyInstance) {
       socket.on("close", () => {
         untrackSession(socket);
         userDisconnected(user.id, session.tokenHash, socket);
+        socketClosed(side).catch((error) => request.log.error(error, "failed to end a call"));
       });
 
       trackSession(socket, {
         userId: user.id,
         tokenHash: session.tokenHash,
+        socketId: side.socketId,
       });
       userConnected(user.id, session.tokenHash, socket, MAX_CONNECTIONS_PER_USER);
 

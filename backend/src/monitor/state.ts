@@ -19,7 +19,14 @@ export type State = {
   samples: { at: number; used: Record<string, number> }[];
 };
 
-export const emptyCounters = (): BackendCounters => ({ requests: 0, serverErrors: 0, rateLimited: 0, failedLogins: 0 });
+export const emptyCounters = (): BackendCounters => ({
+  requests: 0,
+  serverErrors: 0,
+  rateLimited: 0,
+  failedLogins: 0,
+  callsStarted: 0,
+  callsAnswered: 0,
+});
 
 export function localDay(date: Date) {
   const pad = (value: number) => String(value).padStart(2, "0");

@@ -7,4 +7,7 @@ export const metrics = {
   // Answered 429: rate limits and too many failed logins.
   rateLimited: 0,
   failedLogins: 0,
+  // Calls started, and of them answered (calls.ts).
+  callsStarted: 0,
+  callsAnswered: 0,
 };

@@ -227,7 +227,7 @@ Other settings, in `.env` as well (the defaults are shown):
 | `MONITOR_FAILED_LOGINS_ALERT` | `50` | failed logins within 15 minutes |
 | `MONITOR_CERT_MIN_DAYS` | `14` | Caddy renews 30 days ahead |
 | `MONITOR_TLS_HOSTS` | sites in the Caddyfile | e.g. `api.example.com,example.com` |
-| `MONITOR_SERVICES` | `ostrich* postgresql* redis* caddy*` | systemd services to watch |
+| `MONITOR_SERVICES` | `ostrich* postgresql* redis* caddy* coturn*` | systemd services to watch |
 | `BACKUP_DIR` | `/var/backups/ostrich` | where `backup.sh` writes |
 
 Times are the server's: `timedatectl set-timezone Europe/Moscow` (your
@@ -256,6 +256,47 @@ copy the folder to another machine now and then, e.g. from your computer:
 ```bash
 rsync -a root@SERVER:/opt/ostrich/backend/data/attachments/ ostrich-attachments/
 ```
+
+## Calls: the TURN server
+
+Calls go straight between the two devices when they can reach each other.
+Behind strict NATs and firewalls (some mobile networks, offices) they
+cannot, and the audio has to go through a TURN server: without one such
+calls connect but stay silent. The audio stays encrypted end to end on the
+way; the TURN server only passes packets it cannot read.
+
+[`turnserver.conf`](turnserver.conf) sets up coturn on the same server. The
+backend gives each app a TURN login for 6 hours, made with a secret that
+coturn shares (nothing is stored). Each command is one line:
+
+```bash
+apt-get install -y coturn
+```
+
+```bash
+SECRET=$(openssl rand -hex 32) && IP=$(curl -4 -s ifconfig.me) && sed "s/^static-auth-secret=CHANGE_ME/static-auth-secret=$SECRET/" /opt/ostrich/ops/turnserver.conf > /etc/turnserver.conf && printf 'TURN_SECRET=%s\nTURN_URLS=turn:%s:3478?transport=udp,turn:%s:3478?transport=tcp\nSTUN_URLS=stun:%s:3478\n' "$SECRET" "$IP" "$IP" "$IP" >> /opt/ostrich/backend/.env && tail -2 /opt/ostrich/backend/.env
+```
+
+```bash
+sed -i 's/^#\?TURNSERVER_ENABLED=.*/TURNSERVER_ENABLED=1/' /etc/default/coturn 2>/dev/null; systemctl enable --now coturn && systemctl restart coturn ostrich && systemctl is-active coturn ostrich
+```
+
+With a firewall (ufw), open the TURN port and the relay ports:
+
+```bash
+ufw allow 3478 && ufw allow 49152:49352/udp
+```
+
+The monitoring bot watches the `coturn` service, and its reports count
+calls (started and answered). The relayed audio shows in the server's
+network traffic: about 50 kbit/s each way for every call that needs the
+relay.
+
+To check it: open
+[Trickle ICE](https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/),
+add `turn:<server's IP>:3478` with a login from
+`curl -s -H "Authorization: Bearer <a session token>" https://<api>/api/calls/ice-servers`,
+and press *Gather candidates*: a `relay` line means it works.
 
 ## Backups: Healthchecks.io
 

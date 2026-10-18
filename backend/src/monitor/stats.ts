@@ -33,6 +33,9 @@ export type BackendCounters = {
   serverErrors: number;
   rateLimited: number;
   failedLogins: number;
+  // Calls started and answered (missing from backends before calls).
+  callsStarted?: number;
+  callsAnswered?: number;
 };
 
 export type BackendStats = {

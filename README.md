@@ -52,6 +52,7 @@
 - 💬 Direct chats, **groups** of up to 50 members with roles, **invite links** and join requests
 - 📎 Encrypted **files and photos** (up to 10 per message, 25 MB each) with upload progress and a photo viewer
 - 🎤 Encrypted **voice messages** with a waveform, seeking and playback speed
+- 📞 **Audio calls**, peer to peer and end-to-end encrypted, with the **Ostrich handshake** to make sure nobody is listening in
 - 🔗 **Link previews** made by the sender's phone and sent inside the encrypted message, so the server never sees the link
 - ↩️ Replies, forwarding, editing, deleting, **reactions with any emoji**, pinned messages
 - 🔖 **Saved messages**, @mentions, formatting, search in a chat or across all chats
@@ -97,6 +98,12 @@ devices.
 To install the web app, use the browser's **Install app** / **Add to Home Screen** option.
 It keeps working offline and sends messages when it is back online.
 
+**Calls.** Press the 📞 button at the top of a direct chat. Calls ring while Ostrich is open (a
+browser tab, or the app in the foreground); the chat gets an entry for every call, missed ones
+too. During a call, open the **Ostrich handshake**: each of you reads a silly sentence aloud
+("Sleepy flamingo juggles cacti") and picks the other's among four. If both find it, nobody is in
+the middle of the call.
+
 In the web app, **Settings → Keyboard shortcuts** lists the keys: `Ctrl/⌘ K` search chats,
 `Alt ↑/↓` previous / next chat, `↑` edit your last message, `Esc` cancel or close the chat.
 
@@ -140,6 +147,8 @@ in a narrow terminal. The keyboard and the mouse both work.
 | Chosen message | `r` reply · `e` edit · `d` delete · `c` copy · `1`–`8` react · `Enter` more |
 
 Voice messages are shown with their waveform and length; play them in the web or mobile app.
+Calls are answered in the web or mobile app; the CLI says who is calling and shows the chat's
+call entries.
 Link previews are shown as text.
 
 The full key reference, the "Remember me" option, where sessions and the cache are stored and
@@ -181,6 +190,14 @@ flowchart LR
   A preview is shown only for a link that is in the message's text.
 - **Groups.** A random group key is wrapped separately for every member. A new key epoch starts
   whenever someone leaves or is removed. The group name and photo are encrypted too.
+- **Calls.** The audio goes straight between the two devices (WebRTC), or through the TURN server
+  when they cannot reach each other, encrypted with DTLS-SRTP either way. The offer and answer
+  that set the call up carry the fingerprints of the call's certificates, and they are themselves
+  encrypted for the other member, so the server cannot swap them to listen in. The **Ostrich
+  handshake** checks even that: both devices turn the two fingerprints into two sentences, each
+  person reads theirs aloud and picks the other's among four. The caller commits to its part of
+  the input before seeing the callee's, so someone in the middle gets a single 1-in-a-million
+  try. Details in [`frontend/src/lib/handshake.ts`](frontend/src/lib/handshake.ts).
 - **Safety codes.** 40 digits computed from both public keys. If the codes match on both devices,
   the server has not substituted a key.
 - **Logging in with a QR code.** The new device shows a one-time X25519 public key in its QR
@@ -188,8 +205,8 @@ flowchart LR
   server only relays ciphertext. The session goes to the device that holds the link's secret,
   which is not in the code, so seeing the code is not enough to log in.
 
-**What the server can see:** usernames, who talks to whom and when, message sizes, profile photos,
-and IP addresses. **What it cannot see:** message text, files, group names and photos, your
+**What the server can see:** usernames, who talks to whom and when (calls included), message
+sizes, profile photos, and IP addresses. **What it cannot see:** message text, files, group names and photos, your
 OstrichID or your private key.
 
 > [!NOTE]
@@ -212,6 +229,7 @@ flowchart TB
     B1 & B2 -.->|optional| R[(Redis)]
     B1 & B2 --> FS[("Encrypted files<br/>on disk")]
     B1 -->|push| EXPO["Expo push service"]
+    W & M -.->|"call audio, when direct fails"| TURN["coturn<br/>TURN relay"]
     MON["Monitoring bot"] -->|reports and alerts| TG["Telegram"]
     MON --> B1
 ```
@@ -289,7 +307,8 @@ npx eas-cli build --platform ios --profile production
 
 For your own server, set `EXPO_PUBLIC_API_URL` to its address for the build, and
 `EXPO_PUBLIC_WEB_URL` too if the web app is on another address (it is used for invite and
-profile links). The apps ask for the camera (QR codes) and the microphone (voice messages).
+profile links). The apps ask for the camera (QR codes) and the microphone (voice messages and
+calls). Calls need a development or store build: `react-native-webrtc` does not run in Expo Go.
 
 ### Useful commands
 
@@ -420,7 +439,8 @@ here, so links need no extra setting. If you serve the web app from another doma
 `EXPO_PUBLIC_WEB_URL` and `OSTRICH_WEB` in [Configuration](#configuration), and add that origin to
 `CORS_ORIGINS`.
 
-Next steps: [daily backups](#backups) and [monitoring](#monitoring).
+Next steps: [daily backups](#backups), [monitoring](#monitoring) and a
+[TURN server for calls](ops/README.md#calls-the-turn-server).
 
 ## Configuration
 
@@ -441,6 +461,9 @@ The backend reads its settings from environment variables, usually in `backend/.
 | `ATTACHMENTS_DIR` | `backend/data/attachments` | Where encrypted files are stored |
 | `EXPO_ACCESS_TOKEN` | none | Expo token for push notifications, if your Expo project requires one |
 | `MONITOR_SECRET` | none | Shared secret for the monitoring bot's stats endpoint |
+| `TURN_URLS` | none | TURN servers for calls, comma separated, e.g. `turn:203.0.113.7:3478?transport=udp,turn:203.0.113.7:3478?transport=tcp` |
+| `STUN_URLS` | none | STUN servers for calls, e.g. `stun:203.0.113.7:3478` |
+| `TURN_SECRET` | none | coturn's `static-auth-secret`: the backend makes TURN logins with it ([setup](ops/README.md#calls-the-turn-server)) |
 
 The monitoring bot's own settings (`MONITOR_*`) are listed in
 [`ops/README.md`](ops/README.md#monitoring-bot).
@@ -537,10 +560,10 @@ binaries, `install.sh` and `SHA256SUMS`, plus notes generated from the commits.
 ├── frontend/               Expo app: web (PWA), iOS and Android
 │   ├── src/app/            screens (expo-router)
 │   ├── src/components/     UI components
-│   ├── src/context/        auth, chats, realtime, theme
+│   ├── src/context/        auth, chats, calls, realtime, theme
 │   └── src/lib/            API client, crypto, cache, helpers
 ├── cli/                    Go terminal client
-├── ops/                    deploy and backup scripts, systemd units
+├── ops/                    deploy and backup scripts, systemd units, coturn config
 ├── testdata/               test vectors shared by the TypeScript and Go code
 └── .github/workflows/      CI and CLI releases
 ```

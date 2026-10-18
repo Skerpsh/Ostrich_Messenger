@@ -8,9 +8,11 @@ import IconButton from "@/components/icon-button";
 import MarkupText from "@/components/markup-text";
 import { useAppTheme } from "@/context/theme";
 import type { Reaction } from "@/lib/api";
+import { formatDuration } from "@/lib/attachments";
+import { callEntryText } from "@/lib/calls";
 import { isLegacyMessage } from "@/lib/crypto";
 import type { MessageRow } from "@/lib/chat-rows";
-import type { Attachment } from "@/lib/payload";
+import type { Attachment, CallEntry } from "@/lib/payload";
 import { formatTime, previewText } from "@/lib/format";
 import { messagePreview } from "@/lib/preview";
 import type { Shown } from "@/lib/use-chat-crypto";
@@ -43,6 +45,7 @@ export default function MessageBubble({
   onReact,
   onError,
   onOpenPhoto,
+  onCall,
   selected,
   onToggle,
 }: {
@@ -67,6 +70,8 @@ export default function MessageBubble({
   onError: (message: string) => void;
   // A photo of the message was tapped.
   onOpenPhoto?: (attachment: Attachment) => void;
+  // A call entry was tapped: call back.
+  onCall?: () => void;
   // Choosing messages: whether this one is chosen (undefined: not
   // choosing); a tap chooses it or not.
   selected?: boolean;
@@ -204,7 +209,9 @@ export default function MessageBubble({
           {text.attachments?.length ? (
             <AttachmentView attachments={text.attachments} own={own} onError={onError} onOpenPhoto={onOpenPhoto} />
           ) : null}
-          {text.status === "ok" && !text.text && text.attachments?.length ? null : text.status === "ok" ? (
+          {text.status === "ok" && text.call ? (
+            <CallEntryView entry={text.call} own={own} onCall={selecting ? undefined : onCall} />
+          ) : text.status === "ok" && !text.text && text.attachments?.length ? null : text.status === "ok" ? (
             <MarkupText
               text={text.text}
               // Touch screens copy through the long-press menu; selecting
@@ -317,6 +324,41 @@ export default function MessageBubble({
 }
 
 // Reactions as chips: emoji, how many, whether one is yours.
+// "Outgoing call · 4:12", "Missed call": tapping it calls back.
+function CallEntryView({ entry, own, onCall }: { entry: CallEntry; own: boolean; onCall?: () => void }) {
+  const { colors } = useAppTheme();
+  const missed = entry.outcome !== "answered";
+  const color = own ? colors.onAccent : missed ? colors.danger : colors.text;
+  const label = callEntryText(entry, own);
+  const detail =
+    entry.outcome === "answered" && entry.duration ? formatDuration(entry.duration) : onCall ? "Tap to call back" : "";
+
+  return (
+    <Pressable
+      onPress={onCall}
+      disabled={!onCall}
+      accessibilityRole={onCall ? "button" : undefined}
+      accessibilityLabel={onCall ? `${label}. Call back` : label}
+      style={styles.callEntry}
+    >
+      <View
+        style={[
+          styles.callIcon,
+          { backgroundColor: own ? "rgba(0, 0, 0, 0.14)" : missed ? "rgba(255, 107, 107, 0.14)" : colors.panelAlt },
+        ]}
+      >
+        <Ionicons name={missed ? "call-outline" : "call"} size={18} color={color} />
+      </View>
+      <View>
+        <Text style={[styles.callLabel, { color }]}>{label}</Text>
+        {detail ? (
+          <Text style={[styles.callDetail, { color: own ? colors.onAccent : colors.muted }]}>{detail}</Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 function groupReactions(reactions: Reaction[], ownId: string | undefined) {
   const groups = new Map<string, { emoji: string; count: number; mine: boolean }>();
 
@@ -394,6 +436,32 @@ function useSwipeToReply(onReply: () => void) {
 }
 
 const styles = StyleSheet.create({
+  callEntry: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 2,
+    paddingRight: 6,
+  },
+
+  callIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  callLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+
+  callDetail: {
+    fontSize: 13,
+    fontVariant: ["tabular-nums"],
+  },
+
   check: {
     alignSelf: "center",
     paddingHorizontal: 6,

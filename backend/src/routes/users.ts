@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { endCallsBetween } from "../calls.js";
 import { db } from "../database.js";
 import { authenticate } from "../middleware/auth.js";
 import { sendToUserSockets } from "../realtime.js";
@@ -11,8 +12,8 @@ const blockRateLimit = {
 };
 
 export default async function usersRoutes(server: FastifyInstance) {
-  // BLOCK / UNBLOCK a user. Blocked users cannot message you or start a
-  // chat with you, and neither of you sees the other's online status.
+  // BLOCK / UNBLOCK a user. Blocked users cannot message or call you or
+  // start a chat with you, and neither of you sees the other's online status.
   const setBlocked = async (blockerId: string, blockedId: string, blocked: boolean) => {
     if (blocked) {
       await db.query(
@@ -23,6 +24,7 @@ export default async function usersRoutes(server: FastifyInstance) {
         `,
         [blockerId, blockedId],
       );
+      await endCallsBetween(blockerId, blockedId);
     } else {
       await db.query(
         "DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2",

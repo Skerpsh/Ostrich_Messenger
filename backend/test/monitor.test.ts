@@ -191,7 +191,7 @@ test("monitor: daily summary", () => {
     peak: { online: 80, at },
     active: 300,
     totalUsers: 1200,
-    traffic: { requests: 1_234_567, serverErrors: 3, rateLimited: 1, failedLogins: 40 },
+    traffic: { requests: 1_234_567, serverErrors: 3, rateLimited: 1, failedLogins: 40, callsStarted: 25, callsAnswered: 19 },
     logErrors: { count: 14, top: "boom" },
     crashes: 0,
     databaseBytes: 120 * MB,
@@ -207,6 +207,7 @@ test("monitor: daily summary", () => {
   assert.match(text, /New users: 12 \(▲20% vs the day before\)/);
   assert.match(text, /Messages: 5,000 \(same as the day before\)/);
   assert.match(text, /Requests: 1.2M/);
+  assert.match(text, /Calls: 25 · answered: 19/);
   assert.match(text, /Database: 120 MB \(\+3 MB\)/);
   assert.match(text, /20 GB free \(\+200 MB used\) · full in ~29d/);
   assert.match(text, /12 updates \(3 security\) · reboot required/);
