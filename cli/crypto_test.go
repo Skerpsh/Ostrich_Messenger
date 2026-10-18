@@ -353,6 +353,7 @@ func TestCallEntryVector(t *testing.T) {
 
 	var v struct {
 		Payload string `json:"payload_call"`
+		Video   string `json:"payload_video_call"`
 	}
 
 	if err := json.Unmarshal(data, &v); err != nil {
@@ -370,6 +371,20 @@ func TestCallEntryVector(t *testing.T) {
 	}
 
 	if got := callText(*p.call, false); got != "📞 Incoming call · 4:12" {
+		t.Fatalf("text: %q", got)
+	}
+
+	video := decodePayload(v.Video)
+
+	if video.call == nil || !video.call.Video || video.call.Outcome != "missed" {
+		t.Fatalf("video call: %+v", video.call)
+	}
+
+	if got := encodePayload(video); got != v.Video {
+		t.Fatalf("written back differently:\n%s\n%s", got, v.Video)
+	}
+
+	if got := callText(*video.call, false); got != "🎥 Missed video call" {
 		t.Fatalf("text: %q", got)
 	}
 

@@ -47,17 +47,19 @@ type payload struct {
 }
 
 // callEntry: "answered" (with how long, in milliseconds), "missed" or
-// "declined".
+// "declined"; Video: started as a video call.
 type callEntry struct {
 	ID       string
 	Outcome  string
 	Duration int64
+	Video    bool
 }
 
 type wireCall struct {
 	I string `json:"i"`
 	O string `json:"o"`
 	D *int64 `json:"d,omitempty"`
+	V bool   `json:"v,omitempty"`
 }
 
 // linkPreview: the page's title, description, site and picture (an
@@ -148,7 +150,7 @@ func encodePayload(p payload) string {
 	}
 
 	if c := p.call; c != nil {
-		wire.C = &wireCall{I: c.ID, O: c.Outcome}
+		wire.C = &wireCall{I: c.ID, O: c.Outcome, V: c.Video}
 
 		if c.Outcome == "answered" {
 			d := c.Duration
@@ -211,7 +213,7 @@ func decodePayload(plain string) payload {
 
 		if json.Unmarshal(wire.C, &c) == nil && attachmentIDRE.MatchString(c.I) &&
 			(c.O == "answered" || c.O == "missed" || c.O == "declined") {
-			p.call = &callEntry{ID: c.I, Outcome: c.O}
+			p.call = &callEntry{ID: c.I, Outcome: c.O, Video: c.V}
 
 			if c.D != nil && *c.D >= 0 {
 				p.call.Duration = *c.D
@@ -224,19 +226,25 @@ func decodePayload(plain string) payload {
 
 // callText: the call entry from this user's side, like the app's.
 func callText(c callEntry, own bool) string {
+	icon, kind := "📞", "call"
+
+	if c.Video {
+		icon, kind = "🎥", "video call"
+	}
+
 	switch {
 	case c.Outcome == "answered" && own:
-		return "📞 Outgoing call · " + formatDuration(c.Duration)
+		return icon + " Outgoing " + kind + " · " + formatDuration(c.Duration)
 	case c.Outcome == "answered":
-		return "📞 Incoming call · " + formatDuration(c.Duration)
+		return icon + " Incoming " + kind + " · " + formatDuration(c.Duration)
 	case c.Outcome == "declined" && own:
-		return "📞 Declined"
+		return icon + " Declined"
 	case c.Outcome == "declined":
-		return "📞 Declined call"
+		return icon + " Declined " + kind
 	case own:
-		return "📞 No answer"
+		return icon + " No answer"
 	default:
-		return "📞 Missed call"
+		return icon + " Missed " + kind
 	}
 }
 
