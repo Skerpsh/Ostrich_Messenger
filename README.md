@@ -305,7 +305,13 @@ The apps are built with [EAS Build](https://docs.expo.dev/build/introduction/)
 cd frontend
 npx eas-cli build --platform android --profile preview   # installable APK
 npx eas-cli build --platform ios --profile production
+npx eas-cli build --platform android --profile quest     # APK for Meta Quest
 ```
+
+On a Meta Quest (in developer mode) the APK is installed with `adb install -r ostrich.apk`
+and runs as a window, without the phone or the computer; it opens from Library → Unknown
+sources. The headset has no Google Play services, so notifications only come while the app is
+open.
 
 For your own server, set `EXPO_PUBLIC_API_URL` to its address for the build, and
 `EXPO_PUBLIC_WEB_URL` too if the web app is on another address (it is used for invite and

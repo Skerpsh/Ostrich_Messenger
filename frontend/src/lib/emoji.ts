@@ -1,13 +1,10 @@
 import { getItem, setItem } from "./storage";
 
-const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
-
-// One emoji per character; those that are text by default (☀, ✈) get the
-// emoji variation selector.
+// One emoji per character (code point: Hermes on Android and iOS has no
+// Intl.Segmenter); those that are text by default (☀, ✈) get the emoji
+// variation selector.
 function split(text: string) {
-  return [...graphemes.segment(text)]
-    .map(({ segment }) => segment)
-    .map((emoji) => ([...emoji].length === 1 && emoji.codePointAt(0)! < 0x1f000 ? `${emoji}\uFE0F` : emoji));
+  return [...text].map((emoji) => (emoji.codePointAt(0)! < 0x1f000 ? `${emoji}\uFE0F` : emoji));
 }
 
 // The emoji offered in the picker (components/emoji-picker.tsx), by

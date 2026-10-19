@@ -11,6 +11,12 @@
     "preview": {
       "distribution": "internal"
     },
+    "quest": {
+      "extends": "preview",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "autoIncrement": true
     }
