@@ -35,6 +35,7 @@
 - [Releasing the CLI](#releasing-the-cli)
 - [Project structure](#project-structure)
 - [Contributing](#contributing)
+- [Contact](#contact)
 - [Security](#security)
 - [License](#license)
 
@@ -581,10 +582,18 @@ binaries, `install.sh` and `SHA256SUMS`, plus notes generated from the commits.
 Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how
 to set up the project and what a good pull request looks like.
 
+## Contact
+
+- Help with the app: [support@ostrich-messenger.com](mailto:support@ostrich-messenger.com)
+- Vulnerabilities: [security@ostrich-messenger.com](mailto:security@ostrich-messenger.com)
+- Personal data requests: [privacy@ostrich-messenger.com](mailto:privacy@ostrich-messenger.com)
+- Everything else: [hello@ostrich-messenger.com](mailto:hello@ostrich-messenger.com)
+
 ## Security
 
 Please **do not** open public issues for vulnerabilities. Report them privately as described in
-[SECURITY.md](SECURITY.md).
+[SECURITY.md](SECURITY.md) or by email to
+[security@ostrich-messenger.com](mailto:security@ostrich-messenger.com).
 
 ## License
 

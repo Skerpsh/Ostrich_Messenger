@@ -7,7 +7,8 @@ us more than any other kind.
 
 **Do not open a public issue.** Report it privately through GitHub:
 **Security** tab → **Report a vulnerability**
-([direct link](https://github.com/Skerpsh/Ostrich_Messenger/security/advisories/new)).
+([direct link](https://github.com/Skerpsh/Ostrich_Messenger/security/advisories/new)),
+or by email to **[security@ostrich-messenger.com](mailto:security@ostrich-messenger.com)**.
 
 Please include:
 

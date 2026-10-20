@@ -2,7 +2,7 @@ import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppHeader from "@/components/app-header";
 import DevBadge from "@/components/dev-badge";
@@ -22,7 +22,7 @@ import { Divider, Row, Section, styles } from "@/components/settings/ui";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme, type ThemePreference } from "@/context/theme";
 import { useIsWide } from "@/lib/layout";
-import { profileLink } from "@/lib/links";
+import { profileLink, SUPPORT_EMAIL } from "@/lib/links";
 import { installApp, useCanInstall } from "@/lib/pwa";
 import { accents } from "@/theme/colors";
 
@@ -271,6 +271,15 @@ export default function SettingsScreen() {
           <DevicesSection />
 
           <ShortcutsSection />
+
+          <Section title="Help">
+            <Row
+              icon="mail-outline"
+              label="Contact support"
+              value={SUPPORT_EMAIL}
+              onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+            />
+          </Section>
 
           <Section
             title="Security"

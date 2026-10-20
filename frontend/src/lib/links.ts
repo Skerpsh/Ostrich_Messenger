@@ -20,7 +20,10 @@ export const WEB_URL = (
       : DEFAULT_WEB_URL)
 ).replace(/\/+$/, "");
 
-export const inviteLink = (token: string) => `${WEB_URL}/chats/join/${token}`;
+// Ostrich's support address, opened in the device's mail app from Settings.
+export const SUPPORT_EMAIL = "support@ostrich-messenger.com";
+
+export const inviteLink =(token: string) => `${WEB_URL}/chats/join/${token}`;
 
 export const profileLink = (username: string) => `${WEB_URL}/chats/u/${encodeURIComponent(username)}`;
 
