@@ -18,6 +18,7 @@
     },
     "android": {
       "package": "com.ostrich.messenger",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#111111",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
