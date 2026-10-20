@@ -240,47 +240,50 @@ export default function ChatList() {
   }
 
   const settingsOpen = pathname.startsWith("/chats/settings");
+  const statusText =
+    status === "online" ? "online" : status === "connecting" ? "Connecting…" : "Waiting for network…";
+
+  const profileButton = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Settings"
+      onPress={() => go("/chats/settings")}
+      style={({ hovered, pressed }) => [
+        styles.profile,
+        (hovered || pressed || (wide && settingsOpen)) && { backgroundColor: colors.hover },
+      ]}
+    >
+      <Avatar name={user.username} avatarId={user.avatar_id} size={36} />
+    </Pressable>
+  );
+
+  const settingsButton = (
+    <IconButton icon="settings-outline" label="Settings" onPress={() => go("/chats/settings")} />
+  );
+  const savedButton = <IconButton icon="bookmark-outline" label="Saved messages" onPress={openSaved} />;
+  const newChatButton = (
+    <IconButton icon="create-outline" label="New chat or group" onPress={() => go("/chats/new")} />
+  );
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.surface }]}>
-      <AppHeader
-        left={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Settings"
-            onPress={() => go("/chats/settings")}
-            style={({ hovered, pressed }) => [
-              styles.profile,
-              (hovered || pressed || (wide && settingsOpen)) && {
-                backgroundColor: colors.hover,
-              },
-            ]}
-          >
-            <Avatar name={user.username} avatarId={user.avatar_id} size={36} />
-          </Pressable>
-        }
-        title="Chats"
-        subtitle={
-          status === "online"
-            ? `@${user.username}`
-            : status === "connecting"
-              ? "Connecting…"
-              : "Waiting for network…"
-        }
-        right={
-          <>
-            <IconButton icon="bookmark-outline" label="Saved messages" onPress={openSaved} />
-            <IconButton
-              icon="create-outline"
-              label="New chat or group"
-              onPress={() => go("/chats/new")}
-            />
-          </>
-        }
-      />
+      {/* Wide screens: the profile is at the bottom, under the list. */}
+      {wide ? null : (
+        <AppHeader
+          left={profileButton}
+          title="Chats"
+          subtitle={status === "online" ? `@${user.username}` : statusText}
+          right={
+            <>
+              {savedButton}
+              {settingsButton}
+            </>
+          }
+        />
+      )}
 
-      <View style={styles.searchWrap}>
-        <View style={[styles.search, { backgroundColor: colors.panelAlt }]}>
+      <View style={[styles.searchWrap, wide && styles.searchRow]}>
+        <View style={[styles.search, wide && styles.searchWide, { backgroundColor: colors.panelAlt }]}>
           <Ionicons name="search" size={18} color={colors.muted} />
           <TextInput
             ref={searchRef}
@@ -315,6 +318,7 @@ export default function ChatList() {
             />
           ) : null}
         </View>
+        {wide ? newChatButton : null}
       </View>
 
       <FlatList
@@ -322,7 +326,8 @@ export default function ChatList() {
         keyExtractor={(chat) => chat.id}
         contentContainerStyle={[
           styles.list,
-          { paddingBottom: insets.bottom + 16 },
+          // Phones: room for the "new chat" button over the last chat.
+          { paddingBottom: insets.bottom + (wide ? 16 : 92) },
         ]}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -468,6 +473,35 @@ export default function ChatList() {
           />
         )}
       />
+
+      {wide ? (
+        <View style={[styles.profileBar, { backgroundColor: colors.surface, borderTopColor: colors.line }]}>
+          {profileButton}
+          <View style={styles.profileText}>
+            <Text numberOfLines={1} style={[styles.profileName, { color: colors.text }]}>
+              @{user.username}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.profileStatus, { color: status === "online" ? colors.online : colors.muted }]}
+            >
+              {statusText}
+            </Text>
+          </View>
+          {savedButton}
+          {settingsButton}
+        </View>
+      ) : (
+        // Phones: "new chat" within reach of the thumb.
+        <Pressable
+          onPress={() => go("/chats/new")}
+          accessibilityRole="button"
+          accessibilityLabel="New chat or group"
+          style={[styles.fab, { backgroundColor: colors.accent, bottom: insets.bottom + 20, boxShadow: `0 4px 12px ${colors.shadow}` }]}
+        >
+          <Ionicons name="create-outline" size={24} color={colors.onAccent} />
+        </Pressable>
+      )}
 
       <Modal
         visible={menuFor !== null}
@@ -737,6 +771,53 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     padding: 2,
     marginLeft: 2,
+  },
+
+  // Wide screens: "new chat" next to the search.
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  searchWide: {
+    flex: 1,
+  },
+
+  // Wide screens: the user, their status, saved messages and settings,
+  // under the list.
+  profileBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    height: 60,
+    paddingHorizontal: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+
+  profileText: {
+    flex: 1,
+    paddingHorizontal: 2,
+  },
+
+  profileName: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  profileStatus: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+
+  fab: {
+    position: "absolute",
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   searchWrap: {
