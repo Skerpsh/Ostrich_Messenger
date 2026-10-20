@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -9,7 +9,9 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import AnimatedPressable from "@/components/animated-pressable";
 import { useAppTheme } from "@/context/theme";
+import { pressStyle, useMotion, usePressed } from "@/lib/motion";
 import { radius } from "@/theme/colors";
 import type { IconName } from "./icon-button";
 
@@ -32,6 +34,9 @@ export default function Button({
   ...props
 }: ButtonProps) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
+  const { pressed, handlers } = usePressed();
+  const [hovered, setHovered] = useState(false);
 
   const inactive = disabled || loading;
   const textColor =
@@ -42,11 +47,14 @@ export default function Button({
         : colors.text;
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityState={{ disabled: Boolean(inactive) }}
       disabled={inactive}
-      style={({ pressed, hovered }) => [
+      {...handlers}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      style={[
         styles.button,
         variant === "primary"
           ? { backgroundColor: colors.accent, borderColor: colors.accent }
@@ -57,6 +65,7 @@ export default function Button({
             },
         variant === "primary" && (pressed || hovered) && !inactive && styles.primaryActive,
         inactive && styles.inactive,
+        pressStyle(pressed && !inactive, motion, 0.96),
         style,
       ]}
       {...props}
@@ -69,7 +78,7 @@ export default function Button({
           <Text style={[styles.text, { color: textColor }]}>{title}</Text>
         </View>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

@@ -1,7 +1,9 @@
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import AnimatedPressable from "@/components/animated-pressable";
 import { useAppTheme } from "@/context/theme";
+import { pressStyle, useMotion, usePressed } from "@/lib/motion";
 
 export type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -30,18 +32,24 @@ export default function IconButton({
   style,
 }: IconButtonProps) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
+  const { pressed, handlers } = usePressed();
+  const [hovered, setHovered] = useState(false);
   const box = Math.round(size * 1.85);
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={label}
       // Tooltip on web.
       {...({ title: label } as object)}
       onPress={onPress}
+      {...handlers}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
       disabled={disabled}
       hitSlop={6}
-      style={({ pressed, hovered }) => [
+      style={[
         styles.button,
         { width: box, height: box, borderRadius: box / 2 },
         filled
@@ -51,6 +59,7 @@ export default function IconButton({
             : null,
         pressed && filled && styles.pressed,
         disabled && !filled && styles.disabled,
+        pressStyle(pressed && !disabled, motion, 0.88),
         style,
       ]}
     >
@@ -62,7 +71,7 @@ export default function IconButton({
           (filled ? (disabled ? colors.muted : colors.onAccent) : colors.text)
         }
       />
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

@@ -4,7 +4,9 @@ import ChatAvatar from "@/components/chat-avatar";
 import DevBadge from "@/components/dev-badge";
 import { noWebOutline } from "@/components/text-field";
 import { useChats } from "@/context/chats";
+import AnimatedPressable from "@/components/animated-pressable";
 import { useAppTheme } from "@/context/theme";
+import { enterStyle, useMotion } from "@/lib/motion";
 import type { Chat } from "@/lib/api";
 import { chatTitle, groupKeyOf } from "@/lib/groups";
 import { radius } from "@/theme/colors";
@@ -19,6 +21,7 @@ export default function ForwardPicker({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
   const { chats } = useChats();
   const [query, setQuery] = useState("");
 
@@ -36,8 +39,15 @@ export default function ForwardPicker({
   }, [chats, query]);
 
   return (
-    <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close">
-      <Pressable style={[styles.card, { backgroundColor: colors.panel }]} onPress={() => {}}>
+    <AnimatedPressable
+      style={[styles.backdrop, enterStyle("fade", motion)]}
+      onPress={onClose}
+      accessibilityLabel="Close"
+    >
+      <AnimatedPressable
+        style={[styles.card, { backgroundColor: colors.panel }, enterStyle("pop", motion)]}
+        onPress={() => {}}
+      >
         <Text style={[styles.title, { color: colors.text }]}>Forward to…</Text>
         <View style={[styles.search, { backgroundColor: colors.panelAlt }]}>
           <TextInput
@@ -75,8 +85,8 @@ export default function ForwardPicker({
             </Pressable>
           )}
         />
-      </Pressable>
-    </Pressable>
+      </AnimatedPressable>
+    </AnimatedPressable>
   );
 }
 

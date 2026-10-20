@@ -1,11 +1,13 @@
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Button from "@/components/button";
 import QrCode from "@/components/qr-code";
 import QrScanner from "@/components/qr-scanner";
 import { parseLink, safetyQr } from "@/lib/links";
+import AnimatedPressable from "@/components/animated-pressable";
 import { useAppTheme } from "@/context/theme";
+import { enterStyle, useMotion } from "@/lib/motion";
 import { radius } from "@/theme/colors";
 
 // The chat's safety code over a dimmed background (placed like
@@ -26,6 +28,7 @@ export default function SafetyCode({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
   const [showQr, setShowQr] = useState(false);
   const [scanning, setScanning] = useState(false);
   // The scanned code: the same, or not.
@@ -45,8 +48,15 @@ export default function SafetyCode({
   };
 
   return (
-    <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close">
-      <Pressable style={[styles.card, { backgroundColor: colors.panel }]} onPress={() => {}}>
+    <AnimatedPressable
+      style={[styles.backdrop, enterStyle("fade", motion)]}
+      onPress={onClose}
+      accessibilityLabel="Close"
+    >
+      <AnimatedPressable
+        style={[styles.card, { backgroundColor: colors.panel }, enterStyle("pop", motion)]}
+        onPress={() => {}}
+      >
         <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>
           <Ionicons
             name={keyChanged ? "warning-outline" : "shield-checkmark-outline"}
@@ -123,12 +133,12 @@ export default function SafetyCode({
           <Button title="The codes are the same" onPress={onConfirm} />
         ) : null}
         <Button title="Close" variant="secondary" onPress={onClose} />
-      </Pressable>
+      </AnimatedPressable>
 
       {scanning ? (
         <QrScanner title={`Scan @${username}'s safety code`} onScan={onScan} onClose={() => setScanning(false)} />
       ) : null}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

@@ -70,6 +70,8 @@ type ThemeContextValue = {
   // The photo for the "photo" wallpaper (data URI), null if none was chosen.
   wallpaperPhoto: string | null;
   setWallpaperPhoto: (photo: string | null) => void;
+  animations: boolean;
+  setAnimations: (animations: boolean) => void;
   sync: boolean;
   setSync: (sync: boolean) => void;
   // Bumped on every change the user makes (not on applying synced ones).
@@ -185,6 +187,8 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
           setPhotoState(photo);
           cacheSet(PHOTO_KEY, photo);
         },
+        animations: preferences.animations,
+        setAnimations: (animations) => update({ animations }),
         sync: preferences.sync,
         // Not a change to sync: turning it on loads what is synced first.
         setSync: (sync) => savePreferences((current) => ({ ...current, sync })),

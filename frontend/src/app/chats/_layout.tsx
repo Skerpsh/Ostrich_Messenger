@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 import ChatList from "@/components/chat-list";
 import { useAppTheme } from "@/context/theme";
 import { useIsWide, useSidebarWidth } from "@/lib/layout";
+import { useScreenAnimation } from "@/lib/motion";
 
 // Phones: the chats list, a chat, new chat and settings are separate
 // screens. Wide screens: the chats list stays on the left and the rest
@@ -10,6 +11,7 @@ import { useIsWide, useSidebarWidth } from "@/lib/layout";
 export default function ChatsLayout() {
   const { colors } = useAppTheme();
   const wide = useIsWide();
+  const animation = useScreenAnimation();
   const sidebarWidth = useSidebarWidth();
 
   if (!wide) {
@@ -17,6 +19,7 @@ export default function ChatsLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
+          animation,
           contentStyle: { backgroundColor: colors.bg },
         }}
       >

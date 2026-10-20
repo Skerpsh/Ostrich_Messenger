@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text } from "react-native";
+import AnimatedPressable from "@/components/animated-pressable";
 import { useAppTheme } from "@/context/theme";
+import { enterStyle, useMotion } from "@/lib/motion";
 import { radius } from "@/theme/colors";
 import type { IconName } from "./icon-button";
 
@@ -29,16 +31,20 @@ export default function ActionMenu({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
   const [confirming, setConfirming] = useState<string | null>(null);
 
   return (
-    <Pressable
-      style={styles.backdrop}
+    <AnimatedPressable
+      style={[styles.backdrop, enterStyle("fade", motion)]}
       onPress={onClose}
       accessibilityLabel="Close menu"
     >
       {/* Taps inside the card do not close the menu. */}
-      <Pressable style={[styles.menu, { backgroundColor: colors.panel }]} onPress={() => {}}>
+      <AnimatedPressable
+        style={[styles.menu, { backgroundColor: colors.panel }, enterStyle("pop", motion)]}
+        onPress={() => {}}
+      >
         {title ? (
           <Text numberOfLines={2} style={[styles.title, { color: colors.muted }]}>
             {title}
@@ -73,8 +79,8 @@ export default function ActionMenu({
             </Pressable>
           );
         })}
-      </Pressable>
-    </Pressable>
+      </AnimatedPressable>
+    </AnimatedPressable>
   );
 }
 

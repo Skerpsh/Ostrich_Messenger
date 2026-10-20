@@ -63,6 +63,8 @@ export type Preferences = {
   textSize: TextSize;
   density: ListDensity;
   wallpaper: Wallpaper;
+  // Animations (lib/motion.ts); the system's "Reduce motion" also tones them down.
+  animations: boolean;
   // Sync personalization with the account's other devices.
   sync: boolean;
 };
@@ -72,6 +74,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   textSize: "m",
   density: "comfortable",
   wallpaper: DEFAULT_WALLPAPER,
+  animations: true,
   sync: false,
 };
 
@@ -86,6 +89,7 @@ export function readPreferences(value: unknown): Preferences {
     textSize: typeof p.textSize === "string" && SIZES.has(p.textSize) ? p.textSize : "m",
     density: typeof p.density === "string" && DENSITIES.has(p.density) ? p.density : "comfortable",
     wallpaper: readWallpaper(p.wallpaper) ?? DEFAULT_WALLPAPER,
+    animations: p.animations !== false,
     sync: p.sync === true,
   };
 }

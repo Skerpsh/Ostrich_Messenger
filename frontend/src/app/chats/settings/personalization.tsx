@@ -75,6 +75,16 @@ export default function PersonalizationSettings() {
         </Block>
       </Section>
 
+      <Section title="Motion">
+        <ToggleRow
+          icon="sparkles-outline"
+          label="Animations"
+          hint="Messages, menus and screens move in. With the system's Reduce motion they only fade."
+          value={theme.animations}
+          onChange={theme.setAnimations}
+        />
+      </Section>
+
       <Section title="Chats list" footer={DENSITY_HINTS[theme.density]}>
         <Segmented options={LIST_DENSITIES} value={theme.density} onChange={theme.setDensity} />
       </Section>

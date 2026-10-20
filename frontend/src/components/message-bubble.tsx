@@ -1,6 +1,8 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+// The bubble's entrance; the swipe to reply uses React Native's Animated.
+import Reanimated from "react-native-reanimated";
 import AttachmentView from "@/components/attachment-view";
 import LinkCard from "@/components/link-card";
 import DevBadge from "@/components/dev-badge";
@@ -14,6 +16,7 @@ import { isLegacyMessage } from "@/lib/crypto";
 import type { MessageRow } from "@/lib/chat-rows";
 import type { Attachment, CallEntry, LookEntry } from "@/lib/payload";
 import { formatTime, previewText } from "@/lib/format";
+import { enterStyle, useMotion } from "@/lib/motion";
 import { messagePreview } from "@/lib/preview";
 import type { Shown } from "@/lib/use-chat-crypto";
 import { accentVariant, isAccentChoice, radius, type AccentChoice } from "@/theme/colors";
@@ -47,6 +50,7 @@ export default function MessageBubble({
   onOpenPhoto,
   onCall,
   onLook,
+  animateIn = false,
   selected,
   onToggle,
 }: {
@@ -76,6 +80,8 @@ export default function MessageBubble({
   onCall?: (video: boolean) => void;
   // A chat look entry was tapped: open the chat's "Wallpaper & color".
   onLook?: () => void;
+  // Arrived while the chat is open: comes in animated.
+  animateIn?: boolean;
   // Choosing messages: whether this one is chosen (undefined: not
   // choosing); a tap chooses it or not.
   selected?: boolean;
@@ -83,6 +89,7 @@ export default function MessageBubble({
 }) {
   const selecting = selected !== undefined;
   const { colors, textScale } = useAppTheme();
+  const motion = useMotion();
   // Settings → Personalization → Text size.
   const contentSize = { fontSize: 16 * textScale, lineHeight: 22 * textScale };
   const [hovered, setHovered] = useState(false);
@@ -114,13 +121,15 @@ export default function MessageBubble({
     ) : null;
 
   return (
-    <View
+    <Reanimated.View
       // pointerenter/leave are not fired when the pointer moves onto the
       // reply button inside the row, so the button stays while used.
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
       {...swipe.handlers}
       style={[
+        animateIn && enterStyle("bubble", motion),
+        { transformOrigin: own ? "right bottom" : "left bottom" },
         styles.row,
         own ? styles.rowOwn : styles.rowOther,
         { marginTop: joinedAbove ? 2 : 10 },
@@ -328,7 +337,7 @@ export default function MessageBubble({
           <Ionicons name="arrow-undo" size={18} color={colors.accent} />
         </Animated.View>
       ) : null}
-    </View>
+    </Reanimated.View>
   );
 }
 

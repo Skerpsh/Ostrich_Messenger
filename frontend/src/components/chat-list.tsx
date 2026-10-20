@@ -4,7 +4,6 @@ import * as Clipboard from "expo-clipboard";
 import { usePathname, useRouter } from "expo-router";
 import {
   ActivityIndicator,
-  FlatList,
   Modal,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppHeader from "@/components/app-header";
 import ActionMenu from "@/components/action-menu";
@@ -21,6 +21,7 @@ import Avatar from "@/components/avatar";
 import ChatAvatar from "@/components/chat-avatar";
 import DevBadge from "@/components/dev-badge";
 import IconButton from "@/components/icon-button";
+import TypingDots from "@/components/typing-dots";
 import Welcome from "@/components/welcome";
 import { noWebOutline } from "@/components/text-field";
 import { useAuth, useCurrentUser, usePrivateKey } from "@/context/auth";
@@ -35,6 +36,7 @@ import { chatTitle } from "@/lib/groups";
 import { messagePreview } from "@/lib/preview";
 import { hasMod, useKeydown } from "@/lib/keys";
 import { useIsWide } from "@/lib/layout";
+import { enterStyle, LIST_LAYOUT, useMotion } from "@/lib/motion";
 import { useChatCrypto } from "@/lib/use-chat-crypto";
 import { useMinuteTick } from "@/lib/use-minute-tick";
 import { useStartChat } from "@/lib/use-start-chat";
@@ -52,6 +54,7 @@ export default function ChatList() {
   const router = useRouter();
   const pathname = usePathname();
   const { colors } = useAppTheme();
+  const motion = useMotion();
   const insets = useSafeAreaInsets();
   const wide = useIsWide();
   const user = useCurrentUser();
@@ -321,9 +324,10 @@ export default function ChatList() {
         {wide ? newChatButton : null}
       </View>
 
-      <FlatList
+      <Reanimated.FlatList
         data={shown}
         keyExtractor={(chat) => chat.id}
+        itemLayoutAnimation={motion === "full" ? LIST_LAYOUT : undefined}
         contentContainerStyle={[
           styles.list,
           // Phones: room for the "new chat" button over the last chat.
@@ -615,6 +619,7 @@ function ChatRow({
   onMenu: () => void;
 }) {
   const { colors, density, textScale } = useAppTheme();
+  const motion = useMotion();
   const { decrypt } = useChatCrypto(chat);
   const last = chat.last_message;
   // Settings → Personalization → Chats list.
@@ -651,8 +656,11 @@ function ChatRow({
         </View>
       ) : null}
       {chat.unread_count > 0 ? (
-        <View
+        <Reanimated.View
+          // A new count pops in.
+          key={chat.unread_count}
           style={[
+            enterStyle("badge", motion),
             styles.badge,
             // Muted chats count quietly.
             { backgroundColor: chat.muted ? colors.muted : colors.accent },
@@ -666,7 +674,7 @@ function ChatRow({
           >
             {chat.unread_count > 99 ? "99+" : chat.unread_count}
           </Text>
-        </View>
+        </Reanimated.View>
       ) : null}
     </>
   );
@@ -730,27 +738,34 @@ function ChatRow({
         </View>
         {minimal ? null : (
           <View style={styles.rowLine}>
-            <Text numberOfLines={1} style={[styles.preview, { color: colors.muted, fontSize: 14 * textScale }]}>
-              {typing ? (
-                <Text style={{ color: colors.accent }}>typing…</Text>
-              ) : draft ? (
-                <>
-                  <Text style={{ color: colors.danger }}>Draft: </Text>
-                  {previewText(draft)}
-                </>
-              ) : last && shownLast ? (
-                <>
-                  {shownLast.status === "system" || chat.type === "saved" ? null : own ? (
-                    <Text style={{ color: colors.textSoft }}>You: </Text>
-                  ) : group ? (
-                    <Text style={{ color: colors.textSoft }}>@{last.sender_username}: </Text>
-                  ) : null}
-                  {previewText(messagePreview(shownLast))}
-                </>
-              ) : (
-                <Text style={styles.italic}>No messages yet</Text>
-              )}
-            </Text>
+            {typing ? (
+              <View style={styles.typing}>
+                <Text style={[styles.preview, styles.typingText, { color: colors.accent, fontSize: 14 * textScale }]}>
+                  typing
+                </Text>
+                <TypingDots color={colors.accent} />
+              </View>
+            ) : (
+              <Text numberOfLines={1} style={[styles.preview, { color: colors.muted, fontSize: 14 * textScale }]}>
+                {draft ? (
+                  <>
+                    <Text style={{ color: colors.danger }}>Draft: </Text>
+                    {previewText(draft)}
+                  </>
+                ) : last && shownLast ? (
+                  <>
+                    {shownLast.status === "system" || chat.type === "saved" ? null : own ? (
+                      <Text style={{ color: colors.textSoft }}>You: </Text>
+                    ) : group ? (
+                      <Text style={{ color: colors.textSoft }}>@{last.sender_username}: </Text>
+                    ) : null}
+                    {previewText(messagePreview(shownLast))}
+                  </>
+                ) : (
+                  <Text style={styles.italic}>No messages yet</Text>
+                )}
+              </Text>
+            )}
             {badges}
           </View>
         )}
@@ -909,6 +924,17 @@ const styles = StyleSheet.create({
   preview: {
     flex: 1,
     fontSize: 14,
+  },
+
+  typing: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  typingText: {
+    flex: 0,
   },
 
   italic: {

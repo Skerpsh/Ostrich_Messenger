@@ -16,6 +16,7 @@ import {
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
 } from "react-native";
+import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActionMenu, { type ActionMenuItem } from "@/components/action-menu";
 import AppHeader, { HEADER_HEIGHT } from "@/components/app-header";
@@ -32,6 +33,8 @@ import IconButton from "@/components/icon-button";
 import MessageBubble from "@/components/message-bubble";
 import PhotoViewer from "@/components/photo-viewer";
 import SafetyCode from "@/components/safety-code";
+import TypingDots from "@/components/typing-dots";
+import ScreenEnter from "@/components/screen-enter";
 import { RecordButton, RecordingBar, useVoiceRecorder } from "@/components/voice-recorder";
 import { noWebOutline } from "@/components/text-field";
 import { useAuth, useCurrentUser, usePrivateKey } from "@/context/auth";
@@ -80,6 +83,7 @@ import { chatTitle, isGroupDistrusted } from "@/lib/groups";
 import { loadCachedMessages, saveCachedMessages } from "@/lib/local-cache";
 import { mentionedUsernames, plainText } from "@/lib/markup";
 import { useInvertedWheel } from "@/lib/inverted-wheel";
+import { enterStyle, useMotion } from "@/lib/motion";
 import { linkImage } from "@/lib/link-preview";
 import { encodePayload, type Attachment, type LinkPreview, type LookEntry } from "@/lib/payload";
 import type { ChatLook } from "@/lib/personalization";
@@ -127,7 +131,9 @@ export default function ChatRoute() {
 
   return (
     <ChatAccentProvider accent={look.accent}>
-      <ChatScreen key={`${chatId}:${message ?? ""}`} chatId={chatId} focusId={message} look={look} />
+      <ScreenEnter key={chatId}>
+        <ChatScreen key={`${chatId}:${message ?? ""}`} chatId={chatId} focusId={message} look={look} />
+      </ScreenEnter>
     </ChatAccentProvider>
   );
 }
@@ -173,6 +179,9 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   const startChat = useStartChat();
 
   const [messages, setMessages] = useState<Message[] | null>(null);
+  const motion = useMotion();
+  // Messages newer than this come in animated (not the history).
+  const [openedAt] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   // Unsent text, kept per chat on this device.
   const [draft, setDraft] = useState(() => drafts[chatId] ?? "");
@@ -1453,11 +1462,13 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
     ? null
     : group && typingNames.length
       ? typingNames.length === 1
-        ? `@${typingNames[0]} is typing…`
-        : `${typingNames.length} people are typing…`
-      : "typing…";
+        ? `@${typingNames[0]} is typing`
+        : `${typingNames.length} people are typing`
+      : "typing";
 
   const peerReadAt = chat?.peer_last_read_at ?? null;
+  // What the composer's button does now (it springs in when that changes).
+  const composerAction = voice.active ? "voice" : !draft.trim() && picked.length === 0 && !editing ? "record" : editing ? "save" : "send";
   const canSend =
     (Boolean(draft.trim()) || (picked.length > 0 && !editing)) && !sending && !uploading && !keyChanged;
 
@@ -1537,6 +1548,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
             statusText
           )
         }
+        subtitleAccessory={typingText ? <TypingDots color={colors.accent} /> : null}
         right={
           chat ? (
             <>
@@ -1791,6 +1803,9 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                     onOpenPhoto={(attachment) => setViewing(attachment.id)}
                     onCall={chat?.type === "direct" ? startCall : undefined}
                     onLook={() => setShowLook(true)}
+                    animateIn={
+                      Boolean(outgoingOf(item.message)) || time(item.message.created_at) > openedAt - 2000
+                    }
                     selected={selected && !outgoingOf(item.message) ? selected.has(item.message.id) : undefined}
                     onToggle={() => toggleChosen(item.message)}
                   />
@@ -2089,27 +2104,30 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                 </>
               )}
 
-              {voice.active ? (
-                <IconButton
-                  icon="arrow-up"
-                  label="Send the voice message"
-                  filled
-                  size={22}
-                  onPress={voice.finish}
-                  disabled={uploading}
-                />
-              ) : !draft.trim() && picked.length === 0 && !editing ? (
-                <RecordButton voice={voice} disabled={sending || uploading || keyChanged} />
-              ) : (
-                <IconButton
-                  icon={editing ? "checkmark" : "arrow-up"}
-                  label={editing ? "Save" : "Send"}
-                  filled
-                  size={22}
-                  onPress={() => send()}
-                  disabled={!canSend}
-                />
-              )}
+              {/* The button turns into another as the draft changes. */}
+              <Reanimated.View key={composerAction} style={enterStyle("grow", motion)}>
+                {voice.active ? (
+                  <IconButton
+                    icon="arrow-up"
+                    label="Send the voice message"
+                    filled
+                    size={22}
+                    onPress={voice.finish}
+                    disabled={uploading}
+                  />
+                ) : !draft.trim() && picked.length === 0 && !editing ? (
+                  <RecordButton voice={voice} disabled={sending || uploading || keyChanged} />
+                ) : (
+                  <IconButton
+                    icon={editing ? "checkmark" : "arrow-up"}
+                    label={editing ? "Save" : "Send"}
+                    filled
+                    size={22}
+                    onPress={() => send()}
+                    disabled={!canSend}
+                  />
+                )}
+              </Reanimated.View>
             </View>
           </View>
         )}

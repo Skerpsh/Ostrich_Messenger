@@ -17,6 +17,8 @@ type AppHeaderProps = {
   // Shown right after the title, e.g. the DEV badge.
   titleBadge?: ReactNode;
   subtitle?: ReactNode;
+  // After the subtitle, e.g. "typing…"'s dots.
+  subtitleAccessory?: ReactNode;
   right?: ReactNode;
   // The Ostrich logo and light/dark switch, for signed-out screens.
   brand?: boolean;
@@ -31,6 +33,7 @@ export default function AppHeader({
   title,
   titleBadge,
   subtitle,
+  subtitleAccessory,
   right,
   brand = false,
 }: AppHeaderProps) {
@@ -79,12 +82,15 @@ export default function AppHeader({
           </View>
         ) : null}
         {subtitle ? (
-          <Text
-            numberOfLines={1}
-            style={[styles.subtitle, { color: colors.muted }]}
-          >
-            {subtitle}
-          </Text>
+          <View style={styles.subtitleRow}>
+            <Text
+              numberOfLines={1}
+              style={[styles.subtitle, { color: colors.muted }]}
+            >
+              {subtitle}
+            </Text>
+            {subtitleAccessory}
+          </View>
         ) : null}
       </View>
 
@@ -129,7 +135,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
+  subtitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
   subtitle: {
+    flexShrink: 1,
     marginTop: 1,
     fontSize: 13,
   },

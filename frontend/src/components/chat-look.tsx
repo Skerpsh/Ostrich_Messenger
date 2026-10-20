@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import Button from "@/components/button";
 import { AccentPicker, ChatPreview, WallpaperPicker } from "@/components/personalization";
 import { Segmented } from "@/components/settings/ui";
 import { useChatLooks } from "@/context/chat-looks";
+import AnimatedPressable from "@/components/animated-pressable";
 import { ChatAccentProvider, useAppTheme } from "@/context/theme";
+import { enterStyle, useMotion } from "@/lib/motion";
 import type { ChatLook, Wallpaper } from "@/lib/personalization";
 import { radius, type AccentChoice } from "@/theme/colors";
 
@@ -26,6 +28,7 @@ export default function ChatLookSheet({
   onClose: () => void;
 }) {
   const { colors, wallpaper: deviceWallpaper, wallpaperPhoto } = useAppTheme();
+  const motion = useMotion();
   const looks = useChatLooks();
   const [audience, setAudience] = useState<Audience>("me");
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +72,15 @@ export default function ChatLookSheet({
   };
 
   return (
-    <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close">
-      <Pressable style={[styles.card, { backgroundColor: colors.panel }]} onPress={() => {}}>
+    <AnimatedPressable
+      style={[styles.backdrop, enterStyle("fade", motion)]}
+      onPress={onClose}
+      accessibilityLabel="Close"
+    >
+      <AnimatedPressable
+        style={[styles.card, { backgroundColor: colors.panel }, enterStyle("pop", motion)]}
+        onPress={() => {}}
+      >
         <ScrollView contentContainerStyle={styles.body}>
           <Text style={[styles.title, { color: colors.text }]}>Wallpaper & color</Text>
 
@@ -127,8 +137,8 @@ export default function ChatLookSheet({
             />
           </View>
         </ScrollView>
-      </Pressable>
-    </Pressable>
+      </AnimatedPressable>
+    </AnimatedPressable>
   );
 }
 

@@ -11,7 +11,9 @@ import SafetyCode from "@/components/safety-code";
 import TextField from "@/components/text-field";
 import { useAuth } from "@/context/auth";
 import { useRealtime } from "@/context/realtime";
+import AnimatedPressable from "@/components/animated-pressable";
 import { useAppTheme } from "@/context/theme";
+import { enterStyle, useMotion } from "@/lib/motion";
 import {
   declineJoinRequest,
   findUser,
@@ -66,6 +68,7 @@ export default function GroupInfo({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
   const { state, withToken } = useAuth();
   const { presence, status } = useRealtime();
   const me = state.status === "signedIn" && state.privateKey ? { id: state.user.id, privateKey: state.privateKey } : null;
@@ -186,8 +189,15 @@ export default function GroupInfo({
     (chat.role === "owner" || (chat.role === "admin" && member.role === "member"));
 
   return (
-    <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close">
-      <Pressable style={[styles.card, { backgroundColor: colors.panel }]} onPress={() => {}}>
+    <AnimatedPressable
+      style={[styles.backdrop, enterStyle("fade", motion)]}
+      onPress={onClose}
+      accessibilityLabel="Close"
+    >
+      <AnimatedPressable
+        style={[styles.card, { backgroundColor: colors.panel }, enterStyle("pop", motion)]}
+        onPress={() => {}}
+      >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.head}>
             <ChatAvatar chat={chat} size={72} />
@@ -417,7 +427,7 @@ export default function GroupInfo({
 
           <Button title="Close" variant="secondary" onPress={onClose} />
         </ScrollView>
-      </Pressable>
+      </AnimatedPressable>
 
       {codeFor && me && codeFor.member.public_key ? (
         <SafetyCode
@@ -431,7 +441,7 @@ export default function GroupInfo({
           onClose={() => setCodeFor(null)}
         />
       ) : null}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
