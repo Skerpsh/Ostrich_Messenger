@@ -34,7 +34,7 @@ import MessageBubble from "@/components/message-bubble";
 import PhotoViewer from "@/components/photo-viewer";
 import SafetyCode from "@/components/safety-code";
 import TypingDots from "@/components/typing-dots";
-import ScreenEnter from "@/components/screen-enter";
+import ScreenEnter, { useLeaveScreen } from "@/components/screen-enter";
 import { RecordButton, RecordingBar, useVoiceRecorder } from "@/components/voice-recorder";
 import { noWebOutline } from "@/components/text-field";
 import { useAuth, useCurrentUser, usePrivateKey } from "@/context/auth";
@@ -83,6 +83,7 @@ import { chatTitle, isGroupDistrusted } from "@/lib/groups";
 import { loadCachedMessages, saveCachedMessages } from "@/lib/local-cache";
 import { mentionedUsernames, plainText } from "@/lib/markup";
 import { useInvertedWheel } from "@/lib/inverted-wheel";
+import { useEscape } from "@/lib/keys";
 import { enterStyle, useMotion } from "@/lib/motion";
 import { linkImage } from "@/lib/link-preview";
 import { encodePayload, type Attachment, type LinkPreview, type LookEntry } from "@/lib/payload";
@@ -97,6 +98,7 @@ import { useIsWide } from "@/lib/layout";
 import { encryptForChat, useChatCrypto, type Shown } from "@/lib/use-chat-crypto";
 import { useStartChat } from "@/lib/use-start-chat";
 import { useMinuteTick } from "@/lib/use-minute-tick";
+import { TOUCH_UI } from "@/lib/touch";
 import { radius } from "@/theme/colors";
 
 const MAX_MESSAGE_LENGTH = 4096;
@@ -261,8 +263,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   );
   const firstLoad = useRef(true);
 
+  // The web slides the chat out first.
+  const leaveScreen = useLeaveScreen();
   const goBack = () =>
-    router.canGoBack() ? router.back() : router.replace("/chats");
+    leaveScreen(() => (router.canGoBack() ? router.back() : router.replace("/chats")));
 
   // Incoming messages of the chat on screen are read right away.
   useEffect(() => {
@@ -1404,22 +1408,23 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         startEdit(last);
       }
     }
-
-    // Esc cancels a reply or an edit; with neither, it closes the chat.
-    if (Platform.OS === "web" && nativeEvent.key === "Escape") {
-      event.preventDefault();
-
-      if (replyTo || editing) {
-        setReplyTo(null);
-
-        if (editing) {
-          cancelEdit();
-        }
-      } else if (wide) {
-        router.replace("/chats");
-      }
-    }
   };
+
+  // Web: Esc closes one thing at a time, the one opened last (lib/keys.ts),
+  // and in the end the chat.
+  useEscape(wide, () => leaveScreen(() => router.replace("/chats")));
+  useEscape(Boolean(replyTo || editing), () => {
+    setReplyTo(null);
+
+    if (editing) {
+      cancelEdit();
+    }
+  });
+  useEscape(selected !== null, () => setSelected(null));
+  useEscape(searching, () => setSearching(false));
+  useEscape(attachMenu, () => setAttachMenu(false));
+  useEscape(emojiOpen, () => setEmojiOpen(false));
+  useEscape(voice.active, voice.cancel);
 
   // Not in the list from the server (the saved list may just be old).
   if (synced && !chat) {
@@ -1433,7 +1438,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           <Button
             title="Back to chats"
             variant="secondary"
-            onPress={() => router.replace("/chats")}
+            onPress={() => leaveScreen(() => router.replace("/chats"))}
           />
         </View>
       </View>
@@ -1622,7 +1627,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                 onSubmitEditing={() => goToMatch(matchIndex)}
                 placeholder="Search messages"
                 placeholderTextColor={colors.muted}
-                autoFocus
+                autoFocus={!TOUCH_UI}
                 returnKeyType="search"
                 style={[styles.searchInput, { color: colors.text }, noWebOutline]}
               />
@@ -2082,7 +2087,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                       // One row on web (textarea defaults to two); grows while typing.
                       numberOfLines={1}
                       maxLength={MAX_MESSAGE_LENGTH}
-                      autoFocus={Platform.OS === "web"}
+                      autoFocus={!TOUCH_UI}
                       onContentSizeChange={(event) =>
                         setInputHeight(
                           Math.min(

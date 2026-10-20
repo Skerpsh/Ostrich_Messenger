@@ -34,7 +34,7 @@ import { takePendingLink } from "@/lib/links";
 import { searchMessages, snippet, type MessageMatch } from "@/lib/search";
 import { chatTitle } from "@/lib/groups";
 import { messagePreview } from "@/lib/preview";
-import { hasMod, useKeydown } from "@/lib/keys";
+import { hasMod, useEscape, useKeydown } from "@/lib/keys";
 import { useIsWide } from "@/lib/layout";
 import { enterStyle, LIST_LAYOUT, useMotion } from "@/lib/motion";
 import { useChatCrypto } from "@/lib/use-chat-crypto";
@@ -71,6 +71,7 @@ export default function ChatList() {
   useMinuteTick();
 
   const [query, setQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -152,6 +153,12 @@ export default function ChatList() {
       focusSearch = null;
     };
   }, []);
+
+  // Web: Esc clears the search and leaves it.
+  useEscape(searchFocused, () => {
+    setQuery("");
+    searchRef.current?.blur();
+  });
 
   // Web: Ctrl/⌘ K goes to the search, Alt ↑ / ↓ to the chat above or below.
   useKeydown((event) => {
@@ -301,14 +308,8 @@ export default function ChatList() {
             autoCorrect={false}
             returnKeyType="search"
             onSubmitEditing={() => (canStart ? startChat() : undefined)}
-            onKeyPress={(event) => {
-              // Web: Esc clears the search and leaves it.
-              if (Platform.OS === "web" && event.nativeEvent.key === "Escape") {
-                event.preventDefault();
-                setQuery("");
-                searchRef.current?.blur();
-              }
-            }}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             style={[styles.searchInput, { color: colors.text }, noWebOutline]}
           />
           {query ? (

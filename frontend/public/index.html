@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <!-- viewport-fit=cover lets the app draw under the notch and home indicator; screens pad themselves with safe-area insets. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
+    <!-- viewport-fit=cover lets the app draw under the notch and home indicator; screens pad themselves with safe-area insets. The page does not zoom, like an app: maximum-scale=1 also stops Safari on iPhone from zooming in on a field it focuses (lib/no-zoom.ts stops pinching). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
     <title>%WEB_TITLE%</title>
     <!-- Lets the site be added to the home screen and open full screen, like an app. -->
@@ -25,6 +25,12 @@
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
+      }
+      /* No zooming: no double-tap zoom, no text resizing on turning the phone. */
+      html {
+        touch-action: pan-x pan-y;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
       }
       /* These styles make the root element full-height */
       #root {

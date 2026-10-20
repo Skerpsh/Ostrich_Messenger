@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import AnimatedPressable from "@/components/animated-pressable";
 import ChatAvatar from "@/components/chat-avatar";
 import DevBadge from "@/components/dev-badge";
 import { noWebOutline } from "@/components/text-field";
 import { useChats } from "@/context/chats";
-import AnimatedPressable from "@/components/animated-pressable";
 import { useAppTheme } from "@/context/theme";
-import { enterStyle, useMotion } from "@/lib/motion";
+import { useEscape } from "@/lib/keys";
+import { enterStyle, leaveStyle, useLeave } from "@/lib/motion";
 import type { Chat } from "@/lib/api";
 import { chatTitle, groupKeyOf } from "@/lib/groups";
+import { TOUCH_UI } from "@/lib/touch";
 import { radius } from "@/theme/colors";
 
 // "Forward to…": a chat to forward a message to, over a dimmed background
@@ -21,7 +23,10 @@ export default function ForwardPicker({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
-  const motion = useMotion();
+  const { motion, leaving, leave } = useLeave();
+  // Leaves with an animation (also on Esc, on the web).
+  const close = () => leave(onClose);
+  useEscape(true, close);
   const { chats } = useChats();
   const [query, setQuery] = useState("");
 
@@ -40,12 +45,13 @@ export default function ForwardPicker({
 
   return (
     <AnimatedPressable
-      style={[styles.backdrop, enterStyle("fade", motion)]}
-      onPress={onClose}
+      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      pointerEvents={leaving ? "none" : "auto"}
+      onPress={close}
       accessibilityLabel="Close"
     >
       <AnimatedPressable
-        style={[styles.card, { backgroundColor: colors.panel }, enterStyle("pop", motion)]}
+        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
         onPress={() => {}}
       >
         <Text style={[styles.title, { color: colors.text }]}>Forward to…</Text>
@@ -55,7 +61,7 @@ export default function ForwardPicker({
             onChangeText={setQuery}
             placeholder="Search chats"
             placeholderTextColor={colors.muted}
-            autoFocus
+            autoFocus={!TOUCH_UI}
             style={[styles.searchInput, { color: colors.text }, noWebOutline]}
           />
         </View>

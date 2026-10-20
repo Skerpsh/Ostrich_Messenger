@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import IconButton from "@/components/icon-button";
 import { useAppTheme } from "@/context/theme";
+import { useEscape } from "@/lib/keys";
 
 // Scanning a QR code with the computer's or phone's camera in the browser:
 // the browser's own detector where there is one, jsQR otherwise.
@@ -24,6 +25,8 @@ export default function QrScanner({
   onScan: (text: string) => boolean;
   onClose: () => void;
 }) {
+  // Esc closes it (lib/keys.ts).
+  useEscape(true, onClose);
   const { colors } = useAppTheme();
   const video = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);

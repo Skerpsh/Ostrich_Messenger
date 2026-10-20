@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import AnimatedPressable from "@/components/animated-pressable";
 import Button from "@/components/button";
 import { AccentPicker, ChatPreview, WallpaperPicker } from "@/components/personalization";
 import { Segmented } from "@/components/settings/ui";
 import { useChatLooks } from "@/context/chat-looks";
-import AnimatedPressable from "@/components/animated-pressable";
 import { ChatAccentProvider, useAppTheme } from "@/context/theme";
-import { enterStyle, useMotion } from "@/lib/motion";
+import { useEscape } from "@/lib/keys";
+import { enterStyle, leaveStyle, useLeave } from "@/lib/motion";
 import type { ChatLook, Wallpaper } from "@/lib/personalization";
 import { radius, type AccentChoice } from "@/theme/colors";
 
@@ -28,7 +29,10 @@ export default function ChatLookSheet({
   onClose: () => void;
 }) {
   const { colors, wallpaper: deviceWallpaper, wallpaperPhoto } = useAppTheme();
-  const motion = useMotion();
+  const { motion, leaving, leave } = useLeave();
+  // Leaves with an animation (also on Esc, on the web).
+  const close = () => leave(onClose);
+  useEscape(true, close);
   const looks = useChatLooks();
   const [audience, setAudience] = useState<Audience>("me");
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +58,7 @@ export default function ChatLookSheet({
   const apply = async (look: ChatLook | null) => {
     if (audience === "me") {
       looks.setMine(chatId, look, look?.wallpaper?.pattern === "photo" ? draft.photo : null);
-      onClose();
+      close();
       return;
     }
 
@@ -63,7 +67,7 @@ export default function ChatLookSheet({
 
     try {
       await share?.(look, look?.wallpaper?.pattern === "photo" ? draft.photo : null);
-      onClose();
+      close();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not send the wallpaper");
     } finally {
@@ -73,12 +77,13 @@ export default function ChatLookSheet({
 
   return (
     <AnimatedPressable
-      style={[styles.backdrop, enterStyle("fade", motion)]}
-      onPress={onClose}
+      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      pointerEvents={leaving ? "none" : "auto"}
+      onPress={close}
       accessibilityLabel="Close"
     >
       <AnimatedPressable
-        style={[styles.card, { backgroundColor: colors.panel }, enterStyle("pop", motion)]}
+        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
         onPress={() => {}}
       >
         <ScrollView contentContainerStyle={styles.body}>

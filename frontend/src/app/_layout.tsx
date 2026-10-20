@@ -20,6 +20,7 @@ import { ChatLooksProvider } from "@/context/chat-looks";
 import { AppThemeProvider, useAppTheme } from "@/context/theme";
 import { restoreAppIcon, setAppIcon } from "@/lib/app-icon";
 import { rememberLink } from "@/lib/links";
+import { preventZoom } from "@/lib/no-zoom";
 import { registerServiceWorker } from "@/lib/pwa";
 import SettingsSync from "@/lib/settings-sync";
 import { nearestAccent } from "@/theme/colors";
@@ -27,6 +28,7 @@ import { nearestAccent } from "@/theme/colors";
 // Keep the splash screen until the saved session has been checked.
 SplashScreen.preventAutoHideAsync();
 registerServiceWorker();
+preventZoom();
 
 export default function RootLayout() {
   return (

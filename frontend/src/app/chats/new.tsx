@@ -14,20 +14,32 @@ import AppHeader from "@/components/app-header";
 import Avatar from "@/components/avatar";
 import Button from "@/components/button";
 import QrScanner from "@/components/qr-scanner";
+import ScreenEnter, { useLeaveScreen } from "@/components/screen-enter";
 import TextField from "@/components/text-field";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useChats } from "@/context/chats";
 import { useAppTheme } from "@/context/theme";
 import { findUser, type FoundUser } from "@/lib/api";
 import { createGroup, MAX_GROUP_MEMBERS } from "@/lib/groups";
+import { useEscape } from "@/lib/keys";
 import { useIsWide } from "@/lib/layout";
 import { linkPath, parseLink } from "@/lib/links";
+import { TOUCH_UI } from "@/lib/touch";
 import { useStartChat } from "@/lib/use-start-chat";
 import { cleanUsername, USERNAME_RE, USERNAME_RULES } from "@/lib/validation";
 import { radius } from "@/theme/colors";
 
 export default function NewChatScreen() {
+  return (
+    <ScreenEnter>
+      <NewChat />
+    </ScreenEnter>
+  );
+}
+
+function NewChat() {
   const router = useRouter();
+  const leaveScreen = useLeaveScreen();
   const { colors } = useAppTheme();
   const wide = useIsWide();
   const user = useCurrentUser();
@@ -40,7 +52,10 @@ export default function NewChatScreen() {
   const [loading, setLoading] = useState(false);
 
   const close = () =>
-    wide || !router.canGoBack() ? router.replace("/chats") : router.back();
+    leaveScreen(() => (wide || !router.canGoBack() ? router.replace("/chats") : router.back()));
+
+  // Web: Esc closes it.
+  useEscape(true, close);
 
   const open = (chatId: string) =>
     router.replace({ pathname: "/chats/[chatId]", params: { chatId } });
@@ -139,7 +154,7 @@ export default function NewChatScreen() {
                   setError(null);
                 }}
                 maxLength={33}
-                autoFocus
+                autoFocus={!TOUCH_UI}
                 returnKeyType="go"
                 onSubmitEditing={submit}
               />
@@ -303,7 +318,7 @@ function NewGroup({ onCreated }: { onCreated: (chatId: string) => void }) {
           setError(null);
         }}
         maxLength={64}
-        autoFocus
+        autoFocus={!TOUCH_UI}
       />
 
       <View style={styles.addRow}>

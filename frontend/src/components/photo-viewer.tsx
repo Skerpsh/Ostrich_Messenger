@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/auth";
 import { loadAttachment } from "@/lib/attachments";
 import { imageSource, saveFile } from "@/lib/files";
+import { useEscape } from "@/lib/keys";
 import type { Attachment } from "@/lib/payload";
 
 // The chat's photos on the whole screen, one at a time: arrows (and the
@@ -57,7 +58,9 @@ export default function PhotoViewer({
     };
   }, [photo, withToken, onError]);
 
-  // Web: ← → to go through, Esc to close.
+  // Web: Esc closes it (lib/keys.ts), ← → go through.
+  useEscape(true, onClose);
+
   useEffect(() => {
     if (Platform.OS !== "web") {
       return;
@@ -68,8 +71,6 @@ export default function PhotoViewer({
         setIndex((current) => Math.max(0, current - 1));
       } else if (event.key === "ArrowRight") {
         setIndex((current) => Math.min(photos.length - 1, current + 1));
-      } else if (event.key === "Escape") {
-        onClose();
       } else {
         return;
       }

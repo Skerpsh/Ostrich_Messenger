@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Platform, type ViewStyle } from "react-native";
 import {
   cubicBezier,
@@ -92,6 +92,71 @@ const ANIMATIONS = {
 } satisfies Record<string, Animation>;
 
 export type Enter = keyof typeof ANIMATIONS;
+
+// Speeding up as it goes, for things leaving.
+const EASE_IN = cubicBezier(0.4, 0, 1, 1);
+
+// How long leaving takes, before the view is gone.
+export const LEAVE_MS = { full: 200, reduced: 120, off: 0 } satisfies Record<Motion, number>;
+
+const LEAVING = {
+  // A screen closing: back to the right, fading.
+  push: {
+    animationName: {
+      from: { opacity: 1, transform: [{ translateX: 0 }] },
+      to: { opacity: 0, transform: [{ translateX: 48 }] },
+    },
+  },
+  // Menus and dialogs: shrinking a little, fading.
+  pop: {
+    animationName: {
+      from: { opacity: 1, transform: [{ scale: 1 }] },
+      to: { opacity: 0, transform: [{ scale: 0.92 }] },
+    },
+  },
+  fade: { animationName: { from: { opacity: 1 }, to: { opacity: 0 } } },
+} satisfies Record<string, Animation>;
+
+// The style that animates a view out before it goes (see useLeave).
+export function leaveStyle(kind: keyof typeof LEAVING, motion: Motion): Animation | null {
+  if (motion === "off") {
+    return null;
+  }
+
+  return {
+    ...(motion === "reduced" ? LEAVING.fade : LEAVING[kind]),
+    animationDuration: LEAVE_MS[motion],
+    animationTimingFunction: EASE_IN,
+    animationFillMode: "forwards",
+  };
+}
+
+// Leaving with an animation: leave(then) shows it, then calls then (the
+// navigation, onClose). leaving: whether it is on its way out.
+export function useLeave() {
+  const motion = useMotion();
+  const [leaving, setLeaving] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const leave = (then: () => void) => {
+    if (motion === "off") {
+      then();
+      return;
+    }
+
+    if (timer.current) {
+      return;
+    }
+
+    setLeaving(true);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      then();
+    }, LEAVE_MS[motion]);
+  };
+
+  return { motion, leaving, leave };
+}
 
 // The style that animates a view in as it appears (Animated.View).
 export function enterStyle(kind: Enter, motion: Motion): Animation | null {

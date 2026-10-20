@@ -8,6 +8,7 @@ import ChatAvatar from "@/components/chat-avatar";
 import IconButton, { type IconName } from "@/components/icon-button";
 import { useCalls } from "@/context/calls";
 import { useAppTheme } from "@/context/theme";
+import { useEscape } from "@/lib/keys";
 import { formatDuration } from "@/lib/attachments";
 import type { CallStats } from "@/lib/call-connection";
 import type { CallView, HandshakeView } from "@/lib/calls";
@@ -155,6 +156,8 @@ function VideoScreen({ call, status, wide }: { call: CallView; status: string; w
   const [handshakeOpen, setHandshakeOpen] = useState(false);
   const both = localOn(call) && remoteOn(call);
   const live = call.phase === "active" || call.phase === "reconnecting";
+  // Web: Esc folds the video call into the bar at the top.
+  useEscape(call.phase !== "incoming" && call.phase !== "ended", () => setMinimized(true));
   // The controls hide only over the other side's video, in a call.
   const autoHide = remoteOn(call) && live && !handshakeOpen;
 

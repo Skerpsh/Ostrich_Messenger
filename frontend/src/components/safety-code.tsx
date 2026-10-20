@@ -1,13 +1,14 @@
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
+import AnimatedPressable from "@/components/animated-pressable";
 import Button from "@/components/button";
 import QrCode from "@/components/qr-code";
 import QrScanner from "@/components/qr-scanner";
 import { parseLink, safetyQr } from "@/lib/links";
-import AnimatedPressable from "@/components/animated-pressable";
 import { useAppTheme } from "@/context/theme";
-import { enterStyle, useMotion } from "@/lib/motion";
+import { useEscape } from "@/lib/keys";
+import { enterStyle, leaveStyle, useLeave } from "@/lib/motion";
 import { radius } from "@/theme/colors";
 
 // The chat's safety code over a dimmed background (placed like
@@ -28,7 +29,10 @@ export default function SafetyCode({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
-  const motion = useMotion();
+  const { motion, leaving, leave } = useLeave();
+  // Leaves with an animation (also on Esc, on the web).
+  const close = () => leave(onClose);
+  useEscape(true, close);
   const [showQr, setShowQr] = useState(false);
   const [scanning, setScanning] = useState(false);
   // The scanned code: the same, or not.
@@ -49,12 +53,13 @@ export default function SafetyCode({
 
   return (
     <AnimatedPressable
-      style={[styles.backdrop, enterStyle("fade", motion)]}
-      onPress={onClose}
+      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      pointerEvents={leaving ? "none" : "auto"}
+      onPress={close}
       accessibilityLabel="Close"
     >
       <AnimatedPressable
-        style={[styles.card, { backgroundColor: colors.panel }, enterStyle("pop", motion)]}
+        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
         onPress={() => {}}
       >
         <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>
@@ -132,7 +137,7 @@ export default function SafetyCode({
         {keyChanged && scanned !== "different" ? (
           <Button title="The codes are the same" onPress={onConfirm} />
         ) : null}
-        <Button title="Close" variant="secondary" onPress={onClose} />
+        <Button title="Close" variant="secondary" onPress={close} />
       </AnimatedPressable>
 
       {scanning ? (

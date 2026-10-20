@@ -18,16 +18,13 @@ import type { Attachment, CallEntry, LookEntry } from "@/lib/payload";
 import { formatTime, previewText } from "@/lib/format";
 import { enterStyle, useMotion } from "@/lib/motion";
 import { messagePreview } from "@/lib/preview";
+import { TOUCH_UI } from "@/lib/touch";
 import type { Shown } from "@/lib/use-chat-crypto";
 import { accentVariant, isAccentChoice, radius, type AccentChoice } from "@/theme/colors";
 
-// Phones and tablets (also their browsers): swipe left to reply, long press
-// for the menu. Mouse users get a reply button on hover instead, and can
-// select text by dragging.
-export const TOUCH_UI =
-  Platform.OS !== "web" ||
-  (typeof window !== "undefined" &&
-    Boolean(window.matchMedia?.("(pointer: coarse)").matches));
+// Touch screens (lib/touch.ts): swipe left to reply, long press for the
+// menu. Mouse users get a reply button on hover instead, and can select
+// text by dragging.
 
 // How far a bubble follows the finger, and how far it must go to reply.
 const SWIPE_MAX = 72;

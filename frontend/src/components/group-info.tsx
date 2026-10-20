@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import * as Clipboard from "expo-clipboard";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import AnimatedPressable from "@/components/animated-pressable";
 import Avatar from "@/components/avatar";
 import Button from "@/components/button";
 import ChatAvatar from "@/components/chat-avatar";
@@ -11,9 +12,9 @@ import SafetyCode from "@/components/safety-code";
 import TextField from "@/components/text-field";
 import { useAuth } from "@/context/auth";
 import { useRealtime } from "@/context/realtime";
-import AnimatedPressable from "@/components/animated-pressable";
 import { useAppTheme } from "@/context/theme";
-import { enterStyle, useMotion } from "@/lib/motion";
+import { useEscape } from "@/lib/keys";
+import { enterStyle, leaveStyle, useLeave } from "@/lib/motion";
 import {
   declineJoinRequest,
   findUser,
@@ -68,7 +69,10 @@ export default function GroupInfo({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
-  const motion = useMotion();
+  const { motion, leaving, leave } = useLeave();
+  // Leaves with an animation (also on Esc, on the web).
+  const close = () => leave(onClose);
+  useEscape(true, close);
   const { state, withToken } = useAuth();
   const { presence, status } = useRealtime();
   const me = state.status === "signedIn" && state.privateKey ? { id: state.user.id, privateKey: state.privateKey } : null;
@@ -190,12 +194,13 @@ export default function GroupInfo({
 
   return (
     <AnimatedPressable
-      style={[styles.backdrop, enterStyle("fade", motion)]}
-      onPress={onClose}
+      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      pointerEvents={leaving ? "none" : "auto"}
+      onPress={close}
       accessibilityLabel="Close"
     >
       <AnimatedPressable
-        style={[styles.card, { backgroundColor: colors.panel }, enterStyle("pop", motion)]}
+        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
         onPress={() => {}}
       >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -425,7 +430,7 @@ export default function GroupInfo({
             <Action label="Delete group" icon="trash-outline" danger onPress={onDelete} />
           ) : null}
 
-          <Button title="Close" variant="secondary" onPress={onClose} />
+          <Button title="Close" variant="secondary" onPress={close} />
         </ScrollView>
       </AnimatedPressable>
 

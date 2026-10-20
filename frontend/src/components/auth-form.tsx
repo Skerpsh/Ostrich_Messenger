@@ -22,6 +22,7 @@ import {
   USERNAME_RE,
   USERNAME_RULES,
 } from "@/lib/validation";
+import { TOUCH_UI } from "@/lib/touch";
 import { radius } from "@/theme/colors";
 
 type AuthFormProps = {
@@ -141,7 +142,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 returnKeyType="next"
                 submitBehavior="submit"
                 onSubmitEditing={() => passwordRef.current?.focus()}
-                autoFocus={Platform.OS === "web"}
+                autoFocus={!TOUCH_UI}
               />
 
               <TextField

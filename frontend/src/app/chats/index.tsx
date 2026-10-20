@@ -3,19 +3,30 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import ChatList, { focusChatSearch } from "@/components/chat-list";
 import Welcome from "@/components/welcome";
 import { useCurrentUser } from "@/context/auth";
 import { useChats } from "@/context/chats";
 import { useAppTheme } from "@/context/theme";
 import { useIsWide } from "@/lib/layout";
+import { enterStyle, useMotion } from "@/lib/motion";
 import { radius } from "@/theme/colors";
 
 export default function ChatsScreen() {
   const wide = useIsWide();
 
-  // Wide screens show the list in the sidebar; this is the empty right pane.
-  return wide ? <NoChatSelected /> : <ChatList />;
+  const motion = useMotion();
+
+  // Wide screens show the list in the sidebar; this is the empty right pane
+  // (fading in as a chat closes).
+  return wide ? (
+    <Animated.View style={[styles.pane, enterStyle("fade", motion)]}>
+      <NoChatSelected />
+    </Animated.View>
+  ) : (
+    <ChatList />
+  );
 }
 
 function NoChatSelected() {
@@ -79,6 +90,10 @@ function NoChatSelected() {
 }
 
 const styles = StyleSheet.create({
+  pane: {
+    flex: 1,
+  },
+
   screen: {
     flex: 1,
     alignItems: "center",

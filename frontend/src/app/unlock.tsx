@@ -15,6 +15,7 @@ import Button from "@/components/button";
 import TextField from "@/components/text-field";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
+import { TOUCH_UI } from "@/lib/touch";
 import { radius } from "@/theme/colors";
 
 // A device logged in without the account's keys (e.g. from before
@@ -75,7 +76,7 @@ export default function UnlockScreen() {
               maxLength={40}
               autoCapitalize="characters"
               autoComplete="off"
-              autoFocus
+              autoFocus={!TOUCH_UI}
               returnKeyType="go"
               onSubmitEditing={submit}
             />
