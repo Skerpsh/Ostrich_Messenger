@@ -81,7 +81,7 @@ export default function PersonalizationSettings() {
 
       <Section
         title="Sync"
-        footer="Theme, accent, wallpapers (not photos), text size and the chats list, also each chat's own look. Encrypted on this device: the server cannot read them. Devices with sync turned on share them."
+        footer="Theme, accent, wallpapers (not photos), text size and the chats list, also each chat's own look. Encrypted on this device: the server cannot read them. Turn it on on each device that should share them."
       >
         <ToggleRow
           icon="sync-outline"

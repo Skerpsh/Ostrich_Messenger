@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { AppState } from "react-native";
 import { useAuth, useCurrentUser, usePrivateKey } from "@/context/auth";
 import { useChatLooks } from "@/context/chat-looks";
 import { useRealtime } from "@/context/realtime";
@@ -48,11 +49,13 @@ export default function SettingsSync() {
   const { withToken } = useAuth();
   const userId = useCurrentUser()?.id ?? null;
   const privateKey = usePrivateKey();
-  const { subscribeEvents } = useRealtime();
+  const { subscribeEvents, status } = useRealtime();
 
   const enabled = theme.sync && Boolean(userId && privateKey);
   // The version on the server this device has (saved or loaded).
   const known = useRef<string | null>(null);
+  // A save on its way: its own event may come before its answer.
+  const saving = useRef(false);
   // Changes made before sync was on are not saved by themselves.
   const seen = useRef({ theme: theme.revision, looks: looks.revision });
 
@@ -91,8 +94,14 @@ export default function SettingsSync() {
 
       const synced: Synced = { v: 1, look: theme.syncedLook(), chats: looks.syncedLooks() };
       const data = encryptSettings(JSON.stringify(synced), privateKey, userId);
-      const { updated_at } = await withToken((token) => saveSettings(token, data));
-      known.current = updated_at;
+      saving.current = true;
+
+      try {
+        const { updated_at } = await withToken((token) => saveSettings(token, data));
+        known.current = updated_at;
+      } finally {
+        saving.current = false;
+      }
     },
   });
 
@@ -130,12 +139,34 @@ export default function SettingsSync() {
 
     return subscribeEvents({
       onEvent: (event) => {
-        if (event.type === "settings_changed" && event.updatedAt !== known.current) {
+        if (event.type === "settings_changed" && event.updatedAt !== known.current && !saving.current) {
           work.current.load().catch(() => {});
         }
       },
     });
   }, [enabled, subscribeEvents, work]);
+
+  // Events missed while offline or in the background: load again on
+  // reconnecting and on coming back to the app.
+  useEffect(() => {
+    if (enabled && status === "online") {
+      work.current.load().catch(() => {});
+    }
+  }, [enabled, status, work]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        work.current.load().catch(() => {});
+      }
+    });
+
+    return () => subscription.remove();
+  }, [enabled, work]);
 
   return null;
 }

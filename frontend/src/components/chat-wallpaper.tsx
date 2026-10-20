@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { Image } from "expo-image";
 import { StyleSheet, View } from "react-native";
+import PatternLayer from "@/components/pattern-layer";
 import { useAppTheme } from "@/context/theme";
 import type { Wallpaper } from "@/lib/personalization";
 
@@ -8,7 +8,7 @@ import type { Wallpaper } from "@/lib/personalization";
 // dimmed toward the page's color so messages stay readable.
 //
 // The patterns are seamless square tiles (white lines on transparent, drawn
-// at 3x), laid out in a grid over the whole area and tinted.
+// at 3x), repeated over the whole area in the accent color (PatternLayer).
 
 const PATTERNS = {
   running: { source: require("@/assets/images/wallpapers/running.png"), tile: 600 },
@@ -32,7 +32,6 @@ export default function ChatWallpaper({
   scale?: number;
 }) {
   const { colors, mode } = useAppTheme();
-  const [size, setSize] = useState({ width: 0, height: 0 });
   const level = wallpaper.brightness - 1;
 
   if (wallpaper.pattern === "none") {
@@ -51,35 +50,11 @@ export default function ChatWallpaper({
     ) : null;
   }
 
-  const { source } = PATTERNS[wallpaper.pattern];
-  const tile = PATTERNS[wallpaper.pattern].tile * scale;
-  const columns = Math.ceil(size.width / tile);
-  const rows = Math.ceil(size.height / tile);
-  const tiles = [];
-
-  for (let row = 0; row < rows; row++) {
-    for (let column = 0; column < columns; column++) {
-      tiles.push(
-        <Image
-          key={`${row}-${column}`}
-          source={source}
-          tintColor={colors.accent}
-          style={[styles.tile, { left: column * tile, top: row * tile, width: tile, height: tile }]}
-        />,
-      );
-    }
-  }
+  const { source, tile } = PATTERNS[wallpaper.pattern];
 
   return (
-    <View
-      pointerEvents="none"
-      style={[styles.wallpaper, { opacity: PATTERN_OPACITY[mode][level] }]}
-      onLayout={(event) => {
-        const { width, height } = event.nativeEvent.layout;
-        setSize({ width, height });
-      }}
-    >
-      {tiles}
+    <View pointerEvents="none" style={[styles.wallpaper, { opacity: PATTERN_OPACITY[mode][level] }]}>
+      <PatternLayer source={source} tile={tile * scale} color={colors.accent} />
     </View>
   );
 }
@@ -93,8 +68,5 @@ const styles = StyleSheet.create({
   photo: {
     width: "100%",
     height: "100%",
-  },
-  tile: {
-    position: "absolute",
   },
 });

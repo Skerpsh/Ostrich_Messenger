@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
@@ -79,6 +79,7 @@ import { formatPresence, previewText } from "@/lib/format";
 import { chatTitle, isGroupDistrusted } from "@/lib/groups";
 import { loadCachedMessages, saveCachedMessages } from "@/lib/local-cache";
 import { mentionedUsernames, plainText } from "@/lib/markup";
+import { useInvertedWheel } from "@/lib/inverted-wheel";
 import { linkImage } from "@/lib/link-preview";
 import { encodePayload, type Attachment, type LinkPreview, type LookEntry } from "@/lib/payload";
 import type { ChatLook } from "@/lib/personalization";
@@ -242,6 +243,13 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
     }
   }, [focusRequest]);
   const listRef = useRef<FlatList<Row>>(null);
+  const listWrapRef = useRef<View>(null);
+  // Web: mouse wheels and touchpads on the upside-down list.
+  useInvertedWheel(
+    listWrapRef,
+    listRef as RefObject<{ getScrollableNode?: () => HTMLElement | null }>,
+    messages !== null,
+  );
   const firstLoad = useRef(true);
 
   const goBack = () =>
@@ -1658,7 +1666,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         {messages === null ? (
           <ActivityIndicator color={colors.muted} style={styles.screen} />
         ) : (
-          <View style={styles.screen}>
+          <View ref={listWrapRef} style={styles.screen}>
             <FlatList
               ref={listRef}
               inverted
