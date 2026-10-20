@@ -3,6 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, Text, View } from "react-native";
 import Button from "@/components/button";
 import type { IconName } from "@/components/icon-button";
+import Reveal from "@/components/reveal";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { endSession, getSessions, type Session } from "@/lib/api";
@@ -92,9 +93,11 @@ export function DevicesSection() {
           );
         })
       )}
-      {error ? (
-        <Text style={[styles.formMessage, styles.inset, { color: colors.danger }]}>{error}</Text>
-      ) : null}
+      <Reveal>
+        {error ? (
+          <Text style={[styles.formMessage, styles.inset, { color: colors.danger }]}>{error}</Text>
+        ) : null}
+      </Reveal>
     </Section>
   );
 }

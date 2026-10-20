@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import { StyleSheet, View } from "react-native";
 import PatternLayer from "@/components/pattern-layer";
 import { useAppTheme } from "@/context/theme";
+import { IMAGE_FADE_MS, useMotion } from "@/lib/motion";
 import type { Wallpaper } from "@/lib/personalization";
 
 // Behind the messages of a chat: ostriches in the accent color, or a photo
@@ -32,6 +33,7 @@ export default function ChatWallpaper({
   scale?: number;
 }) {
   const { colors, mode } = useAppTheme();
+  const motion = useMotion();
   const level = wallpaper.brightness - 1;
 
   if (wallpaper.pattern === "none") {
@@ -44,6 +46,7 @@ export default function ChatWallpaper({
         <Image
           source={{ uri: photo }}
           contentFit="cover"
+          transition={IMAGE_FADE_MS[motion]}
           style={[styles.photo, { opacity: PHOTO_OPACITY[mode][level] }]}
         />
       </View>

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import AppHeader from "@/components/app-header";
 import Button from "@/components/button";
+import Reveal from "@/components/reveal";
 import { useAuth } from "@/context/auth";
 import { useChats } from "@/context/chats";
 import { useAppTheme } from "@/context/theme";
@@ -103,7 +104,9 @@ export default function JoinScreen() {
             </>
           ) : null}
 
-          {error ? <Text style={[styles.text, { color: colors.danger }]}>{error}</Text> : null}
+          <Reveal>
+            {error ? <Text style={[styles.text, { color: colors.danger }]}>{error}</Text> : null}
+          </Reveal>
         </View>
       </View>
     </View>

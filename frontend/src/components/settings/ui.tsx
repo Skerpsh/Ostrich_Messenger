@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import type { IconName } from "@/components/icon-button";
+import { useSlider } from "@/components/reveal";
 import { useAppTheme } from "@/context/theme";
 import { radius } from "@/theme/colors";
 
@@ -160,25 +162,24 @@ export function Segmented<T extends string | number>({
   onChange: (value: T) => void;
 }) {
   const { colors } = useAppTheme();
+  const slider = useSlider(options.findIndex((option) => option.value === value));
+  const raised = { backgroundColor: colors.panel, boxShadow: `0 1px 4px ${colors.shadow}` };
 
   return (
     <View style={[styles.segmented, { backgroundColor: colors.panelAlt }]}>
-      {options.map((option) => {
+      {/* The selected one's background slides to it. */}
+      {slider.style ? <Animated.View style={[styles.segmentSlider, raised, slider.style]} /> : null}
+      {options.map((option, index) => {
         const selected = value === option.value;
 
         return (
           <Pressable
             key={String(option.value)}
             onPress={() => onChange(option.value)}
+            onLayout={slider.onLayout(index)}
             accessibilityRole="radio"
             accessibilityState={{ checked: selected }}
-            style={[
-              styles.segment,
-              selected && {
-                backgroundColor: colors.panel,
-                boxShadow: `0 1px 4px ${colors.shadow}`,
-              },
-            ]}
+            style={[styles.segment, selected && !slider.style && raised]}
           >
             {option.icon ? (
               <Ionicons name={option.icon} size={16} color={selected ? colors.accent : colors.muted} />
@@ -359,6 +360,10 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     paddingVertical: 9,
+    borderRadius: 10,
+  },
+
+  segmentSlider: {
     borderRadius: 10,
   },
 

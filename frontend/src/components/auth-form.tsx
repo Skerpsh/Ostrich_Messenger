@@ -9,9 +9,12 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import AppHeader from "@/components/app-header";
 import Button from "@/components/button";
+import Reveal from "@/components/reveal";
 import TextField from "@/components/text-field";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
@@ -22,6 +25,7 @@ import {
   USERNAME_RE,
   USERNAME_RULES,
 } from "@/lib/validation";
+import { useShake } from "@/lib/motion";
 import { TOUCH_UI } from "@/lib/touch";
 import { radius } from "@/theme/colors";
 
@@ -41,6 +45,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [ostrichId, setOstrichId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // A failed try: the fields shake and the error shows.
+  const { style: shakeStyle, shake } = useShake();
+
+  const fail = (message: string) => {
+    setError(message);
+    shake();
+  };
 
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
@@ -53,28 +64,28 @@ export default function AuthForm({ mode }: AuthFormProps) {
     const name = cleanUsername(username);
 
     if (!name || !password) {
-      setError("Username and password are required");
+      fail("Username and password are required");
       return;
     }
 
     if (!isRegister && !ostrichId.trim()) {
-      setError("Enter your OstrichID");
+      fail("Enter your OstrichID");
       return;
     }
 
     if (isRegister) {
       if (!USERNAME_RE.test(name)) {
-        setError(USERNAME_RULES);
+        fail(USERNAME_RULES);
         return;
       }
 
       if (password.length < MIN_PASSWORD) {
-        setError(`Password must be at least ${MIN_PASSWORD} characters`);
+        fail(`Password must be at least ${MIN_PASSWORD} characters`);
         return;
       }
 
       if (password !== confirmPassword) {
-        setError("Passwords do not match");
+        fail("Passwords do not match");
         return;
       }
     }
@@ -88,7 +99,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         : signIn(name, password, ostrichId.trim()));
       // The navigator switches to the chats screen on its own.
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      fail(e instanceof Error ? e.message : "Something went wrong");
       setLoading(false);
     }
   };
@@ -130,7 +141,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
               {isRegister ? "Create account" : "Log in"}
             </Text>
 
-            <View style={styles.fields}>
+            <Animated.View style={[styles.fields, shakeStyle]}>
               <TextField
                 label="Username"
                 placeholder="@username"
@@ -195,7 +206,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   onSubmitEditing={submit}
                 />
               ) : null}
-            </View>
+            </Animated.View>
 
             {isRegister ? (
               <Text style={[styles.note, { color: colors.textSoft }]}>
@@ -205,11 +216,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
               </Text>
             ) : null}
 
-            {shownError ? (
-              <Text style={[styles.error, { color: colors.danger }]}>
-                {shownError}
-              </Text>
-            ) : null}
+            <Reveal>
+              {shownError ? (
+                <Text style={[styles.error, { color: colors.danger }]}>
+                  {shownError}
+                </Text>
+              ) : null}
+            </Reveal>
 
             <Button
               title={isRegister ? "Create account" : "Log in"}

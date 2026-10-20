@@ -8,6 +8,7 @@ import Button from "@/components/button";
 import ChatAvatar from "@/components/chat-avatar";
 import DevBadge from "@/components/dev-badge";
 import QrCode from "@/components/qr-code";
+import Reveal from "@/components/reveal";
 import SafetyCode from "@/components/safety-code";
 import TextField from "@/components/text-field";
 import { useAuth } from "@/context/auth";
@@ -245,14 +246,18 @@ export default function GroupInfo({
             sure of.
           </Text>
 
-          {isGroupDistrusted(chat.id) ? (
-            <Text style={[styles.note, { color: colors.danger }]}>
-              A key of this group came from someone whose security key has changed, and is not
-              used. Compare safety codes with the members.
-            </Text>
-          ) : null}
+          <Reveal>
+            {isGroupDistrusted(chat.id) ? (
+              <Text style={[styles.note, { color: colors.danger }]}>
+                A key of this group came from someone whose security key has changed, and is not
+                used. Compare safety codes with the members.
+              </Text>
+            ) : null}
+          </Reveal>
 
-          {error ? <Text style={[styles.note, { color: colors.danger }]}>{error}</Text> : null}
+          <Reveal>
+            {error ? <Text style={[styles.note, { color: colors.danger }]}>{error}</Text> : null}
+          </Reveal>
 
           {admin && chat.member_count < MAX_GROUP_MEMBERS ? (
             <View style={styles.inline}>
@@ -283,11 +288,13 @@ export default function GroupInfo({
                   <Text selectable numberOfLines={2} style={[styles.inviteLink, { color: colors.accent }]}>
                     {inviteLink(invite)}
                   </Text>
-                  {showInviteQr ? (
-                    <View style={styles.qr}>
-                      <QrCode value={inviteLink(invite)} />
-                    </View>
-                  ) : null}
+                  <Reveal>
+                    {showInviteQr ? (
+                      <View style={styles.qr}>
+                        <QrCode value={inviteLink(invite)} />
+                      </View>
+                    ) : null}
+                  </Reveal>
                   <View style={styles.buttons}>
                     <Button title={copied ? "Copied" : "Copy"} style={styles.flexButton} variant="secondary" onPress={() => copyInvite(invite)} />
                     <Button
@@ -320,32 +327,34 @@ export default function GroupInfo({
                 />
               )}
 
-              {requests.length > 0 ? (
-                <>
-                  <Text style={[styles.boxTitle, { color: colors.text }]}>
-                    Asking to join ({requests.length})
-                  </Text>
-                  {requests.map((request) => (
-                    <View key={request.id} style={styles.member}>
-                      <Avatar name={request.username} avatarId={request.avatar_id} size={32} />
-                      <View style={styles.grow}>
-                        <Text numberOfLines={1} style={[styles.memberName, { color: colors.text }]}>
-                          @{request.username}
-                        </Text>
+              <Reveal>
+                {requests.length > 0 ? (
+                  <>
+                    <Text style={[styles.boxTitle, { color: colors.text }]}>
+                      Asking to join ({requests.length})
+                    </Text>
+                    {requests.map((request) => (
+                      <View key={request.id} style={styles.member}>
+                        <Avatar name={request.username} avatarId={request.avatar_id} size={32} />
+                        <View style={styles.grow}>
+                          <Text numberOfLines={1} style={[styles.memberName, { color: colors.text }]}>
+                            @{request.username}
+                          </Text>
+                        </View>
+                        <Button
+                          title="Let in" style={styles.smallButton}
+                          disabled={busy || !me || chat.member_count >= MAX_GROUP_MEMBERS}
+                          onPress={() => runInvite(() => addGroupMember(withToken, me!, chat, request))}
+                        />
+                        <IconButtonLike
+                          label={`Decline @${request.username}`}
+                          onPress={() => runInvite(() => withToken((t) => declineJoinRequest(t, chat.id, request.id)))}
+                        />
                       </View>
-                      <Button
-                        title="Let in" style={styles.smallButton}
-                        disabled={busy || !me || chat.member_count >= MAX_GROUP_MEMBERS}
-                        onPress={() => runInvite(() => addGroupMember(withToken, me!, chat, request))}
-                      />
-                      <IconButtonLike
-                        label={`Decline @${request.username}`}
-                        onPress={() => runInvite(() => withToken((t) => declineJoinRequest(t, chat.id, request.id)))}
-                      />
-                    </View>
-                  ))}
-                </>
-              ) : null}
+                    ))}
+                  </>
+                ) : null}
+              </Reveal>
             </View>
           ) : null}
 
@@ -383,35 +392,37 @@ export default function GroupInfo({
                       ) : null}
                     </Pressable>
 
-                    {open ? (
-                      <View style={styles.memberActions}>
-                        <Action label="Message" icon="chatbubble-outline" onPress={() => onMessage(member.username)} />
-                        {member.public_key ? (
-                          <Action label="Safety code" icon="shield-checkmark-outline" onPress={() => showCode(member)} />
-                        ) : null}
-                        {chat.role === "owner" && member.role !== "owner" ? (
-                          <Action
-                            label={member.role === "admin" ? "Remove admin" : "Make admin"}
-                            icon="star-outline"
-                            onPress={() =>
-                              run(() =>
-                                withToken((token) =>
-                                  setGroupRole(token, chat.id, member.id, member.role === "admin" ? "member" : "admin"),
-                                ),
-                              )
-                            }
-                          />
-                        ) : null}
-                        {canRemove(member) && me ? (
-                          <Action
-                            label="Remove"
-                            icon="person-remove-outline"
-                            danger
-                            onPress={() => run(() => removeGroupMember(withToken, me, chat, member.id))}
-                          />
-                        ) : null}
-                      </View>
-                    ) : null}
+                    <Reveal>
+                      {open ? (
+                        <View style={styles.memberActions}>
+                          <Action label="Message" icon="chatbubble-outline" onPress={() => onMessage(member.username)} />
+                          {member.public_key ? (
+                            <Action label="Safety code" icon="shield-checkmark-outline" onPress={() => showCode(member)} />
+                          ) : null}
+                          {chat.role === "owner" && member.role !== "owner" ? (
+                            <Action
+                              label={member.role === "admin" ? "Remove admin" : "Make admin"}
+                              icon="star-outline"
+                              onPress={() =>
+                                run(() =>
+                                  withToken((token) =>
+                                    setGroupRole(token, chat.id, member.id, member.role === "admin" ? "member" : "admin"),
+                                  ),
+                                )
+                              }
+                            />
+                          ) : null}
+                          {canRemove(member) && me ? (
+                            <Action
+                              label="Remove"
+                              icon="person-remove-outline"
+                              danger
+                              onPress={() => run(() => removeGroupMember(withToken, me, chat, member.id))}
+                            />
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </Reveal>
                   </View>
                 );
               })}

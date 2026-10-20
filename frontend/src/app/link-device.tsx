@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppHeader from "@/components/app-header";
 import Button from "@/components/button";
 import QrCode from "@/components/qr-code";
+import Reveal from "@/components/reveal";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { ApiError, createDeviceLink, deviceLinkSession } from "@/lib/api";
@@ -109,27 +110,29 @@ export default function LinkDeviceScreen() {
             {qr ? <QrCode value={qr} size={220} /> : error ? null : <ActivityIndicator color={colors.muted} />}
           </View>
 
-          {error ? (
-            <>
-              <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
-              <Button title="Try again" variant="secondary" onPress={() => setRound((n) => n + 1)} />
-            </>
-          ) : (
-            <View style={styles.steps}>
-              {[
-                "Open Ostrich on a device where you are logged in",
-                "Go to Settings → Devices → Link a device",
-                "Point its camera at this code and confirm",
-              ].map((step, i) => (
-                <View key={step} style={styles.step}>
-                  <View style={[styles.number, { backgroundColor: colors.accentSoft }]}>
-                    <Text style={[styles.numberText, { color: colors.accent }]}>{i + 1}</Text>
+          <Reveal>
+            {error ? (
+              <>
+                <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
+                <Button title="Try again" variant="secondary" onPress={() => setRound((n) => n + 1)} />
+              </>
+            ) : (
+              <View style={styles.steps}>
+                {[
+                  "Open Ostrich on a device where you are logged in",
+                  "Go to Settings → Devices → Link a device",
+                  "Point its camera at this code and confirm",
+                ].map((step, i) => (
+                  <View key={step} style={styles.step}>
+                    <View style={[styles.number, { backgroundColor: colors.accentSoft }]}>
+                      <Text style={[styles.numberText, { color: colors.accent }]}>{i + 1}</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: colors.textSoft }]}>{step}</Text>
                   </View>
-                  <Text style={[styles.stepText, { color: colors.textSoft }]}>{step}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+                ))}
+              </View>
+            )}
+          </Reveal>
 
           <Text style={[styles.note, { color: colors.muted }]}>
             Your messages’ key comes from that device, encrypted for this one only: the server never

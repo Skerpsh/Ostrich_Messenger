@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -17,6 +18,7 @@ import {
   type Wallpaper,
 } from "@/lib/personalization";
 import { getItem, setItem } from "@/lib/storage";
+import { fadeTheme, onSystemTheme } from "@/lib/theme-fade";
 import {
   DEFAULT_ACCENT,
   isAccentChoice,
@@ -132,6 +134,22 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
 
   const changed = () => setRevision((r) => r + 1);
 
+  // Web: new colors flow in (lib/theme-fade).
+  const fade = () => {
+    if (preferences.animations) {
+      fadeTheme();
+    }
+  };
+
+  // The system's theme changing fades too, when the app follows it.
+  const fadeSystem = useRef(false);
+
+  useEffect(() => {
+    fadeSystem.current = preferences.animations && preference === "system";
+  });
+
+  useEffect(() => onSystemTheme(() => fadeSystem.current && fadeTheme()), []);
+
   const savePreference = (next: ThemePreference) => {
     setPreferenceState(next);
     setItem(THEME_KEY, next);
@@ -156,6 +174,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   };
 
   const setPreference = (next: ThemePreference) => {
+    fade();
     savePreference(next);
     changed();
   };
@@ -170,11 +189,15 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
         toggleTheme: () => setPreference(mode === "dark" ? "light" : "dark"),
         accent,
         setAccent: (next) => {
+          fade();
           saveAccent(next);
           changed();
         },
         pureBlack: preferences.pureBlack,
-        setPureBlack: (pureBlack) => update({ pureBlack }),
+        setPureBlack: (pureBlack) => {
+          fade();
+          update({ pureBlack });
+        },
         textSize: preferences.textSize,
         textScale: textScaleOf(preferences.textSize),
         setTextSize: (textSize) => update({ textSize }),
@@ -199,6 +222,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
           return { theme: preference, accent, preferences: rest };
         },
         applySyncedLook: (look) => {
+          fade();
           savePreference(look.theme);
           saveAccent(look.accent);
           savePreferences((current) => ({

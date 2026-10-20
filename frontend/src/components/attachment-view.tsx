@@ -4,9 +4,11 @@ import { Image } from "expo-image";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
+import { usePhotoPlace } from "@/components/photo-viewer";
 import VoiceMessage from "@/components/voice-message";
 import { formatSize, isImage, isVoice, loadAttachment } from "@/lib/attachments";
 import { imageSource, saveFile } from "@/lib/files";
+import { IMAGE_FADE_MS, useMotion } from "@/lib/motion";
 import type { Attachment } from "@/lib/payload";
 
 const MAX_WIDTH = 240;
@@ -81,6 +83,9 @@ function AttachmentImage({
   const [uri, setUri] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const { save, saving } = useSave(attachment, onError);
+  const motion = useMotion();
+  // The viewer opens out of it.
+  const place = usePhotoPlace(attachment, uri);
 
   useEffect(() => {
     let current = true;
@@ -112,13 +117,20 @@ function AttachmentImage({
 
   return (
     <Pressable
+      ref={place}
       onPress={onOpen ?? save}
       accessibilityRole="button"
       accessibilityLabel={`Photo ${attachment.name}, tap to ${onOpen ? "open" : "save"}`}
       style={[styles.image, size, { backgroundColor: colors.panelAlt }]}
     >
       {uri ? (
-        <Image source={{ uri }} style={size} contentFit="cover" accessibilityIgnoresInvertColors />
+        <Image
+          source={{ uri }}
+          style={size}
+          contentFit="cover"
+          transition={IMAGE_FADE_MS[motion]}
+          accessibilityIgnoresInvertColors
+        />
       ) : failed ? (
         <Ionicons name="image-outline" size={28} color={colors.muted} />
       ) : (

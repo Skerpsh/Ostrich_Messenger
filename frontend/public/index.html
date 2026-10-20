@@ -38,6 +38,17 @@
         height: 100%;
         flex: 1;
       }
+      /* Changing the theme: the colors flow into the new ones (lib/theme-fade.web.ts).
+         Not !important: what animates itself (inline transitions) keeps its own. */
+      html.theme-fade *,
+      html.theme-fade *::before,
+      html.theme-fade *::after {
+        transition:
+          background-color 350ms ease,
+          border-color 350ms ease,
+          color 350ms ease,
+          box-shadow 350ms ease;
+      }
     </style>
   </head>
 

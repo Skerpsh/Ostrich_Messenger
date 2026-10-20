@@ -32,6 +32,7 @@ import GroupInfo from "@/components/group-info";
 import IconButton from "@/components/icon-button";
 import MessageBubble from "@/components/message-bubble";
 import PhotoViewer from "@/components/photo-viewer";
+import Reveal, { Collapse } from "@/components/reveal";
 import SafetyCode from "@/components/safety-code";
 import TypingDots from "@/components/typing-dots";
 import ScreenEnter, { useLeaveScreen } from "@/components/screen-enter";
@@ -84,7 +85,7 @@ import { loadCachedMessages, saveCachedMessages } from "@/lib/local-cache";
 import { mentionedUsernames, plainText } from "@/lib/markup";
 import { useInvertedWheel } from "@/lib/inverted-wheel";
 import { useEscape } from "@/lib/keys";
-import { enterStyle, useMotion } from "@/lib/motion";
+import { enterStyle, LEAVE_MS, useMotion } from "@/lib/motion";
 import { linkImage } from "@/lib/link-preview";
 import { encodePayload, type Attachment, type LinkPreview, type LookEntry } from "@/lib/payload";
 import type { ChatLook } from "@/lib/personalization";
@@ -383,6 +384,36 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
     }
   }, [messages, hasMore, loadingOlder, withToken, chatId]);
 
+  // A deleted message shrinks away first (Collapse), then leaves the list
+  // (dropped: when it has, or a moment later if it is not on the screen).
+  const [leavingIds, setLeavingIds] = useState<ReadonlySet<string>>(new Set());
+
+  const dropped = useCallback((id: string) => {
+    setMessages((current) => current?.filter((m) => m.id !== id) ?? current);
+    setLeavingIds((current) => {
+      if (!current.has(id)) {
+        return current;
+      }
+
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const dropMessage = useCallback(
+    (id: string) => {
+      if (motion === "off") {
+        dropped(id);
+        return;
+      }
+
+      setLeavingIds((current) => new Set(current).add(id));
+      setTimeout(() => dropped(id), LEAVE_MS[motion] + 600);
+    },
+    [motion, dropped],
+  );
+
   // Edits, deletions and reactions from any device; the chat being deleted.
   useEffect(
     () =>
@@ -394,7 +425,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
               current,
             );
           } else if (event.type === "message_deleted" && event.chatId === chatId) {
-            setMessages((current) => current?.filter((m) => m.id !== event.messageId) ?? current);
+            dropMessage(event.messageId);
           } else if (event.type === "reactions" && event.chatId === chatId) {
             setMessages((current) =>
               current?.map((m) =>
@@ -406,7 +437,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           }
         },
       }),
-    [subscribeEvents, chatId, router],
+    [subscribeEvents, chatId, router, dropMessage],
   );
 
   // The history saved on the device shows until the server answers (and
@@ -1049,7 +1080,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
     for (const message of chosen) {
       try {
         await withToken((t) => deleteMessage(t, chatId, message.id));
-        setMessages((current) => current?.filter((m) => m.id !== message.id) ?? current);
+        dropMessage(message.id);
       } catch (e) {
         showError(e, "Failed to delete a message");
         return;
@@ -1094,7 +1125,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
 
     try {
       await withToken((t) => deleteMessage(t, chatId, message.id));
-      setMessages((current) => current?.filter((m) => m.id !== message.id) ?? current);
+      dropMessage(message.id);
     } catch (e) {
       showError(e, "Failed to delete the message");
     }
@@ -1487,46 +1518,50 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   return (
     <View ref={screenRef} style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ChatWallpaper wallpaper={look.wallpaper} photo={look.photo} />
-      {dragging ? (
-        <View pointerEvents="none" style={[styles.dropZone, { borderColor: colors.accent, backgroundColor: colors.bg }]}>
-          <Ionicons name="cloud-upload-outline" size={44} color={colors.accent} />
-          <Text style={[styles.dropText, { color: colors.text }]}>Drop files to send them</Text>
-        </View>
-      ) : null}
-      {selected ? (
-        <View
-          style={[
-            styles.selectBar,
-            {
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.line,
-              paddingTop: insets.top,
-              height: HEADER_HEIGHT + insets.top,
-            },
-          ]}
-        >
-          <IconButton icon="close" label="Stop choosing" onPress={() => setSelected(null)} />
-          <Text style={[styles.selectCount, { color: colors.text }]}>{chosen.length} selected</Text>
-          <IconButton icon="copy-outline" label="Copy" onPress={copyChosen} />
-          <IconButton
-            icon="arrow-redo-outline"
-            label="Forward"
-            disabled={chosen.some((m) => outgoingOf(m) || textOf(m).status !== "ok")}
-            onPress={() => setForwarding(chosen)}
-          />
-          {canDeleteChosen ? (
-            confirmingDelete ? (
-              <Pressable onPress={deleteChosen} accessibilityRole="button" style={styles.confirmDelete}>
-                <Text style={[styles.confirmDeleteText, { color: colors.danger }]}>
-                  Delete {chosen.length} for everyone?
-                </Text>
-              </Pressable>
-            ) : (
-              <IconButton icon="trash-outline" label="Delete" color={colors.danger} onPress={deleteChosen} />
-            )
-          ) : null}
-        </View>
-      ) : null}
+      <Reveal collapse={false} kind="fade" style={styles.dropLayer}>
+        {dragging ? (
+          <View pointerEvents="none" style={[styles.dropZone, { borderColor: colors.accent, backgroundColor: colors.bg }]}>
+            <Ionicons name="cloud-upload-outline" size={44} color={colors.accent} />
+            <Text style={[styles.dropText, { color: colors.text }]}>Drop files to send them</Text>
+          </View>
+        ) : null}
+      </Reveal>
+      <Reveal collapse={false} kind="drop" style={styles.selectLayer}>
+        {selected ? (
+          <View
+            style={[
+              styles.selectBar,
+              {
+                backgroundColor: colors.surface,
+                borderBottomColor: colors.line,
+                paddingTop: insets.top,
+                height: HEADER_HEIGHT + insets.top,
+              },
+            ]}
+          >
+            <IconButton icon="close" label="Stop choosing" onPress={() => setSelected(null)} />
+            <Text style={[styles.selectCount, { color: colors.text }]}>{chosen.length} selected</Text>
+            <IconButton icon="copy-outline" label="Copy" onPress={copyChosen} />
+            <IconButton
+              icon="arrow-redo-outline"
+              label="Forward"
+              disabled={chosen.some((m) => outgoingOf(m) || textOf(m).status !== "ok")}
+              onPress={() => setForwarding(chosen)}
+            />
+            {canDeleteChosen ? (
+              confirmingDelete ? (
+                <Pressable onPress={deleteChosen} accessibilityRole="button" style={styles.confirmDelete}>
+                  <Text style={[styles.confirmDeleteText, { color: colors.danger }]}>
+                    Delete {chosen.length} for everyone?
+                  </Text>
+                </Pressable>
+              ) : (
+                <IconButton icon="trash-outline" label="Delete" color={colors.danger} onPress={deleteChosen} />
+              )
+            ) : null}
+          </View>
+        ) : null}
+      </Reveal>
 
       <AppHeader
         onBack={wide ? undefined : goBack}
@@ -1580,101 +1615,105 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         }
       />
 
-      {chat?.pinned_message ? (
-        <View style={[styles.pinnedBar, { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
-          <Pressable
-            onPress={() => {
-              const id = chat.pinned_message!.id;
-
-              if (shownMessages.some((m) => m.id === id)) {
-                showMessage(id);
-              } else {
-                setError("The pinned message is further up: scroll up to load it");
-              }
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Show the pinned message"
-            style={[styles.pinnedText, { borderLeftColor: colors.accent }]}
-          >
-            <Text style={[styles.pinnedLabel, { color: colors.accent }]}>Pinned message</Text>
-            <Text numberOfLines={1} style={[styles.pinnedPreview, { color: colors.textSoft }]}>
-              {previewText(messagePreview(crypto.decrypt(chat.pinned_message)))}
-            </Text>
-          </Pressable>
-          {!group || groupAdmin ? (
-            <IconButton
-              icon="close"
-              label="Unpin"
-              size={18}
-              color={colors.muted}
-              onPress={() => togglePin(null)}
-            />
-          ) : null}
-        </View>
-      ) : null}
-
-      {searching ? (
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
-          <View style={styles.searchRow}>
-            <View style={[styles.searchBox, { backgroundColor: colors.panelAlt }]}>
-              <Ionicons name="search" size={16} color={colors.muted} />
-              <TextInput
-                value={query}
-                onChangeText={(text) => {
-                  setQuery(text);
-                  setMatchIndex(0);
-                }}
-                onSubmitEditing={() => goToMatch(matchIndex)}
-                placeholder="Search messages"
-                placeholderTextColor={colors.muted}
-                autoFocus={!TOUCH_UI}
-                returnKeyType="search"
-                style={[styles.searchInput, { color: colors.text }, noWebOutline]}
-              />
-            </View>
-            <Text style={[styles.searchCount, { color: colors.muted }]}>
-              {query.trim() ? (matches.length ? `${matchIndex + 1}/${matches.length}` : "0") : ""}
-            </Text>
-            <IconButton
-              icon="chevron-up"
-              label="Older match"
-              size={18}
-              disabled={matchIndex >= matches.length - 1}
-              onPress={() => goToMatch(matchIndex + 1)}
-            />
-            <IconButton
-              icon="chevron-down"
-              label="Newer match"
-              size={18}
-              disabled={matchIndex <= 0}
-              onPress={() => goToMatch(matchIndex - 1)}
-            />
-            <IconButton
-              icon="close"
-              label="Close search"
-              size={18}
-              onPress={() => setSearching(false)}
-            />
-          </View>
-          {hasMore ? (
-            // Messages are decrypted on this device, so only loaded ones
-            // can be searched.
+      <Reveal kind="drop">
+        {chat?.pinned_message ? (
+          <View style={[styles.pinnedBar, { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
             <Pressable
-              onPress={loadOlder}
-              disabled={loadingOlder}
+              onPress={() => {
+                const id = chat.pinned_message!.id;
+
+                if (shownMessages.some((m) => m.id === id)) {
+                  showMessage(id);
+                } else {
+                  setError("The pinned message is further up: scroll up to load it");
+                }
+              }}
               accessibilityRole="button"
-              style={styles.searchOlder}
+              accessibilityLabel="Show the pinned message"
+              style={[styles.pinnedText, { borderLeftColor: colors.accent }]}
             >
-              <Text style={[styles.searchOlderText, { color: colors.muted }]}>
-                Searching loaded messages.{" "}
-                <Text style={{ color: colors.accent }}>
-                  {loadingOlder ? "Loading…" : "Load older"}
-                </Text>
+              <Text style={[styles.pinnedLabel, { color: colors.accent }]}>Pinned message</Text>
+              <Text numberOfLines={1} style={[styles.pinnedPreview, { color: colors.textSoft }]}>
+                {previewText(messagePreview(crypto.decrypt(chat.pinned_message)))}
               </Text>
             </Pressable>
-          ) : null}
-        </View>
-      ) : null}
+            {!group || groupAdmin ? (
+              <IconButton
+                icon="close"
+                label="Unpin"
+                size={18}
+                color={colors.muted}
+                onPress={() => togglePin(null)}
+              />
+            ) : null}
+          </View>
+        ) : null}
+      </Reveal>
+
+      <Reveal kind="drop">
+        {searching ? (
+          <View style={[styles.searchBar, { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
+            <View style={styles.searchRow}>
+              <View style={[styles.searchBox, { backgroundColor: colors.panelAlt }]}>
+                <Ionicons name="search" size={16} color={colors.muted} />
+                <TextInput
+                  value={query}
+                  onChangeText={(text) => {
+                    setQuery(text);
+                    setMatchIndex(0);
+                  }}
+                  onSubmitEditing={() => goToMatch(matchIndex)}
+                  placeholder="Search messages"
+                  placeholderTextColor={colors.muted}
+                  autoFocus={!TOUCH_UI}
+                  returnKeyType="search"
+                  style={[styles.searchInput, { color: colors.text }, noWebOutline]}
+                />
+              </View>
+              <Text style={[styles.searchCount, { color: colors.muted }]}>
+                {query.trim() ? (matches.length ? `${matchIndex + 1}/${matches.length}` : "0") : ""}
+              </Text>
+              <IconButton
+                icon="chevron-up"
+                label="Older match"
+                size={18}
+                disabled={matchIndex >= matches.length - 1}
+                onPress={() => goToMatch(matchIndex + 1)}
+              />
+              <IconButton
+                icon="chevron-down"
+                label="Newer match"
+                size={18}
+                disabled={matchIndex <= 0}
+                onPress={() => goToMatch(matchIndex - 1)}
+              />
+              <IconButton
+                icon="close"
+                label="Close search"
+                size={18}
+                onPress={() => setSearching(false)}
+              />
+            </View>
+            {hasMore ? (
+              // Messages are decrypted on this device, so only loaded ones
+              // can be searched.
+              <Pressable
+                onPress={loadOlder}
+                disabled={loadingOlder}
+                accessibilityRole="button"
+                style={styles.searchOlder}
+              >
+                <Text style={[styles.searchOlderText, { color: colors.muted }]}>
+                  Searching loaded messages.{" "}
+                  <Text style={{ color: colors.accent }}>
+                    {loadingOlder ? "Loading…" : "Load older"}
+                  </Text>
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+      </Reveal>
 
       <KeyboardAvoidingView
         style={styles.screen}
@@ -1781,115 +1820,130 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                 }
 
                 return (
-                  <MessageBubble
-                    row={item}
-                    senderName={
-                      group
-                        ? (memberNames.get(item.message.sender_id) ?? item.message.sender_username)
-                        : undefined
-                    }
-                    read={
-                      item.own &&
-                      peerReadAt !== null &&
-                      time(peerReadAt) >= time(item.message.created_at)
-                    }
-                    ownId={user?.id}
-                    text={textOf(item.message)}
-                    quoteText={
-                      item.message.reply_to ? textOf(item.message.reply_to) : null
-                    }
-                    sending={outgoingOf(item.message)?.state}
-                    highlighted={item.message.id === highlightedId}
-                    onReply={() => startReply(item.message)}
-                    onMenu={() => setMenuFor(item.message)}
-                    onQuotePress={showMessage}
-                    onReact={(emoji) => react(item.message, emoji)}
-                    onError={setError}
-                    onOpenPhoto={(attachment) => setViewing(attachment.id)}
-                    onCall={chat?.type === "direct" ? startCall : undefined}
-                    onLook={() => setShowLook(true)}
-                    animateIn={
-                      Boolean(outgoingOf(item.message)) || time(item.message.created_at) > openedAt - 2000
-                    }
-                    selected={selected && !outgoingOf(item.message) ? selected.has(item.message.id) : undefined}
-                    onToggle={() => toggleChosen(item.message)}
-                  />
+                  <Collapse
+                    closing={leavingIds.has(item.message.id)}
+                    onClosed={() => dropped(item.message.id)}
+                  >
+                    <MessageBubble
+                      row={item}
+                      senderName={
+                        group
+                          ? (memberNames.get(item.message.sender_id) ?? item.message.sender_username)
+                          : undefined
+                      }
+                      read={
+                        item.own &&
+                        peerReadAt !== null &&
+                        time(peerReadAt) >= time(item.message.created_at)
+                      }
+                      ownId={user?.id}
+                      text={textOf(item.message)}
+                      quoteText={
+                        item.message.reply_to ? textOf(item.message.reply_to) : null
+                      }
+                      sending={outgoingOf(item.message)?.state}
+                      highlighted={item.message.id === highlightedId}
+                      onReply={() => startReply(item.message)}
+                      onMenu={() => setMenuFor(item.message)}
+                      onQuotePress={showMessage}
+                      onReact={(emoji) => react(item.message, emoji)}
+                      onError={setError}
+                      onOpenPhoto={(attachment) => setViewing(attachment.id)}
+                      onCall={chat?.type === "direct" ? startCall : undefined}
+                      onLook={() => setShowLook(true)}
+                      animateIn={
+                        Boolean(outgoingOf(item.message)) || time(item.message.created_at) > openedAt - 2000
+                      }
+                      selected={selected && !outgoingOf(item.message) ? selected.has(item.message.id) : undefined}
+                      onToggle={() => toggleChosen(item.message)}
+                    />
+                  </Collapse>
                 );
               }}
             />
 
-            {unreadCount >= UNREAD_JUMP_FROM && !unreadJumped ? (
-              <Pressable
-                onPress={jumpToUnread}
-                accessibilityRole="button"
-                accessibilityLabel={`To the first of ${unreadCount} unread messages`}
-                style={[
-                  styles.unreadJump,
-                  { backgroundColor: colors.accent, boxShadow: `0 2px 8px ${colors.shadow}` },
-                ]}
-              >
-                <Ionicons name="arrow-up" size={16} color={colors.onAccent} />
-                <Text style={[styles.unreadJumpText, { color: colors.onAccent }]}>
-                  {unreadCount} unread
-                </Text>
-              </Pressable>
-            ) : null}
+            <Reveal collapse={false} kind="pop" style={styles.unreadJumpPlace}>
+              {unreadCount >= UNREAD_JUMP_FROM && !unreadJumped ? (
+                <Pressable
+                  onPress={jumpToUnread}
+                  accessibilityRole="button"
+                  accessibilityLabel={`To the first of ${unreadCount} unread messages`}
+                  style={[
+                    styles.unreadJump,
+                    { backgroundColor: colors.accent, boxShadow: `0 2px 8px ${colors.shadow}` },
+                  ]}
+                >
+                  <Ionicons name="arrow-up" size={16} color={colors.onAccent} />
+                  <Text style={[styles.unreadJumpText, { color: colors.onAccent }]}>
+                    {unreadCount} unread
+                  </Text>
+                </Pressable>
+              ) : null}
+            </Reveal>
 
-            {scrolledUp ? (
-              <IconButton
-                icon="chevron-down"
-                label="Scroll to the newest message"
-                onPress={() =>
-                  listRef.current?.scrollToOffset({ offset: 0, animated: true })
-                }
-                style={[
-                  styles.scrollDown,
-                  {
-                    backgroundColor: colors.panel,
-                    borderColor: colors.line,
-                    boxShadow: `0 2px 8px ${colors.shadow}`,
-                  },
-                ]}
-              />
-            ) : null}
+            <Reveal collapse={false} kind="pop" style={styles.scrollDownPlace}>
+              {scrolledUp ? (
+                <IconButton
+                  icon="chevron-down"
+                  label="Scroll to the newest message"
+                  onPress={() =>
+                    listRef.current?.scrollToOffset({ offset: 0, animated: true })
+                  }
+                  style={[
+                    styles.scrollDown,
+                    {
+                      backgroundColor: colors.panel,
+                      borderColor: colors.line,
+                      boxShadow: `0 2px 8px ${colors.shadow}`,
+                    },
+                  ]}
+                />
+              ) : null}
+            </Reveal>
           </View>
         )}
 
-        {chat && !crypto.canEncrypt && !composerBlocked ? (
-          <Text style={[styles.notice, { color: group && isGroupDistrusted(chat.id) ? colors.danger : colors.muted }]}>
-            {group
-              ? isGroupDistrusted(chat.id)
-                ? "The group's key came from someone whose security key has changed. Compare safety codes in the group's info."
-                : "Loading the group's key…"
-              : `@${chat.username} has not set up end-to-end encryption yet. You can write once they open the updated Ostrich.`}
-          </Text>
-        ) : null}
-
-        {chat && keyChanged ? (
-          <Pressable
-            onPress={() => setShowSafetyCode(true)}
-            accessibilityRole="button"
-            style={[styles.keyWarning, { backgroundColor: colors.panel }]}
-          >
-            <Ionicons name="warning-outline" size={18} color={colors.danger} />
-            <Text style={[styles.keyWarningText, { color: colors.text }]}>
-              The security key of @{chat.username} has changed.{" "}
-              <Text style={{ color: colors.accent }}>Compare the safety code</Text>
+        <Reveal>
+          {chat && !crypto.canEncrypt && !composerBlocked ? (
+            <Text style={[styles.notice, { color: group && isGroupDistrusted(chat.id) ? colors.danger : colors.muted }]}>
+              {group
+                ? isGroupDistrusted(chat.id)
+                  ? "The group's key came from someone whose security key has changed. Compare safety codes in the group's info."
+                  : "Loading the group's key…"
+                : `@${chat.username} has not set up end-to-end encryption yet. You can write once they open the updated Ostrich.`}
             </Text>
-          </Pressable>
-        ) : null}
+          ) : null}
+        </Reveal>
 
-        {error ? (
-          <Pressable
-            onPress={() => setError(null)}
-            accessibilityRole="button"
-            accessibilityHint="Dismisses the error"
-            style={styles.errorRow}
-          >
-            <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
-            <Ionicons name="close" size={16} color={colors.danger} />
-          </Pressable>
-        ) : null}
+        <Reveal>
+          {chat && keyChanged ? (
+            <Pressable
+              onPress={() => setShowSafetyCode(true)}
+              accessibilityRole="button"
+              style={[styles.keyWarning, { backgroundColor: colors.panel }]}
+            >
+              <Ionicons name="warning-outline" size={18} color={colors.danger} />
+              <Text style={[styles.keyWarningText, { color: colors.text }]}>
+                The security key of @{chat.username} has changed.{" "}
+                <Text style={{ color: colors.accent }}>Compare the safety code</Text>
+              </Text>
+            </Pressable>
+          ) : null}
+        </Reveal>
+
+        <Reveal>
+          {error ? (
+            <Pressable
+              onPress={() => setError(null)}
+              accessibilityRole="button"
+              accessibilityHint="Dismisses the error"
+              style={styles.errorRow}
+            >
+              <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
+              <Ionicons name="close" size={16} color={colors.danger} />
+            </Pressable>
+          ) : null}
+        </Reveal>
 
         {chat && composerBlocked ? (
           <View
@@ -1923,134 +1977,146 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
               },
             ]}
           >
-            {suggestions.length > 0 ? (
-              <View style={[styles.suggestions, { borderBottomColor: colors.line }]}>
-                {suggestions.map((member) => (
-                  <Pressable
-                    key={member.id}
-                    onPress={() => pickMention(member.username)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Mention @${member.username}`}
-                    style={({ hovered, pressed }) => [
-                      styles.suggestion,
-                      (hovered || pressed) && { backgroundColor: colors.hover },
-                    ]}
-                  >
-                    <Avatar name={member.username} avatarId={member.avatar_id} size={26} />
-                    <Text style={[styles.suggestionName, { color: colors.text }]}>@{member.username}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-
-            {editing ? (
-              <View style={styles.replyBar}>
-                <Ionicons name="create-outline" size={18} color={colors.accent} />
-                <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
-                  <Text style={[styles.replyBarName, { color: colors.accent }]}>
-                    Edit message
-                  </Text>
-                  <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
-                    {previewText(messagePreview(textOf(editing)))}
-                  </Text>
+            <Reveal>
+              {suggestions.length > 0 ? (
+                <View style={[styles.suggestions, { borderBottomColor: colors.line }]}>
+                  {suggestions.map((member) => (
+                    <Pressable
+                      key={member.id}
+                      onPress={() => pickMention(member.username)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Mention @${member.username}`}
+                      style={({ hovered, pressed }) => [
+                        styles.suggestion,
+                        (hovered || pressed) && { backgroundColor: colors.hover },
+                      ]}
+                    >
+                      <Avatar name={member.username} avatarId={member.avatar_id} size={26} />
+                      <Text style={[styles.suggestionName, { color: colors.text }]}>@{member.username}</Text>
+                    </Pressable>
+                  ))}
                 </View>
-                <IconButton
-                  icon="close"
-                  label="Cancel editing"
-                  size={18}
-                  color={colors.muted}
-                  onPress={cancelEdit}
-                />
-              </View>
-            ) : null}
+              ) : null}
+            </Reveal>
 
-            {replyTo ? (
-              <View style={styles.replyBar}>
-                <Ionicons name="arrow-undo" size={18} color={colors.accent} />
-                <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
-                  <View style={styles.replyBarNameRow}>
-                    <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
-                      Reply to{" "}
-                      {replyTo.sender_id === user?.id ? "yourself" : replyTo.sender_username}
+            <Reveal>
+              {editing ? (
+                <View style={styles.replyBar}>
+                  <Ionicons name="create-outline" size={18} color={colors.accent} />
+                  <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
+                    <Text style={[styles.replyBarName, { color: colors.accent }]}>
+                      Edit message
                     </Text>
-                    {(replyTo.sender_id === user?.id
-                      ? user?.is_developer
-                      : chat?.is_developer) ? <DevBadge /> : null}
+                    <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
+                      {previewText(messagePreview(textOf(editing)))}
+                    </Text>
                   </View>
-                  <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
-                    {previewText(messagePreview(textOf(replyTo)))}
-                  </Text>
+                  <IconButton
+                    icon="close"
+                    label="Cancel editing"
+                    size={18}
+                    color={colors.muted}
+                    onPress={cancelEdit}
+                  />
                 </View>
-                <IconButton
-                  icon="close"
-                  label="Cancel reply"
-                  size={18}
-                  color={colors.muted}
-                  onPress={() => setReplyTo(null)}
-                />
-              </View>
-            ) : null}
+              ) : null}
+            </Reveal>
 
-            {linkPreview.preview ? (
-              <View style={styles.replyBar}>
-                <Ionicons name="link" size={18} color={colors.accent} />
-                <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
-                  <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
-                    {linkPreview.preview.meta.site ?? linkPreview.preview.meta.title}
-                  </Text>
-                  <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
-                    {linkPreview.preview.meta.title}
-                  </Text>
-                </View>
-                <IconButton
-                  icon="close"
-                  label="Send without the link preview"
-                  size={18}
-                  color={colors.muted}
-                  onPress={linkPreview.dismiss}
-                />
-              </View>
-            ) : null}
-
-            {picked.length > 0 ? (
-              <View style={styles.pickedBar}>
-                {picked.map((file, i) => (
-                  <View key={i} style={[styles.picked, { backgroundColor: colors.panelAlt }]}>
-                    {file.previewUri ? (
-                      <Image source={{ uri: file.previewUri }} style={styles.pickedThumb} contentFit="cover" />
-                    ) : (
-                      <Ionicons name="document-outline" size={20} color={colors.muted} />
-                    )}
-                    <View style={styles.pickedText}>
-                      <Text numberOfLines={1} style={[styles.pickedName, { color: colors.text }]}>
-                        {file.name}
+            <Reveal>
+              {replyTo ? (
+                <View style={styles.replyBar}>
+                  <Ionicons name="arrow-undo" size={18} color={colors.accent} />
+                  <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
+                    <View style={styles.replyBarNameRow}>
+                      <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
+                        Reply to{" "}
+                        {replyTo.sender_id === user?.id ? "yourself" : replyTo.sender_username}
                       </Text>
-                      <Text style={[styles.pickedSize, { color: colors.muted }]}>
-                        {uploading
-                          ? uploadProgress === null
-                            ? "Uploading…"
-                            : `Uploading… ${Math.round(uploadProgress * 100)}%`
-                          : formatSize(file.bytes.length)}
-                      </Text>
+                      {(replyTo.sender_id === user?.id
+                        ? user?.is_developer
+                        : chat?.is_developer) ? <DevBadge /> : null}
                     </View>
-                    <IconButton
-                      icon="close"
-                      label={`Remove ${file.name}`}
-                      size={16}
-                      color={colors.muted}
-                      disabled={uploading}
-                      onPress={() => setPicked((current) => current.filter((_, j) => j !== i))}
-                    />
+                    <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
+                      {previewText(messagePreview(textOf(replyTo)))}
+                    </Text>
                   </View>
-                ))}
-              </View>
-            ) : null}
+                  <IconButton
+                    icon="close"
+                    label="Cancel reply"
+                    size={18}
+                    color={colors.muted}
+                    onPress={() => setReplyTo(null)}
+                  />
+                </View>
+              ) : null}
+            </Reveal>
 
-            {emojiOpen ? (
-              <View style={styles.emojiPanel}>
-                <EmojiPicker onPick={insertEmoji} />
-              </View>
-            ) : null}
+            <Reveal>
+              {linkPreview.preview ? (
+                <View style={styles.replyBar}>
+                  <Ionicons name="link" size={18} color={colors.accent} />
+                  <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
+                    <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
+                      {linkPreview.preview.meta.site ?? linkPreview.preview.meta.title}
+                    </Text>
+                    <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
+                      {linkPreview.preview.meta.title}
+                    </Text>
+                  </View>
+                  <IconButton
+                    icon="close"
+                    label="Send without the link preview"
+                    size={18}
+                    color={colors.muted}
+                    onPress={linkPreview.dismiss}
+                  />
+                </View>
+              ) : null}
+            </Reveal>
+
+            <Reveal>
+              {picked.length > 0 ? (
+                <View style={styles.pickedBar}>
+                  {picked.map((file, i) => (
+                    <View key={i} style={[styles.picked, { backgroundColor: colors.panelAlt }]}>
+                      {file.previewUri ? (
+                        <Image source={{ uri: file.previewUri }} style={styles.pickedThumb} contentFit="cover" />
+                      ) : (
+                        <Ionicons name="document-outline" size={20} color={colors.muted} />
+                      )}
+                      <View style={styles.pickedText}>
+                        <Text numberOfLines={1} style={[styles.pickedName, { color: colors.text }]}>
+                          {file.name}
+                        </Text>
+                        <Text style={[styles.pickedSize, { color: colors.muted }]}>
+                          {uploading
+                            ? uploadProgress === null
+                              ? "Uploading…"
+                              : `Uploading… ${Math.round(uploadProgress * 100)}%`
+                            : formatSize(file.bytes.length)}
+                        </Text>
+                      </View>
+                      <IconButton
+                        icon="close"
+                        label={`Remove ${file.name}`}
+                        size={16}
+                        color={colors.muted}
+                        disabled={uploading}
+                        onPress={() => setPicked((current) => current.filter((_, j) => j !== i))}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </Reveal>
+
+            <Reveal>
+              {emojiOpen ? (
+                <View style={styles.emojiPanel}>
+                  <EmojiPicker onPick={insertEmoji} />
+                </View>
+              ) : null}
+            </Reveal>
 
             <View style={styles.composerRow}>
               {voice.active ? (
@@ -2197,19 +2263,23 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         />
       ) : null}
 
-      {reactingTo ? (
-        <Pressable style={styles.overlay} onPress={() => setReactingTo(null)} accessibilityLabel="Close">
-          <Pressable onPress={() => {}} style={styles.overlayCard}>
-            <EmojiPicker
-              onPick={(emoji) => {
-                const message = reactingTo;
-                setReactingTo(null);
-                react(message, emoji);
-              }}
-            />
+      <Reveal collapse={false} kind="fade" style={styles.layer}>
+        {reactingTo ? (
+          <Pressable style={styles.overlay} onPress={() => setReactingTo(null)} accessibilityLabel="Close">
+            <Reveal appear collapse={false} kind="pop" style={styles.overlayCard}>
+              <Pressable onPress={() => {}}>
+                <EmojiPicker
+                  onPick={(emoji) => {
+                    const message = reactingTo;
+                    setReactingTo(null);
+                    react(message, emoji);
+                  }}
+                />
+              </Pressable>
+            </Reveal>
           </Pressable>
-        </Pressable>
-      ) : null}
+        ) : null}
+      </Reveal>
 
       {attachMenu ? (
         <ActionMenu
@@ -2643,6 +2713,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
+  dropLayer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 30,
+  },
+
   dropZone: {
     position: "absolute",
     top: 8,
@@ -2667,6 +2742,11 @@ const styles = StyleSheet.create({
   emojiPanel: {
     alignItems: "flex-start",
     marginBottom: 8,
+  },
+
+  layer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 10,
   },
 
   overlay: {
@@ -2741,12 +2821,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  selectBar: {
+  selectLayer: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     zIndex: 5,
+  },
+
+  selectBar: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -2770,10 +2853,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  unreadJump: {
+  unreadJumpPlace: {
     position: "absolute",
     alignSelf: "center",
     top: 12,
+  },
+
+  unreadJump: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -2787,10 +2873,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  scrollDown: {
+  scrollDownPlace: {
     position: "absolute",
     right: 16,
     bottom: 12,
+  },
+
+  scrollDown: {
     borderWidth: StyleSheet.hairlineWidth,
   },
 

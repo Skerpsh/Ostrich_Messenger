@@ -14,6 +14,7 @@ import AppHeader from "@/components/app-header";
 import Avatar from "@/components/avatar";
 import Button from "@/components/button";
 import QrScanner from "@/components/qr-scanner";
+import Reveal from "@/components/reveal";
 import ScreenEnter, { useLeaveScreen } from "@/components/screen-enter";
 import TextField from "@/components/text-field";
 import { useAuth, useCurrentUser } from "@/context/auth";
@@ -159,11 +160,13 @@ function NewChat() {
                 onSubmitEditing={submit}
               />
 
-              {error ? (
-                <Text style={[styles.error, { color: colors.danger }]}>
-                  {error}
-                </Text>
-              ) : null}
+              <Reveal>
+                {error ? (
+                  <Text style={[styles.error, { color: colors.danger }]}>
+                    {error}
+                  </Text>
+                ) : null}
+              </Reveal>
 
               <Button title="Start chat" loading={loading} onPress={submit} />
             </View>
@@ -339,26 +342,30 @@ function NewGroup({ onCreated }: { onCreated: (chatId: string) => void }) {
         <Button title="Add" variant="secondary" loading={adding} onPress={add} />
       </View>
 
-      {members.length > 0 ? (
-        <View style={styles.members}>
-          {members.map((member) => (
-            <View key={member.id} style={[styles.member, { backgroundColor: colors.panelAlt }]}>
-              <Avatar name={member.username} avatarId={member.avatar_id} size={24} />
-              <Text style={[styles.memberName, { color: colors.text }]}>@{member.username}</Text>
-              <Pressable
-                onPress={() => setMembers((current) => current.filter((m) => m.id !== member.id))}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove @${member.username}`}
-                hitSlop={8}
-              >
-                <Ionicons name="close" size={16} color={colors.muted} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      ) : null}
+      <Reveal>
+        {members.length > 0 ? (
+          <View style={styles.members}>
+            {members.map((member) => (
+              <View key={member.id} style={[styles.member, { backgroundColor: colors.panelAlt }]}>
+                <Avatar name={member.username} avatarId={member.avatar_id} size={24} />
+                <Text style={[styles.memberName, { color: colors.text }]}>@{member.username}</Text>
+                <Pressable
+                  onPress={() => setMembers((current) => current.filter((m) => m.id !== member.id))}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove @${member.username}`}
+                  hitSlop={8}
+                >
+                  <Ionicons name="close" size={16} color={colors.muted} />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </Reveal>
 
-      {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+      <Reveal>
+        {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+      </Reveal>
 
       <Button title="Create group" loading={creating} onPress={create} />
     </View>

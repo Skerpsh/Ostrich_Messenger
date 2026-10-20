@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Text } from "react-native";
+import Animated from "react-native-reanimated";
 import Button from "@/components/button";
+import Reveal from "@/components/reveal";
 import TextField from "@/components/text-field";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { changePassword, changeUsername, deleteAccount } from "@/lib/api";
 import { deriveFromOstrichId, normalizeOstrichId } from "@/lib/crypto";
 import { formatDate } from "@/lib/format";
+import { useShake } from "@/lib/motion";
 import {
   cleanUsername,
   MAX_PASSWORD,
@@ -26,6 +29,13 @@ export function UsernameForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // A failed try: the form shakes and the error shows.
+  const { style: shakeStyle, shake } = useShake();
+
+  const fail = (message: string) => {
+    setError(message);
+    shake();
+  };
   const [done, setDone] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -42,12 +52,12 @@ export function UsernameForm() {
     const name = cleanUsername(username);
 
     if (!USERNAME_RE.test(name)) {
-      setError(USERNAME_RULES);
+      fail(USERNAME_RULES);
       return;
     }
 
     if (!password) {
-      setError("Password is required");
+      fail("Password is required");
       return;
     }
 
@@ -63,24 +73,26 @@ export function UsernameForm() {
       setPassword("");
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to change username");
+      fail(e instanceof Error ? e.message : "Failed to change username");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <View style={styles.form}>
+    <Animated.View style={[styles.form, shakeStyle]}>
       <Text style={[styles.formText, { color: colors.textSoft }]}>
         You log in with your username, and others find you by it. It can be
         changed once every 28 days.
       </Text>
 
-      {done ? (
-        <Text style={[styles.formMessage, { color: colors.online }]}>
-          Username changed. Use the new one to log in.
-        </Text>
-      ) : null}
+      <Reveal>
+        {done ? (
+          <Text style={[styles.formMessage, { color: colors.online }]}>
+            Username changed. Use the new one to log in.
+          </Text>
+        ) : null}
+      </Reveal>
 
       {next ? (
         <Text style={[styles.formMessage, { color: colors.muted }]}>
@@ -106,16 +118,18 @@ export function UsernameForm() {
             onSubmitEditing={submit}
           />
 
-          {error ? (
-            <Text style={[styles.formMessage, { color: colors.danger }]}>
-              {error}
-            </Text>
-          ) : null}
+          <Reveal>
+            {error ? (
+              <Text style={[styles.formMessage, { color: colors.danger }]}>
+                {error}
+              </Text>
+            ) : null}
+          </Reveal>
 
           <Button title="Change username" loading={saving} onPress={submit} />
         </>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -127,6 +141,13 @@ export function PasswordForm() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // A failed try: the form shakes and the error shows.
+  const { style: shakeStyle, shake } = useShake();
+
+  const fail = (message: string) => {
+    setError(message);
+    shake();
+  };
   const [done, setDone] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -134,17 +155,17 @@ export function PasswordForm() {
     setDone(false);
 
     if (!currentPassword) {
-      setError("Current password is required");
+      fail("Current password is required");
       return;
     }
 
     if (newPassword.length < MIN_PASSWORD) {
-      setError(`New password must be at least ${MIN_PASSWORD} characters`);
+      fail(`New password must be at least ${MIN_PASSWORD} characters`);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
+      fail("New passwords do not match");
       return;
     }
 
@@ -160,14 +181,14 @@ export function PasswordForm() {
       setConfirmPassword("");
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to change password");
+      fail(e instanceof Error ? e.message : "Failed to change password");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <View style={styles.form}>
+    <Animated.View style={[styles.form, shakeStyle]}>
       <Text style={[styles.formText, { color: colors.textSoft }]}>
         Your other devices will be logged out.
       </Text>
@@ -199,17 +220,21 @@ export function PasswordForm() {
         onSubmitEditing={submit}
       />
 
-      {error ? (
-        <Text style={[styles.formMessage, { color: colors.danger }]}>{error}</Text>
-      ) : null}
-      {done ? (
-        <Text style={[styles.formMessage, { color: colors.online }]}>
-          Password changed. Other devices have been logged out.
-        </Text>
-      ) : null}
+      <Reveal>
+        {error ? (
+          <Text style={[styles.formMessage, { color: colors.danger }]}>{error}</Text>
+        ) : null}
+      </Reveal>
+      <Reveal>
+        {done ? (
+          <Text style={[styles.formMessage, { color: colors.online }]}>
+            Password changed. Other devices have been logged out.
+          </Text>
+        ) : null}
+      </Reveal>
 
       <Button title="Change password" loading={saving} onPress={submit} />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -221,6 +246,13 @@ export function DeleteAccountForm() {
   const [ostrichId, setOstrichId] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A failed try: the form shakes and the error shows.
+  const { style: shakeStyle, shake } = useShake();
+
+  const fail = (message: string) => {
+    setError(message);
+    shake();
+  };
   const [deleting, setDeleting] = useState(false);
 
   const submit = async () => {
@@ -228,7 +260,7 @@ export function DeleteAccountForm() {
     const id = normalizeOstrichId(ostrichId);
 
     if (!password || !id) {
-      setError("Enter your password and OstrichID");
+      fail("Enter your password and OstrichID");
       return;
     }
 
@@ -245,7 +277,7 @@ export function DeleteAccountForm() {
       );
       await signOut();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete the account");
+      fail(e instanceof Error ? e.message : "Failed to delete the account");
       setDeleting(false);
       setConfirming(false);
     }
@@ -256,7 +288,7 @@ export function DeleteAccountForm() {
   }
 
   return (
-    <View style={styles.form}>
+    <Animated.View style={[styles.form, shakeStyle]}>
       <Text style={[styles.formText, { color: colors.textSoft }]}>
         Deletes your account, all your chats (for the people you talk to as
         well) and your messages. This cannot be undone. Your username becomes
@@ -279,15 +311,17 @@ export function DeleteAccountForm() {
         autoComplete="off"
         maxLength={40}
       />
-      {error ? (
-        <Text style={[styles.formMessage, { color: colors.danger }]}>{error}</Text>
-      ) : null}
+      <Reveal>
+        {error ? (
+          <Text style={[styles.formMessage, { color: colors.danger }]}>{error}</Text>
+        ) : null}
+      </Reveal>
       <Button
         title={confirming ? "Delete forever?" : "Delete account"}
         variant="danger"
         loading={deleting}
         onPress={submit}
       />
-    </View>
+    </Animated.View>
   );
 }

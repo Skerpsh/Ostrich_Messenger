@@ -3,6 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Button from "@/components/button";
 import QrScanner from "@/components/qr-scanner";
+import Reveal from "@/components/reveal";
 import { useAuth, usePrivateKey } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { approveDeviceLink, getDeviceLink } from "@/lib/api";
@@ -120,7 +121,9 @@ export function LinkDeviceRow({
                 <Text style={[styles.warning, { color: colors.danger }]}>
                   Only scan codes shown on your own devices. Nobody from Ostrich will ever ask you to scan one.
                 </Text>
-                {error ? <Text style={[styles.text, { color: colors.danger }]}>{error}</Text> : null}
+                <Reveal>
+                  {error ? <Text style={[styles.text, { color: colors.danger }]}>{error}</Text> : null}
+                </Reveal>
                 <View style={styles.buttons}>
                   <Button title="Cancel" variant="secondary" onPress={close} disabled={busy} />
                   <Button title="Log in" onPress={approve} loading={busy} />

@@ -87,6 +87,36 @@ const ANIMATIONS = {
     animationDuration: 380,
     animationTimingFunction: SLIDE,
   },
+  // A whole-screen sheet coming up from below (the call).
+  rise: {
+    animationName: {
+      from: { opacity: 0, transform: [{ translateY: 64 }] },
+      "40%": { opacity: 1 },
+      to: { opacity: 1, transform: [{ translateY: 0 }] },
+    },
+    animationDuration: 420,
+    animationTimingFunction: SLIDE,
+  },
+  // The call coming back out of its bar at the top.
+  unfold: {
+    animationName: {
+      from: { opacity: 0, transform: [{ scale: 0.2 }] },
+      "30%": { opacity: 1 },
+      to: { opacity: 1, transform: [{ scale: 1 }] },
+    },
+    animationDuration: 380,
+    animationTimingFunction: SLIDE,
+  },
+  // A bar coming down from the top (the minimized call).
+  drop: {
+    animationName: {
+      from: { opacity: 0, transform: [{ translateY: -24 }] },
+      "40%": { opacity: 1 },
+      to: { opacity: 1, transform: [{ translateY: 0 }] },
+    },
+    animationDuration: 360,
+    animationTimingFunction: SPRING,
+  },
   // Dimmed backgrounds.
   fade: { ...FADE, animationDuration: 200 },
 } satisfies Record<string, Animation>;
@@ -94,7 +124,7 @@ const ANIMATIONS = {
 export type Enter = keyof typeof ANIMATIONS;
 
 // Speeding up as it goes, for things leaving.
-const EASE_IN = cubicBezier(0.4, 0, 1, 1);
+export const EASE_IN = cubicBezier(0.4, 0, 1, 1);
 
 // How long leaving takes, before the view is gone.
 export const LEAVE_MS = { full: 200, reduced: 120, off: 0 } satisfies Record<Motion, number>;
@@ -114,8 +144,25 @@ const LEAVING = {
       to: { opacity: 0, transform: [{ scale: 0.92 }] },
     },
   },
+  // A whole-screen sheet going back down (the call ending).
+  rise: {
+    animationName: {
+      from: { opacity: 1, transform: [{ translateY: 0 }] },
+      to: { opacity: 0, transform: [{ translateY: 64 }] },
+    },
+  },
+  // The call folding into its bar at the top (with transformOrigin: top).
+  fold: {
+    animationName: {
+      from: { opacity: 1, transform: [{ scale: 1 }] },
+      to: { opacity: 0, transform: [{ scale: 0.2 }] },
+    },
+  },
   fade: { animationName: { from: { opacity: 1 }, to: { opacity: 0 } } },
 } satisfies Record<string, Animation>;
+
+// Pictures fade in as they load (expo-image's transition).
+export const IMAGE_FADE_MS = { full: 200, reduced: 150, off: 0 } satisfies Record<Motion, number>;
 
 // The style that animates a view out before it goes (see useLeave).
 export function leaveStyle(kind: keyof typeof LEAVING, motion: Motion): Animation | null {
@@ -167,6 +214,17 @@ export function enterStyle(kind: Enter, motion: Motion): Animation | null {
   return motion === "reduced" ? FADE : ANIMATIONS[kind];
 }
 
+// Runs after the next frame is drawn, so that what changes then animates
+// from how it was drawn (one frame is not enough on the web: the new look
+// would be set before the old one was ever styled). Returns the cancel.
+export function afterFrame(then: () => void) {
+  let frame = requestAnimationFrame(() => {
+    frame = requestAnimationFrame(then);
+  });
+
+  return () => cancelAnimationFrame(frame);
+}
+
 // Pressing a button: it shrinks a little and springs back.
 export function pressStyle(
   pressed: boolean,
@@ -207,4 +265,33 @@ export function useScreenAnimation() {
   const motion = useMotion();
 
   return motion === "off" ? "none" : motion === "reduced" ? "fade" : Platform.OS === "ios" ? "default" : "slide_from_right";
+}
+
+// A wrong password, ID or code: the field shakes its head. Two of them
+// (to the left first, to the right first), taken in turn, so that each new
+// error starts the animation over (the same one again would not).
+const SHAKES = [1, -1].map((side) => ({
+  animationName: {
+    from: { transform: [{ translateX: 0 }] },
+    "15%": { transform: [{ translateX: -10 * side }] },
+    "30%": { transform: [{ translateX: 9 * side }] },
+    "45%": { transform: [{ translateX: -7 * side }] },
+    "60%": { transform: [{ translateX: 5 * side }] },
+    "75%": { transform: [{ translateX: -3 * side }] },
+    to: { transform: [{ translateX: 0 }] },
+  },
+  animationDuration: 460,
+  animationTimingFunction: EASE_OUT,
+})) satisfies Animation[];
+
+// Shaking: shake() starts it (on a failed try), style is for the
+// Animated.View that shakes.
+export function useShake() {
+  const motion = useMotion();
+  const [count, setCount] = useState(0);
+
+  return {
+    style: motion === "full" && count > 0 ? SHAKES[count % 2] : null,
+    shake: () => setCount((current) => current + 1),
+  };
 }

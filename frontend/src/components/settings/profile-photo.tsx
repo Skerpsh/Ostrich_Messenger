@@ -2,6 +2,7 @@ import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import Avatar from "@/components/avatar";
+import Reveal from "@/components/reveal";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { removeAvatar, uploadAvatar } from "@/lib/api";
@@ -84,9 +85,11 @@ export function ProfilePhoto() {
         </Pressable>
       ) : null}
 
-      {error ? (
-        <Text style={[styles.photoError, { color: colors.danger }]}>{error}</Text>
-      ) : null}
+      <Reveal>
+        {error ? (
+          <Text style={[styles.photoError, { color: colors.danger }]}>{error}</Text>
+        ) : null}
+      </Reveal>
     </View>
   );
 }

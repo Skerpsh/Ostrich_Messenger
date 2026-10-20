@@ -306,7 +306,8 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     <CallsContext value={value}>
       <View style={styles.fill}>
         {children}
-        {call ? <CallScreen /> : null}
+        {/* Always there: an ended call's screen animates out first. */}
+        <CallScreen />
       </View>
     </CallsContext>
   );

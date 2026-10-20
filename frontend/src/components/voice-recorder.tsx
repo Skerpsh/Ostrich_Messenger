@@ -5,12 +5,14 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from "expo-audio";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, type ViewStyle } from "react-native";
+import Animated, { type CSSAnimationProperties } from "react-native-reanimated";
 import IconButton from "@/components/icon-button";
 import { LiveWaveform } from "@/components/voice-message";
 import { useAppTheme } from "@/context/theme";
 import { formatDuration, type PickedFile } from "@/lib/attachments";
 import { readUri, removeUri } from "@/lib/files";
+import { enterStyle, useMotion } from "@/lib/motion";
 import {
   encodeWaveform,
   level,
@@ -187,16 +189,24 @@ export function useVoiceRecorder({
 // Shown in place of the message field while recording.
 export function RecordingBar({ voice }: { voice: VoiceRecorder }) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
 
   return (
-    <View style={[styles.bar, { backgroundColor: colors.panelAlt }]}>
+    // Slides out of the microphone button, the red dot blinking.
+    <Animated.View style={[styles.bar, { backgroundColor: colors.panelAlt }, enterStyle("push", motion)]}>
       <IconButton icon="trash-outline" label="Cancel the recording" size={20} color={colors.danger} onPress={voice.cancel} />
-      <View style={[styles.dot, { backgroundColor: colors.danger }]} />
+      <Animated.View style={[styles.dot, { backgroundColor: colors.danger }, motion === "full" && BLINK]} />
       <Text style={[styles.time, { color: colors.text }]}>{formatDuration(voice.durationMillis)}</Text>
       <LiveWaveform levels={voice.levels} color={colors.accent} />
-    </View>
+    </Animated.View>
   );
 }
+
+const BLINK = {
+  animationName: { from: { opacity: 1 }, "50%": { opacity: 0.2 }, to: { opacity: 1 } },
+  animationDuration: 1200,
+  animationIterationCount: "infinite",
+} satisfies CSSAnimationProperties<ViewStyle>;
 
 // The microphone button where the send button is when there is nothing
 // to send.

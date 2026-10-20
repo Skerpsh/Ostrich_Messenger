@@ -5,12 +5,14 @@ import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { loadAttachment } from "@/lib/attachments";
 import { imageSource } from "@/lib/files";
+import { IMAGE_FADE_MS, useMotion } from "@/lib/motion";
 import type { LinkPreview } from "@/lib/payload";
 
 // The preview of a message's link (made by the sender's phone): the site,
 // title, description and picture; tapping it opens the link.
 export default function LinkCard({ link, own }: { link: LinkPreview; own: boolean }) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
   const { withToken } = useAuth();
   const [uri, setUri] = useState<string | null>(null);
   const image = link.image;
@@ -74,7 +76,13 @@ export default function LinkCard({ link, own }: { link: LinkPreview; own: boolea
       {image ? (
         <View style={[styles.image, { aspectRatio: Math.min(2.5, Math.max(0.8, ratio)) }]}>
           {uri ? (
-            <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+            <Image
+              source={{ uri }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={IMAGE_FADE_MS[motion]}
+              accessibilityIgnoresInvertColors
+            />
           ) : null}
         </View>
       ) : null}

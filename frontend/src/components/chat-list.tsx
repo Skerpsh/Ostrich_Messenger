@@ -21,6 +21,7 @@ import Avatar from "@/components/avatar";
 import ChatAvatar from "@/components/chat-avatar";
 import DevBadge from "@/components/dev-badge";
 import IconButton from "@/components/icon-button";
+import Reveal from "@/components/reveal";
 import TypingDots from "@/components/typing-dots";
 import Welcome from "@/components/welcome";
 import { noWebOutline } from "@/components/text-field";
@@ -312,15 +313,17 @@ export default function ChatList() {
             onBlur={() => setSearchFocused(false)}
             style={[styles.searchInput, { color: colors.text }, noWebOutline]}
           />
-          {query ? (
-            <IconButton
-              icon="close-circle"
-              label="Clear search"
-              size={18}
-              color={colors.muted}
-              onPress={() => setQuery("")}
-            />
-          ) : null}
+          <Reveal collapse={false} kind="pop">
+            {query ? (
+              <IconButton
+                icon="close-circle"
+                label="Clear search"
+                size={18}
+                color={colors.muted}
+                onPress={() => setQuery("")}
+              />
+            ) : null}
+          </Reveal>
         </View>
         {wide ? newChatButton : null}
       </View>
@@ -345,85 +348,91 @@ export default function ChatList() {
           )
         }
         ListFooterComponent={
-          shownMatches.length > 0 ? (
-            <View>
-              <Text style={[styles.sectionTitle, { color: colors.muted }]}>Messages</Text>
-              {shownMatches.map((match) => (
-                <Pressable
-                  key={match.message.id}
-                  onPress={() => openMatch(match)}
-                  accessibilityRole="button"
-                  style={({ hovered, pressed }) => [styles.row, (hovered || pressed) && { backgroundColor: colors.hover }]}
-                >
-                  <ChatAvatar chat={match.chat} size={40} />
-                  <View style={styles.rowText}>
-                    <View style={styles.rowLine}>
-                      <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>
-                        {chatTitle(match.chat)}
-                      </Text>
-                      <Text style={[styles.time, { color: colors.muted }]}>
-                        {formatChatDate(match.message.created_at)}
+          <Reveal>
+            {shownMatches.length > 0 ? (
+              <View>
+                <Text style={[styles.sectionTitle, { color: colors.muted }]}>Messages</Text>
+                {shownMatches.map((match) => (
+                  <Pressable
+                    key={match.message.id}
+                    onPress={() => openMatch(match)}
+                    accessibilityRole="button"
+                    style={({ hovered, pressed }) => [styles.row, (hovered || pressed) && { backgroundColor: colors.hover }]}
+                  >
+                    <ChatAvatar chat={match.chat} size={40} />
+                    <View style={styles.rowText}>
+                      <View style={styles.rowLine}>
+                        <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>
+                          {chatTitle(match.chat)}
+                        </Text>
+                        <Text style={[styles.time, { color: colors.muted }]}>
+                          {formatChatDate(match.message.created_at)}
+                        </Text>
+                      </View>
+                      <Text numberOfLines={2} style={[styles.preview, { color: colors.muted }]}>
+                        {match.message.sender_id === user?.id
+                          ? "You: "
+                          : match.chat.type === "group"
+                            ? `@${match.message.sender_username}: `
+                            : ""}
+                        {snippet(match.text, messageQuery)}
                       </Text>
                     </View>
-                    <Text numberOfLines={2} style={[styles.preview, { color: colors.muted }]}>
-                      {match.message.sender_id === user?.id
-                        ? "You: "
-                        : match.chat.type === "group"
-                          ? `@${match.message.sender_username}: `
-                          : ""}
-                      {snippet(match.text, messageQuery)}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-              <Text style={[styles.notice, { color: colors.muted }]}>
-                Searched the messages saved on this device: messages are encrypted, the server
-                cannot search them.
-              </Text>
-            </View>
-          ) : null
+                  </Pressable>
+                ))}
+                <Text style={[styles.notice, { color: colors.muted }]}>
+                  Searched the messages saved on this device: messages are encrypted, the server
+                  cannot search them.
+                </Text>
+              </View>
+            ) : null}
+          </Reveal>
         }
         ListHeaderComponent={
           <>
-            {canStart ? (
-              <Pressable
-                onPress={startChat}
-                disabled={starting}
-                style={({ hovered, pressed }) => [
-                  styles.row,
-                  (hovered || pressed) && { backgroundColor: colors.hover },
-                ]}
-              >
-                <View
-                  style={[styles.startIcon, { backgroundColor: colors.accentSoft }]}
+            <Reveal>
+              {canStart ? (
+                <Pressable
+                  onPress={startChat}
+                  disabled={starting}
+                  style={({ hovered, pressed }) => [
+                    styles.row,
+                    (hovered || pressed) && { backgroundColor: colors.hover },
+                  ]}
                 >
-                  {starting ? (
-                    <ActivityIndicator color={colors.accent} />
-                  ) : (
-                    <Ionicons name="chatbubble-ellipses" size={22} color={colors.accent} />
-                  )}
-                </View>
-                <View style={styles.rowText}>
-                  <Text style={[styles.name, { color: colors.text }]}>
-                    Start a chat with @{search}
+                  <View
+                    style={[styles.startIcon, { backgroundColor: colors.accentSoft }]}
+                  >
+                    {starting ? (
+                      <ActivityIndicator color={colors.accent} />
+                    ) : (
+                      <Ionicons name="chatbubble-ellipses" size={22} color={colors.accent} />
+                    )}
+                  </View>
+                  <View style={styles.rowText}>
+                    <Text style={[styles.name, { color: colors.text }]}>
+                      Start a chat with @{search}
+                    </Text>
+                    <Text style={[styles.preview, { color: startError ? colors.danger : colors.muted }]}>
+                      {startError ?? "Find this user by their exact username"}
+                    </Text>
+                  </View>
+                </Pressable>
+              ) : null}
+            </Reveal>
+            <Reveal>
+              {error || actionError ? (
+                <Pressable
+                  onPress={() => setActionError(null)}
+                  disabled={!actionError}
+                  accessibilityRole={actionError ? "button" : undefined}
+                >
+                  <Text style={[styles.notice, { color: colors.danger }]}>
+                    {actionError ?? error}
                   </Text>
-                  <Text style={[styles.preview, { color: startError ? colors.danger : colors.muted }]}>
-                    {startError ?? "Find this user by their exact username"}
-                  </Text>
-                </View>
-              </Pressable>
-            ) : null}
-            {error || actionError ? (
-              <Pressable
-                onPress={() => setActionError(null)}
-                disabled={!actionError}
-                accessibilityRole={actionError ? "button" : undefined}
-              >
-                <Text style={[styles.notice, { color: colors.danger }]}>
-                  {actionError ?? error}
-                </Text>
-              </Pressable>
-            ) : null}
+                </Pressable>
+              ) : null}
+            </Reveal>
           </>
         }
         ListEmptyComponent={

@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { StyleSheet, Text, View } from "react-native";
 import { useAppTheme } from "@/context/theme";
 import { avatarUrl } from "@/lib/api";
+import { IMAGE_FADE_MS, useMotion } from "@/lib/motion";
 
 export default function Avatar({
   name,
@@ -28,6 +29,7 @@ export default function Avatar({
   ringColor?: string;
 }) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
   const dot = Math.max(10, Math.round(size * 0.28));
 
   return (
@@ -47,6 +49,7 @@ export default function Avatar({
           source={{ uri }}
           style={{ width: size, height: size, borderRadius: size / 2 }}
           contentFit="cover"
+          transition={IMAGE_FADE_MS[motion]}
           accessibilityIgnoresInvertColors
         />
       ) : icon ? (
@@ -58,7 +61,7 @@ export default function Avatar({
           contentFit="cover"
           // The URL changes with every upload, so caching is safe.
           cachePolicy="memory-disk"
-          transition={120}
+          transition={IMAGE_FADE_MS[motion]}
           accessibilityIgnoresInvertColors
         />
       ) : (

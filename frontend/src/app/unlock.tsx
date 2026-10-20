@@ -9,12 +9,16 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import AppHeader from "@/components/app-header";
 import Button from "@/components/button";
+import Reveal from "@/components/reveal";
 import TextField from "@/components/text-field";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
+import { useShake } from "@/lib/motion";
 import { TOUCH_UI } from "@/lib/touch";
 import { radius } from "@/theme/colors";
 
@@ -29,6 +33,7 @@ export default function UnlockScreen() {
   const [ostrichId, setOstrichId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { style: shakeStyle, shake } = useShake();
 
   const submit = async () => {
     setError(null);
@@ -39,6 +44,7 @@ export default function UnlockScreen() {
       // The navigator moves on to the chats on its own.
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
+      shake();
       setLoading(false);
     }
   };
@@ -68,22 +74,26 @@ export default function UnlockScreen() {
               OstrichID once on this device to unlock them.
             </Text>
 
-            <TextField
-              label="OstrichID"
-              placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
-              value={ostrichId}
-              onChangeText={setOstrichId}
-              maxLength={40}
-              autoCapitalize="characters"
-              autoComplete="off"
-              autoFocus={!TOUCH_UI}
-              returnKeyType="go"
-              onSubmitEditing={submit}
-            />
+            <Animated.View style={shakeStyle}>
+              <TextField
+                label="OstrichID"
+                placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
+                value={ostrichId}
+                onChangeText={setOstrichId}
+                maxLength={40}
+                autoCapitalize="characters"
+                autoComplete="off"
+                autoFocus={!TOUCH_UI}
+                returnKeyType="go"
+                onSubmitEditing={submit}
+              />
+            </Animated.View>
 
-            {error ? (
-              <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
-            ) : null}
+            <Reveal>
+              {error ? (
+                <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
+              ) : null}
+            </Reveal>
 
             <Button title="Unlock" loading={loading} onPress={submit} />
 

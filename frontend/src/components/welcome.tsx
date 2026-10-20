@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import QrCode from "@/components/qr-code";
 import type { IconName } from "@/components/icon-button";
+import Reveal from "@/components/reveal";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useChats } from "@/context/chats";
 import { useAppTheme } from "@/context/theme";
@@ -86,29 +87,31 @@ export default function Welcome({ onFindFriend }: { onFindFriend: () => void }) 
           expanded={showQr}
           onPress={() => setShowQr((open) => !open)}
         />
-        {showQr ? (
-          <View style={styles.qr}>
-            <QrCode value={link} size={180} />
-            <Pressable
-              onPress={share}
-              accessibilityRole="button"
-              style={({ hovered, pressed }) => [
-                styles.chip,
-                { backgroundColor: colors.accentSoft },
-                (hovered || pressed) && styles.chipHover,
-              ]}
-            >
-              <Ionicons
-                name={copied ? "checkmark" : Platform.OS === "web" ? "link-outline" : "share-outline"}
-                size={16}
-                color={colors.accent}
-              />
-              <Text style={[styles.chipText, { color: colors.accent }]}>
-                {copied ? "Link copied" : Platform.OS === "web" ? "Copy the link" : "Share the link"}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
+        <Reveal>
+          {showQr ? (
+            <View style={styles.qr}>
+              <QrCode value={link} size={180} />
+              <Pressable
+                onPress={share}
+                accessibilityRole="button"
+                style={({ hovered, pressed }) => [
+                  styles.chip,
+                  { backgroundColor: colors.accentSoft },
+                  (hovered || pressed) && styles.chipHover,
+                ]}
+              >
+                <Ionicons
+                  name={copied ? "checkmark" : Platform.OS === "web" ? "link-outline" : "share-outline"}
+                  size={16}
+                  color={colors.accent}
+                />
+                <Text style={[styles.chipText, { color: colors.accent }]}>
+                  {copied ? "Link copied" : Platform.OS === "web" ? "Copy the link" : "Share the link"}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </Reveal>
         <View style={[styles.divider, { backgroundColor: colors.line }]} />
         <Step
           icon="bookmark-outline"
@@ -125,7 +128,9 @@ export default function Welcome({ onFindFriend }: { onFindFriend: () => void }) 
         />
       </View>
 
-      {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+      <Reveal>
+        {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+      </Reveal>
     </View>
   );
 }

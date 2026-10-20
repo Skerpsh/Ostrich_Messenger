@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { Animated, Easing, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CallVideo from "@/components/call-video";
 import ChatAvatar from "@/components/chat-avatar";
@@ -9,6 +10,7 @@ import IconButton, { type IconName } from "@/components/icon-button";
 import { useCalls } from "@/context/calls";
 import { useAppTheme } from "@/context/theme";
 import { useEscape } from "@/lib/keys";
+import { enterStyle, LEAVE_MS, leaveStyle, useMotion } from "@/lib/motion";
 import { formatDuration } from "@/lib/attachments";
 import type { CallStats } from "@/lib/call-connection";
 import type { CallView, HandshakeView } from "@/lib/calls";
@@ -18,24 +20,72 @@ import { getItem, setItem } from "@/lib/storage";
 import { callSounds } from "@/lib/webrtc";
 import { radius } from "@/theme/colors";
 
+type Drawn = "screen" | "bar" | null;
+
 // The call over every screen (context/calls.tsx): ringing, the call's
 // buttons, the Ostrich handshake, the video; minimized, a bar at the top.
+// Minimizing folds the screen into the bar (and back out of it); a call
+// that is over goes the way it came.
 export default function CallScreen() {
-  const { call, minimized, setMinimized, hangUp } = useCalls();
+  const { call: current, minimized, setMinimized, hangUp } = useCalls();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const wide = useIsWide();
+  const motion = useMotion();
+  // The call, kept for the screen to leave once it is over.
+  const [kept, setKept] = useState(current);
+  const call = current ?? kept;
   const now = useNow(call?.phase === "active" || call?.phase === "reconnecting");
 
-  if (!call) {
+  const wanted: Drawn = !current
+    ? null
+    : minimized && current.phase !== "incoming" && current.phase !== "ended"
+      ? "bar"
+      : "screen";
+  const [drawn, setDrawn] = useState<Drawn>(wanted);
+  // The screen on its way out (to the bar, or gone), and whether it came
+  // out of the bar.
+  const [leaving, setLeaving] = useState(false);
+  const [unfolding, setUnfolding] = useState(false);
+
+  // Following the call as it is rendered (React's way to adjust state to
+  // new props).
+  if (current && current !== kept) {
+    setKept(current);
+  }
+
+  if (wanted !== drawn && !leaving) {
+    if (drawn === "screen" && motion !== "off") {
+      setLeaving(true);
+    } else {
+      setUnfolding(drawn === "bar" && wanted === "screen");
+      setDrawn(wanted);
+    }
+  }
+
+  useEffect(() => {
+    if (!leaving) {
+      return;
+    }
+
+    // Then drawn follows what is wanted by now (above).
+    const timer = setTimeout(() => {
+      setLeaving(false);
+      setDrawn(null);
+    }, LEAVE_MS[motion]);
+
+    return () => clearTimeout(timer);
+  }, [leaving, motion]);
+
+  if (!call || !drawn) {
     return null;
   }
 
   const status = statusText(call, now);
 
-  if (minimized && call.phase !== "incoming" && call.phase !== "ended") {
+  if (drawn === "bar") {
     return (
-      <View pointerEvents="box-none" style={[styles.barWrap, { top: insets.top + 8 }]}>
+      <Reanimated.View pointerEvents="box-none" style={[styles.barWrap, { top: insets.top + 8 }, enterStyle("drop", motion)]}>
         <Pressable
           onPress={() => setMinimized(false)}
           accessibilityRole="button"
@@ -50,7 +100,7 @@ export default function CallScreen() {
             <Ionicons name="close-circle" size={20} color="#08240f" />
           </Pressable>
         </Pressable>
-      </View>
+      </Reanimated.View>
     );
   }
 
@@ -100,7 +150,27 @@ export default function CallScreen() {
     </View>
   );
 
-  return wide ? <View style={styles.backdrop}>{screen}</View> : <View style={styles.full}>{screen}</View>;
+  // Opening: over a fading background on a wide screen, coming up from
+  // below on a phone; out of the bar, growing from the top. Leaving the
+  // same way back, or folding into the bar.
+  const folding = leaving && wanted === "bar";
+  const sheet = leaving
+    ? leaveStyle(folding ? "fold" : wide ? "pop" : "rise", motion)
+    : enterStyle(unfolding ? "unfold" : wide ? "pop" : "rise", motion);
+  const origin = (folding || unfolding) && styles.fromTop;
+
+  return wide ? (
+    <Reanimated.View
+      pointerEvents={leaving ? "none" : "auto"}
+      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+    >
+      <Reanimated.View style={[styles.cardPlace, origin, sheet]}>{screen}</Reanimated.View>
+    </Reanimated.View>
+  ) : (
+    <Reanimated.View pointerEvents={leaving ? "none" : "auto"} style={[styles.full, origin, sheet]}>
+      {screen}
+    </Reanimated.View>
+  );
 }
 
 // Some video to show: this side's camera, or the other's.
@@ -1213,6 +1283,18 @@ const styles = StyleSheet.create({
   peerVerdict: {
     fontSize: 13,
     textAlign: "center",
+  },
+
+  // Where the card animates: all of the backdrop, the card sized in it.
+  cardPlace: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  fromTop: {
+    transformOrigin: "50% 0%",
   },
 
   barWrap: {
