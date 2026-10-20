@@ -5,6 +5,7 @@ import AnimatedPressable from "@/components/animated-pressable";
 import Button from "@/components/button";
 import QrCode from "@/components/qr-code";
 import QrScanner from "@/components/qr-scanner";
+import { Swap } from "@/components/reveal";
 import { parseLink, safetyQr } from "@/lib/links";
 import { useAppTheme } from "@/context/theme";
 import { useEscape } from "@/lib/keys";
@@ -74,19 +75,21 @@ export default function SafetyCode({
           Safety code with @{username}
         </Text>
 
-        {showQr ? (
-          <View style={styles.qr}>
-            <QrCode value={safetyQr(code)} size={200} />
-          </View>
-        ) : (
-          <View style={[styles.code, { backgroundColor: colors.panelAlt }]}>
-            {[code.slice(0, 4), code.slice(4)].map((line, i) => (
-              <Text key={i} selectable style={[styles.codeLine, { color: colors.text }]}>
-                {line.join("  ")}
-              </Text>
-            ))}
-          </View>
-        )}
+        <Swap id={showQr ? "qr" : "code"} step={showQr ? 1 : -1}>
+          {showQr ? (
+            <View style={styles.qr}>
+              <QrCode value={safetyQr(code)} size={200} />
+            </View>
+          ) : (
+            <View style={[styles.code, { backgroundColor: colors.panelAlt }]}>
+              {[code.slice(0, 4), code.slice(4)].map((line, i) => (
+                <Text key={i} selectable style={[styles.codeLine, { color: colors.text }]}>
+                  {line.join("  ")}
+                </Text>
+              ))}
+            </View>
+          )}
+        </Swap>
 
         <View style={styles.buttons}>
           <Button

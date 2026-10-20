@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppHeader from "@/components/app-header";
 import Button from "@/components/button";
 import QrCode from "@/components/qr-code";
-import Reveal from "@/components/reveal";
+import { Swap } from "@/components/reveal";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { ApiError, createDeviceLink, deviceLinkSession } from "@/lib/api";
@@ -107,15 +107,17 @@ export default function LinkDeviceScreen() {
           <Text style={[styles.title, { color: colors.text }]}>Log in with a QR code</Text>
 
           <View style={styles.qr}>
-            {qr ? <QrCode value={qr} size={220} /> : error ? null : <ActivityIndicator color={colors.muted} />}
+            <Swap id={qr ?? (error ? "error" : "loading")} resize={false}>
+              {qr ? <QrCode value={qr} size={220} /> : error ? null : <ActivityIndicator color={colors.muted} />}
+            </Swap>
           </View>
 
-          <Reveal>
+          <Swap id={error ? "error" : "waiting"}>
             {error ? (
-              <>
+              <View style={styles.retry}>
                 <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
                 <Button title="Try again" variant="secondary" onPress={() => setRound((n) => n + 1)} />
-              </>
+              </View>
             ) : (
               <View style={styles.steps}>
                 {[
@@ -132,7 +134,7 @@ export default function LinkDeviceScreen() {
                 ))}
               </View>
             )}
-          </Reveal>
+          </Swap>
 
           <Text style={[styles.note, { color: colors.muted }]}>
             Your messages’ key comes from that device, encrypted for this one only: the server never
@@ -153,6 +155,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     padding: 20,
+  },
+
+  retry: {
+    gap: 18,
   },
 
   card: {

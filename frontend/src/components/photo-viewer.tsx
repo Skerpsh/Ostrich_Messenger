@@ -5,6 +5,7 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type Vi
 import Animated, { cubicBezier, type CSSAnimationProperties, type CSSTransitionProperties } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AnimatedPressable from "@/components/animated-pressable";
+import { Swap } from "@/components/reveal";
 import { useAuth } from "@/context/auth";
 import { loadAttachment } from "@/lib/attachments";
 import { imageSource, saveFile } from "@/lib/files";
@@ -308,7 +309,9 @@ export default function PhotoViewer({
         </Text>
         <View style={styles.actions}>
           <Pressable onPress={save} disabled={saving} accessibilityRole="button" accessibilityLabel="Save the photo" style={styles.button}>
-            {saving ? <ActivityIndicator color="#ffffff" /> : <Ionicons name="download-outline" size={24} color="#ffffff" />}
+            <Swap id={saving ? "saving" : "save"} resize={false}>
+              {saving ? <ActivityIndicator color="#ffffff" /> : <Ionicons name="download-outline" size={24} color="#ffffff" />}
+            </Swap>
           </Pressable>
           <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Close" style={styles.button}>
             <Ionicons name="close" size={26} color="#ffffff" />

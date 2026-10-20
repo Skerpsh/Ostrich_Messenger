@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { Image } from "expo-image";
 import { StyleSheet, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "@/context/theme";
+import { enterStyle, useMotion } from "@/lib/motion";
 import IconButton from "./icon-button";
 import ThemeToggle from "./theme-toggle";
 
@@ -19,6 +21,9 @@ type AppHeaderProps = {
   subtitle?: ReactNode;
   // After the subtitle, e.g. "typing…"'s dots.
   subtitleAccessory?: ReactNode;
+  // Which subtitle it is when it is not plain text ("typing", "online"):
+  // another one fades in.
+  subtitleKey?: string;
   right?: ReactNode;
   // The Ostrich logo and light/dark switch, for signed-out screens.
   brand?: boolean;
@@ -34,11 +39,13 @@ export default function AppHeader({
   titleBadge,
   subtitle,
   subtitleAccessory,
+  subtitleKey,
   right,
   brand = false,
 }: AppHeaderProps) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const motion = useMotion();
 
   return (
     <View
@@ -71,7 +78,8 @@ export default function AppHeader({
 
       <View style={styles.titles}>
         {title ? (
-          <View style={styles.titleRow}>
+          // Another title (New chat → New group) fades in.
+          <Animated.View key={title} style={[styles.titleRow, enterStyle("fade", motion)]}>
             <Text
               numberOfLines={1}
               style={[styles.title, { color: colors.text }]}
@@ -79,10 +87,13 @@ export default function AppHeader({
               {title}
             </Text>
             {titleBadge}
-          </View>
+          </Animated.View>
         ) : null}
         {subtitle ? (
-          <View style={styles.subtitleRow}>
+          <Animated.View
+            key={typeof subtitle === "string" ? subtitle : subtitleKey}
+            style={[styles.subtitleRow, enterStyle("fade", motion)]}
+          >
             <Text
               numberOfLines={1}
               style={[styles.subtitle, { color: colors.muted }]}
@@ -90,7 +101,7 @@ export default function AppHeader({
               {subtitle}
             </Text>
             {subtitleAccessory}
-          </View>
+          </Animated.View>
         ) : null}
       </View>
 

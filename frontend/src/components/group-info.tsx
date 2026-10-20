@@ -8,7 +8,7 @@ import Button from "@/components/button";
 import ChatAvatar from "@/components/chat-avatar";
 import DevBadge from "@/components/dev-badge";
 import QrCode from "@/components/qr-code";
-import Reveal from "@/components/reveal";
+import Reveal, { Swap } from "@/components/reveal";
 import SafetyCode from "@/components/safety-code";
 import TextField from "@/components/text-field";
 import { useAuth } from "@/context/auth";
@@ -281,51 +281,53 @@ export default function GroupInfo({
               <Text style={[styles.note, { color: colors.muted }]}>
                 Whoever opens it asks to join; an admin lets them in here.
               </Text>
-              {invite === undefined ? (
-                <ActivityIndicator color={colors.muted} />
-              ) : invite ? (
-                <>
-                  <Text selectable numberOfLines={2} style={[styles.inviteLink, { color: colors.accent }]}>
-                    {inviteLink(invite)}
-                  </Text>
-                  <Reveal>
-                    {showInviteQr ? (
-                      <View style={styles.qr}>
-                        <QrCode value={inviteLink(invite)} />
-                      </View>
-                    ) : null}
-                  </Reveal>
-                  <View style={styles.buttons}>
-                    <Button title={copied ? "Copied" : "Copy"} style={styles.flexButton} variant="secondary" onPress={() => copyInvite(invite)} />
-                    <Button
-                      title={showInviteQr ? "Hide QR" : "QR code"} style={styles.flexButton}
-                      variant="secondary"
-                      onPress={() => setShowInviteQr((shown) => !shown)}
-                    />
-                  </View>
-                  <View style={styles.buttons}>
-                    <Button
-                      title="New link" style={styles.flexButton}
-                      variant="secondary"
-                      disabled={busy}
-                      onPress={() => runInvite(() => withToken((t) => makeInvite(t, chat.id)))}
-                    />
-                    <Button
-                      title="Remove" style={styles.flexButton}
-                      variant="danger"
-                      disabled={busy}
-                      onPress={() => runInvite(() => withToken((t) => removeInvite(t, chat.id)))}
-                    />
-                  </View>
-                </>
-              ) : (
-                <Button
-                  title="Make an invite link"
-                  variant="secondary"
-                  disabled={busy}
-                  onPress={() => runInvite(() => withToken((t) => makeInvite(t, chat.id)))}
-                />
-              )}
+              <Swap id={invite === undefined ? "loading" : invite ? "link" : "none"}>
+                {invite === undefined ? (
+                  <ActivityIndicator color={colors.muted} />
+                ) : invite ? (
+                  <>
+                    <Text selectable numberOfLines={2} style={[styles.inviteLink, { color: colors.accent }]}>
+                      {inviteLink(invite)}
+                    </Text>
+                    <Reveal>
+                      {showInviteQr ? (
+                        <View style={styles.qr}>
+                          <QrCode value={inviteLink(invite)} />
+                        </View>
+                      ) : null}
+                    </Reveal>
+                    <View style={styles.buttons}>
+                      <Button title={copied ? "Copied" : "Copy"} style={styles.flexButton} variant="secondary" onPress={() => copyInvite(invite)} />
+                      <Button
+                        title={showInviteQr ? "Hide QR" : "QR code"} style={styles.flexButton}
+                        variant="secondary"
+                        onPress={() => setShowInviteQr((shown) => !shown)}
+                      />
+                    </View>
+                    <View style={styles.buttons}>
+                      <Button
+                        title="New link" style={styles.flexButton}
+                        variant="secondary"
+                        disabled={busy}
+                        onPress={() => runInvite(() => withToken((t) => makeInvite(t, chat.id)))}
+                      />
+                      <Button
+                        title="Remove" style={styles.flexButton}
+                        variant="danger"
+                        disabled={busy}
+                        onPress={() => runInvite(() => withToken((t) => removeInvite(t, chat.id)))}
+                      />
+                    </View>
+                  </>
+                ) : (
+                  <Button
+                    title="Make an invite link"
+                    variant="secondary"
+                    disabled={busy}
+                    onPress={() => runInvite(() => withToken((t) => makeInvite(t, chat.id)))}
+                  />
+                )}
+              </Swap>
 
               <Reveal>
                 {requests.length > 0 ? (
@@ -358,76 +360,78 @@ export default function GroupInfo({
             </View>
           ) : null}
 
-          {members === null ? (
-            <ActivityIndicator color={colors.muted} />
-          ) : (
-            <View>
-              {members.map((member) => {
-                const own = member.id === me?.id;
-                const online = !own && status === "online" && Boolean(presence[member.id]?.online);
-                const open = selected === member.id;
+          <Swap id={members === null ? "loading" : "members"}>
+            {members === null ? (
+              <ActivityIndicator color={colors.muted} />
+            ) : (
+              <View>
+                {members.map((member) => {
+                  const own = member.id === me?.id;
+                  const online = !own && status === "online" && Boolean(presence[member.id]?.online);
+                  const open = selected === member.id;
 
-                return (
-                  <View key={member.id}>
-                    <Pressable
-                      onPress={() => setSelected(open || own ? null : member.id)}
-                      accessibilityRole="button"
-                      style={({ hovered, pressed }) => [
-                        styles.member,
-                        (hovered || pressed || open) && { backgroundColor: colors.hover },
-                      ]}
-                    >
-                      <Avatar name={member.username} avatarId={member.avatar_id} size={36} online={online} ringColor={colors.panel} />
-                      <View style={styles.grow}>
-                        <View style={styles.nameRow}>
-                          <Text numberOfLines={1} style={[styles.memberName, { color: colors.text }]}>
-                            @{member.username}
-                            {own ? " (you)" : ""}
-                          </Text>
-                          {member.is_developer ? <DevBadge /> : null}
+                  return (
+                    <View key={member.id}>
+                      <Pressable
+                        onPress={() => setSelected(open || own ? null : member.id)}
+                        accessibilityRole="button"
+                        style={({ hovered, pressed }) => [
+                          styles.member,
+                          (hovered || pressed || open) && { backgroundColor: colors.hover },
+                        ]}
+                      >
+                        <Avatar name={member.username} avatarId={member.avatar_id} size={36} online={online} ringColor={colors.panel} />
+                        <View style={styles.grow}>
+                          <View style={styles.nameRow}>
+                            <Text numberOfLines={1} style={[styles.memberName, { color: colors.text }]}>
+                              @{member.username}
+                              {own ? " (you)" : ""}
+                            </Text>
+                            {member.is_developer ? <DevBadge /> : null}
+                          </View>
                         </View>
-                      </View>
-                      {ROLE_LABEL[member.role] ? (
-                        <Text style={[styles.role, { color: colors.accent }]}>{ROLE_LABEL[member.role]}</Text>
-                      ) : null}
-                    </Pressable>
+                        {ROLE_LABEL[member.role] ? (
+                          <Text style={[styles.role, { color: colors.accent }]}>{ROLE_LABEL[member.role]}</Text>
+                        ) : null}
+                      </Pressable>
 
-                    <Reveal>
-                      {open ? (
-                        <View style={styles.memberActions}>
-                          <Action label="Message" icon="chatbubble-outline" onPress={() => onMessage(member.username)} />
-                          {member.public_key ? (
-                            <Action label="Safety code" icon="shield-checkmark-outline" onPress={() => showCode(member)} />
-                          ) : null}
-                          {chat.role === "owner" && member.role !== "owner" ? (
-                            <Action
-                              label={member.role === "admin" ? "Remove admin" : "Make admin"}
-                              icon="star-outline"
-                              onPress={() =>
-                                run(() =>
-                                  withToken((token) =>
-                                    setGroupRole(token, chat.id, member.id, member.role === "admin" ? "member" : "admin"),
-                                  ),
-                                )
-                              }
-                            />
-                          ) : null}
-                          {canRemove(member) && me ? (
-                            <Action
-                              label="Remove"
-                              icon="person-remove-outline"
-                              danger
-                              onPress={() => run(() => removeGroupMember(withToken, me, chat, member.id))}
-                            />
-                          ) : null}
-                        </View>
-                      ) : null}
-                    </Reveal>
-                  </View>
-                );
-              })}
-            </View>
-          )}
+                      <Reveal>
+                        {open ? (
+                          <View style={styles.memberActions}>
+                            <Action label="Message" icon="chatbubble-outline" onPress={() => onMessage(member.username)} />
+                            {member.public_key ? (
+                              <Action label="Safety code" icon="shield-checkmark-outline" onPress={() => showCode(member)} />
+                            ) : null}
+                            {chat.role === "owner" && member.role !== "owner" ? (
+                              <Action
+                                label={member.role === "admin" ? "Remove admin" : "Make admin"}
+                                icon="star-outline"
+                                onPress={() =>
+                                  run(() =>
+                                    withToken((token) =>
+                                      setGroupRole(token, chat.id, member.id, member.role === "admin" ? "member" : "admin"),
+                                    ),
+                                  )
+                                }
+                              />
+                            ) : null}
+                            {canRemove(member) && me ? (
+                              <Action
+                                label="Remove"
+                                icon="person-remove-outline"
+                                danger
+                                onPress={() => run(() => removeGroupMember(withToken, me, chat, member.id))}
+                              />
+                            ) : null}
+                          </View>
+                        ) : null}
+                      </Reveal>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </Swap>
 
           {admin && me ? (
             <Action

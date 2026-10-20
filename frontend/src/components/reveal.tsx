@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { type StyleProp, type View, type ViewStyle } from "react-native";
-import Animated, { type CSSTransitionProperties } from "react-native-reanimated";
+import { StyleSheet, type StyleProp, type View, type ViewStyle } from "react-native";
+import Animated, { type CSSAnimationProperties, type CSSTransitionProperties } from "react-native-reanimated";
 import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, SPRING, useMotion, type Motion } from "@/lib/motion";
 
 // How a revealed thing looks while hidden.
@@ -252,3 +252,121 @@ export function useSlider(selected: number) {
     style,
   };
 }
+
+const SWAP_MS = { full: 280, reduced: 150, off: 0 } satisfies Record<Motion, number>;
+
+// Another thing in the same place (a tab, what loaded in place of the
+// spinner): the one before goes as the new one comes, and the height
+// follows. id: which one is shown; step: the way it went (-1 back to the
+// left, 1 on to the right, 0 in place, fading). resize: the height
+// animates (off for things of a fixed size); fill: it takes all the room
+// (flex: 1), for what fills a screen.
+export function Swap({
+  id,
+  step = 0,
+  resize = true,
+  fill = false,
+  style,
+  children,
+}: {
+  id: string | number;
+  step?: number;
+  resize?: boolean;
+  fill?: boolean;
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  const motion = useMotion();
+  const [current, setCurrent] = useState({ id, children });
+  const [previous, setPrevious] = useState<{ id: string | number; children: ReactNode; step: number } | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+
+  // Following what it is given, as it renders (only this component renders
+  // again).
+  if (id !== current.id) {
+    if (motion !== "off") {
+      setPrevious({ ...current, step });
+    }
+
+    setCurrent({ id, children });
+  } else if (children !== current.children) {
+    setCurrent({ id, children });
+  }
+
+  useEffect(() => {
+    if (!previous) {
+      return;
+    }
+
+    const timer = setTimeout(() => setPrevious(null), SWAP_MS[motion]);
+    return () => clearTimeout(timer);
+  }, [previous, motion]);
+
+  const shift = motion === "full" ? 40 * (previous?.step ?? 0) : 0;
+  const going: CSSAnimationProperties<ViewStyle> = {
+    animationName: {
+      from: { opacity: 1, transform: [{ translateX: 0 }] },
+      to: { opacity: 0, transform: [{ translateX: -shift }] },
+    },
+    animationDuration: LEAVE_MS[motion],
+    animationTimingFunction: EASE_IN,
+    animationFillMode: "forwards",
+  };
+  const coming: CSSAnimationProperties<ViewStyle> = {
+    animationName: {
+      from: { opacity: 0, transform: [{ translateX: shift }] },
+      to: { opacity: 1, transform: [{ translateX: 0 }] },
+    },
+    animationDuration: SWAP_MS[motion],
+    animationTimingFunction: EASE_OUT,
+  };
+
+  return (
+    <Animated.View
+      style={[
+        fill && styles.fill,
+        style,
+        previous && resize && !fill && height !== null
+          ? {
+              height,
+              overflow: "hidden",
+              ...(motion === "full"
+                ? { transitionProperty: "height", transitionDuration: SWAP_MS.full, transitionTimingFunction: EASE_OUT }
+                : {}),
+            }
+          : null,
+      ]}
+    >
+      {/* Same keys as before: the one going is the very view it was. */}
+      {previous ? (
+        <Animated.View key={previous.id} pointerEvents="none" style={[styles.going, fill && styles.bottom, going]}>
+          {previous.children}
+        </Animated.View>
+      ) : null}
+      <Animated.View
+        key={current.id}
+        onLayout={resize && !fill ? (event) => setHeight(event.nativeEvent.layout.height) : undefined}
+        style={[fill && styles.fill, previous && coming]}
+      >
+        {current.children}
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+const styles = StyleSheet.create({
+  fill: {
+    flex: 1,
+  },
+
+  bottom: {
+    bottom: 0,
+  },
+
+  going: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+});

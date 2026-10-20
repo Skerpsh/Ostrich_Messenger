@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import Animated from "react-native-reanimated";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,7 +15,7 @@ import AppHeader from "@/components/app-header";
 import Avatar from "@/components/avatar";
 import Button from "@/components/button";
 import QrScanner from "@/components/qr-scanner";
-import Reveal from "@/components/reveal";
+import Reveal, { Swap, useSlider } from "@/components/reveal";
 import ScreenEnter, { useLeaveScreen } from "@/components/screen-enter";
 import TextField from "@/components/text-field";
 import { useAuth, useCurrentUser } from "@/context/auth";
@@ -47,6 +48,7 @@ function NewChat() {
   const startChat = useStartChat();
 
   const [mode, setMode] = useState<"chat" | "group">("chat");
+  const slider = useSlider(mode === "chat" ? 0 : 1);
   const [scanning, setScanning] = useState(false);
   const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -103,16 +105,21 @@ function NewChat() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={[styles.tabs, { backgroundColor: colors.panelAlt }]}>
-            {(["chat", "group"] as const).map((tab) => (
+            {/* The chosen tab's background slides to it. */}
+            {slider.style ? (
+              <Animated.View style={[styles.tabSlider, { backgroundColor: colors.panel }, slider.style]} />
+            ) : null}
+            {(["chat", "group"] as const).map((tab, index) => (
               <Pressable
                 key={tab}
                 onPress={() => {
                   setMode(tab);
                   setError(null);
                 }}
+                onLayout={slider.onLayout(index)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: mode === tab }}
-                style={[styles.tab, mode === tab && { backgroundColor: colors.panel }]}
+                style={[styles.tab, mode === tab && !slider.style && { backgroundColor: colors.panel }]}
               >
                 <Text style={[styles.tabText, { color: mode === tab ? colors.text : colors.muted }]}>
                   {tab === "chat" ? "Chat" : "Group"}
@@ -133,44 +140,47 @@ function NewChat() {
             />
           </View>
 
-          {mode === "group" ? (
-            <NewGroup onCreated={open} />
-          ) : (
-            <View style={[styles.card, { backgroundColor: colors.panel }]}>
-              <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>
-                <Ionicons name="person-add-outline" size={26} color={colors.accent} />
+          {/* The other tab's form slides in from its side. */}
+          <Swap id={mode} step={mode === "group" ? 1 : -1}>
+            {mode === "group" ? (
+              <NewGroup onCreated={open} />
+            ) : (
+              <View style={[styles.card, { backgroundColor: colors.panel }]}>
+                <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>
+                  <Ionicons name="person-add-outline" size={26} color={colors.accent} />
+                </View>
+
+                <Text style={[styles.text, { color: colors.textSoft }]}>
+                  Enter the exact @username of the person you want to chat with.
+                  They can find it in their settings.
+                </Text>
+
+                <TextField
+                  label="Username"
+                  placeholder="@username"
+                  value={username}
+                  onChangeText={(text) => {
+                    setUsername(text);
+                    setError(null);
+                  }}
+                  maxLength={33}
+                  autoFocus={!TOUCH_UI}
+                  returnKeyType="go"
+                  onSubmitEditing={submit}
+                />
+
+                <Reveal>
+                  {error ? (
+                    <Text style={[styles.error, { color: colors.danger }]}>
+                      {error}
+                    </Text>
+                  ) : null}
+                </Reveal>
+
+                <Button title="Start chat" loading={loading} onPress={submit} />
               </View>
-
-              <Text style={[styles.text, { color: colors.textSoft }]}>
-                Enter the exact @username of the person you want to chat with.
-                They can find it in their settings.
-              </Text>
-
-              <TextField
-                label="Username"
-                placeholder="@username"
-                value={username}
-                onChangeText={(text) => {
-                  setUsername(text);
-                  setError(null);
-                }}
-                maxLength={33}
-                autoFocus={!TOUCH_UI}
-                returnKeyType="go"
-                onSubmitEditing={submit}
-              />
-
-              <Reveal>
-                {error ? (
-                  <Text style={[styles.error, { color: colors.danger }]}>
-                    {error}
-                  </Text>
-                ) : null}
-              </Reveal>
-
-              <Button title="Start chat" loading={loading} onPress={submit} />
-            </View>
-          )}
+            )}
+          </Swap>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -394,6 +404,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     paddingVertical: 8,
+    borderRadius: radius.pill,
+  },
+
+  tabSlider: {
     borderRadius: radius.pill,
   },
 

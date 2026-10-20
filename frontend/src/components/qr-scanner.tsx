@@ -3,6 +3,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { StyleSheet, Text, View } from "react-native";
 import Button from "@/components/button";
 import IconButton from "@/components/icon-button";
+import { Swap } from "@/components/reveal";
 
 // Scanning a QR code with the phone's camera (the web has its own,
 // qr-scanner.web.tsx).
@@ -28,26 +29,28 @@ export default function QrScanner({
         <Text style={styles.title}>{title}</Text>
         <IconButton icon="close" label="Close" color="#ffffff" onPress={onClose} />
       </View>
-      {permission?.granted ? (
-        <View style={styles.view}>
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={(result) => {
-              if (!done.current && onScan(result.data)) {
-                done.current = true;
-              }
-            }}
-          />
-          <View style={styles.frame} pointerEvents="none" />
-        </View>
-      ) : (
-        <View style={styles.ask}>
-          <Text style={styles.hint}>Ostrich needs the camera to scan QR codes.</Text>
-          <Button title="Allow the camera" onPress={requestPermission} />
-        </View>
-      )}
+      <Swap id={permission?.granted ? "camera" : "ask"} fill>
+        {permission?.granted ? (
+          <View style={styles.view}>
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+              onBarcodeScanned={(result) => {
+                if (!done.current && onScan(result.data)) {
+                  done.current = true;
+                }
+              }}
+            />
+            <View style={styles.frame} pointerEvents="none" />
+          </View>
+        ) : (
+          <View style={styles.ask}>
+            <Text style={styles.hint}>Ostrich needs the camera to scan QR codes.</Text>
+            <Button title="Allow the camera" onPress={requestPermission} />
+          </View>
+        )}
+      </Swap>
       <Text style={styles.hint}>Point the camera at the QR code</Text>
     </View>
   );

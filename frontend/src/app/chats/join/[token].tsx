@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import AppHeader from "@/components/app-header";
 import Button from "@/components/button";
-import Reveal from "@/components/reveal";
+import Reveal, { Swap } from "@/components/reveal";
 import { useAuth } from "@/context/auth";
 import { useChats } from "@/context/chats";
 import { useAppTheme } from "@/context/theme";
@@ -79,28 +79,30 @@ export default function JoinScreen() {
                 you see them once an admin lets you in.
               </Text>
 
-              {info.status === "member" && info.chat_id ? (
-                <Button
-                  title="Open the group"
-                  onPress={() =>
-                    router.replace({ pathname: "/chats/[chatId]", params: { chatId: info.chat_id! } })
-                  }
-                />
-              ) : info.status === "requested" ? (
-                <>
-                  <Text style={[styles.text, { color: colors.accent }]}>
-                    Asked to join: waiting for an admin.
-                  </Text>
+              <Swap id={info.status}>
+                {info.status === "member" && info.chat_id ? (
                   <Button
-                    title="Take the request back"
-                    variant="secondary"
-                    loading={busy}
-                    onPress={() => act((t) => cancelJoinRequest(t, token))}
+                    title="Open the group"
+                    onPress={() =>
+                      router.replace({ pathname: "/chats/[chatId]", params: { chatId: info.chat_id! } })
+                    }
                   />
-                </>
-              ) : (
-                <Button title="Ask to join" loading={busy} onPress={() => act((t) => requestToJoin(t, token))} />
-              )}
+                ) : info.status === "requested" ? (
+                  <>
+                    <Text style={[styles.text, { color: colors.accent }]}>
+                      Asked to join: waiting for an admin.
+                    </Text>
+                    <Button
+                      title="Take the request back"
+                      variant="secondary"
+                      loading={busy}
+                      onPress={() => act((t) => cancelJoinRequest(t, token))}
+                    />
+                  </>
+                ) : (
+                  <Button title="Ask to join" loading={busy} onPress={() => act((t) => requestToJoin(t, token))} />
+                )}
+              </Swap>
             </>
           ) : null}
 

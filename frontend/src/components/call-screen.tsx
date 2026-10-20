@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CallVideo from "@/components/call-video";
 import ChatAvatar from "@/components/chat-avatar";
 import IconButton, { type IconName } from "@/components/icon-button";
+import Reveal, { Swap } from "@/components/reveal";
 import { useCalls } from "@/context/calls";
 import { useAppTheme } from "@/context/theme";
 import { useEscape } from "@/lib/keys";
@@ -104,11 +105,13 @@ export default function CallScreen() {
     );
   }
 
+  // The video and the audio screen fade into each other.
   const screen = videoShown(call) ? (
     <VideoScreen call={call} status={status} wide={wide} />
   ) : (
-    <View
+    <Reanimated.View
       style={[
+        enterStyle("fade", motion),
         styles.screen,
         wide
           ? [styles.card, { backgroundColor: colors.surface, borderColor: colors.line }]
@@ -137,17 +140,23 @@ export default function CallScreen() {
         </Text>
         <Text style={[styles.status, { color: call.phase === "ended" ? colors.danger : colors.textSoft }]}>{status}</Text>
         <Chips call={call} />
-        {call.phase === "active" || call.phase === "reconnecting" ? (
-          <Quality username={call.chat.username ?? "…"} muted={call.muted} />
-        ) : null}
+        <Reveal>
+          {call.phase === "active" || call.phase === "reconnecting" ? (
+            <Quality username={call.chat.username ?? "…"} muted={call.muted} />
+          ) : null}
+        </Reveal>
 
-        {call.handshake && (call.phase === "active" || call.phase === "reconnecting") ? (
-          <Handshake handshake={call.handshake} username={call.chat.username ?? "…"} />
-        ) : null}
+        <Reveal>
+          {call.handshake && (call.phase === "active" || call.phase === "reconnecting") ? (
+            <Handshake handshake={call.handshake} username={call.chat.username ?? "…"} />
+          ) : null}
+        </Reveal>
       </ScrollView>
 
-      <Controls call={call} />
-    </View>
+      <Swap id={controlsOf(call)}>
+        <Controls call={call} />
+      </Swap>
+    </Reanimated.View>
   );
 
   // Opening: over a fading background on a wide screen, coming up from
@@ -173,6 +182,11 @@ export default function CallScreen() {
   );
 }
 
+// Which buttons the call has: answering, in the call, none once over (they
+// change places with a fade).
+const controlsOf = (call: CallView) =>
+  call.phase === "incoming" ? "incoming" : call.phase === "ended" ? "ended" : "call";
+
 // Some video to show: this side's camera, or the other's.
 function videoShown(call: CallView) {
   return call.phase !== "ended" && (localOn(call) || remoteOn(call));
@@ -193,18 +207,24 @@ function Chips({ call, overlay = false }: { call: CallView; overlay?: boolean })
 
   return (
     <>
-      {call.peerMuted ? (
-        <View style={chip}>
-          <Ionicons name="mic-off" size={13} color={overlay ? "#ffffff" : colors.muted} />
-          <Text style={text}>@{call.chat.username} is muted</Text>
-        </View>
-      ) : null}
-      {call.notice ? (
-        <View style={chip}>
-          <Text style={text}>{call.notice}</Text>
-        </View>
-      ) : null}
-      {call.audioBlocked ? <PlayAudio username={call.chat.username ?? "…"} /> : null}
+      <Reveal>
+        {call.peerMuted ? (
+          <View style={chip}>
+            <Ionicons name="mic-off" size={13} color={overlay ? "#ffffff" : colors.muted} />
+            <Text style={text}>@{call.chat.username} is muted</Text>
+          </View>
+        ) : null}
+      </Reveal>
+      <Reveal>
+        {call.notice ? (
+          <View style={chip}>
+            <Text style={text}>{call.notice}</Text>
+          </View>
+        ) : null}
+      </Reveal>
+      <Reveal>
+        {call.audioBlocked ? <PlayAudio username={call.chat.username ?? "…"} /> : null}
+      </Reveal>
     </>
   );
 }
@@ -218,6 +238,7 @@ const LAYOUT_KEY = "ostrich-call-layout";
 // them and hides after a while (a tap brings it back).
 function VideoScreen({ call, status, wide }: { call: CallView; status: string; wide: boolean }) {
   const { setMinimized } = useCalls();
+  const motion = useMotion();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const [layout, setLayout] = useState<Layout>("pip");
@@ -259,65 +280,72 @@ function VideoScreen({ call, status, wide }: { call: CallView; status: string; w
   const overlays = shown || !autoHide;
 
   return (
-    <View
+    <Reanimated.View
       style={[
+        enterStyle("fade", motion),
         styles.videoScreen,
         wide ? [styles.videoCard, { borderColor: colors.line }] : styles.flex,
       ]}
     >
       <Stage call={call} layout={both ? layout : "pip"} swapped={both && swapped} onSwap={() => setSwapped((s) => !s)} onTap={() => setShown((s) => !s)} wide={wide} />
 
-      {overlays ? (
-        <>
-          <View pointerEvents="box-none" style={[styles.videoTop, { paddingTop: (wide ? 0 : insets.top) + 12 }]}>
-            <View style={styles.top}>
-              {call.phase !== "incoming" ? (
-                <OverlayButton icon="chevron-down" label="Minimize the call" onPress={() => setMinimized(true)} />
-              ) : (
-                <View style={styles.topSpacer} />
-              )}
-              <View style={[styles.secure, styles.videoPill]}>
-                <Ionicons name="lock-closed" size={12} color="#ffffff" />
-                <Text style={[styles.secureText, styles.videoText]}>End-to-end encrypted</Text>
+      <Reveal collapse={false} kind="fade" style={StyleSheet.absoluteFill}>
+        {overlays ? (
+          <>
+            <View pointerEvents="box-none" style={[styles.videoTop, { paddingTop: (wide ? 0 : insets.top) + 12 }]}>
+              <View style={styles.top}>
+                {call.phase !== "incoming" ? (
+                  <OverlayButton icon="chevron-down" label="Minimize the call" onPress={() => setMinimized(true)} />
+                ) : (
+                  <View style={styles.topSpacer} />
+                )}
+                <View style={[styles.secure, styles.videoPill]}>
+                  <Ionicons name="lock-closed" size={12} color="#ffffff" />
+                  <Text style={[styles.secureText, styles.videoText]}>End-to-end encrypted</Text>
+                </View>
+                {both ? (
+                  <OverlayButton
+                    icon={layout === "pip" ? "grid-outline" : "albums-outline"}
+                    label={layout === "pip" ? "Side by side" : "Picture in picture"}
+                    onPress={changeLayout}
+                  />
+                ) : (
+                  <View style={styles.topSpacer} />
+                )}
               </View>
-              {both ? (
-                <OverlayButton
-                  icon={layout === "pip" ? "grid-outline" : "albums-outline"}
-                  label={layout === "pip" ? "Side by side" : "Picture in picture"}
-                  onPress={changeLayout}
-                />
-              ) : (
-                <View style={styles.topSpacer} />
-              )}
+              <View pointerEvents="none" style={styles.videoTitle}>
+                <Text numberOfLines={1} style={[styles.videoName, styles.videoText]}>
+                  @{call.chat.username}
+                </Text>
+                <Text style={[styles.videoStatus, styles.videoText]}>
+                  {call.phase === "incoming" ? "Incoming video call" : status}
+                </Text>
+              </View>
+              <View pointerEvents="box-none" style={styles.videoChips}>
+                <Chips call={call} overlay />
+              </View>
             </View>
-            <View pointerEvents="none" style={styles.videoTitle}>
-              <Text numberOfLines={1} style={[styles.videoName, styles.videoText]}>
-                @{call.chat.username}
-              </Text>
-              <Text style={[styles.videoStatus, styles.videoText]}>
-                {call.phase === "incoming" ? "Incoming video call" : status}
-              </Text>
-            </View>
-            <View pointerEvents="box-none" style={styles.videoChips}>
-              <Chips call={call} overlay />
-            </View>
-          </View>
 
-          <View pointerEvents="box-none" style={[styles.videoBottom, { paddingBottom: (wide ? 0 : insets.bottom) + 16 }]}>
-            {call.handshake && live ? (
-              <ScrollView style={styles.videoHandshake} contentContainerStyle={styles.videoHandshakeContent}>
-                <Handshake
-                  handshake={call.handshake}
-                  username={call.chat.username ?? "…"}
-                  onOpen={setHandshakeOpen}
-                />
-              </ScrollView>
-            ) : null}
-            <Controls call={call} overlay />
-          </View>
-        </>
-      ) : null}
-    </View>
+            <View pointerEvents="box-none" style={[styles.videoBottom, { paddingBottom: (wide ? 0 : insets.bottom) + 16 }]}>
+              <Reveal>
+                {call.handshake && live ? (
+                  <ScrollView style={styles.videoHandshake} contentContainerStyle={styles.videoHandshakeContent}>
+                    <Handshake
+                      handshake={call.handshake}
+                      username={call.chat.username ?? "…"}
+                      onOpen={setHandshakeOpen}
+                    />
+                  </ScrollView>
+                ) : null}
+              </Reveal>
+              <Swap id={controlsOf(call)}>
+                <Controls call={call} overlay />
+              </Swap>
+            </View>
+          </>
+        ) : null}
+      </Reveal>
+    </Reanimated.View>
   );
 }
 
@@ -765,28 +793,32 @@ function Handshake({
         <Text style={styles.mineEmoji}>{phraseEmoji(handshake.mine)}</Text>
         <Text style={[styles.mineText, { color: colors.text }]}>{phraseText(handshake.mine)}</Text>
       </View>
-      <PeerVerdict heard={handshake.peerHeard} username={username} />
+      <Reveal>
+        {handshake.peerHeard ? <PeerVerdict heard={handshake.peerHeard} username={username} /> : null}
+      </Reveal>
 
       <Text style={[styles.step, { color: colors.muted }]}>2 · Which one does @{username} read to you?</Text>
-      {handshake.heard === null ? (
-        <>
-          {handshake.choices.map((choice) => (
-            <Choice key={choice.join("-")} phrase={choice} onPress={() => pickPhrase(choice)} />
-          ))}
-          <Pressable onPress={() => pickPhrase(null)} accessibilityRole="button" style={styles.none}>
-            <Text style={[styles.noneText, { color: colors.muted }]}>None of these</Text>
-          </Pressable>
-        </>
-      ) : handshake.heard === "right" ? (
-        <Text style={[styles.verdict, { color: colors.online }]}>
-          ✓ That&apos;s @{username}&apos;s sentence: nobody is in the middle of this call.
-        </Text>
-      ) : (
-        <Text style={[styles.verdict, { color: colors.danger }]}>
-          ⚠ That&apos;s not the sentence of this call. Someone may be listening in: hang up and compare the safety code
-          in the chat.
-        </Text>
-      )}
+      <Swap id={handshake.heard ?? "choose"}>
+        {handshake.heard === null ? (
+          <>
+            {handshake.choices.map((choice) => (
+              <Choice key={choice.join("-")} phrase={choice} onPress={() => pickPhrase(choice)} />
+            ))}
+            <Pressable onPress={() => pickPhrase(null)} accessibilityRole="button" style={styles.none}>
+              <Text style={[styles.noneText, { color: colors.muted }]}>None of these</Text>
+            </Pressable>
+          </>
+        ) : handshake.heard === "right" ? (
+          <Text style={[styles.verdict, { color: colors.online }]}>
+            ✓ That&apos;s @{username}&apos;s sentence: nobody is in the middle of this call.
+          </Text>
+        ) : (
+          <Text style={[styles.verdict, { color: colors.danger }]}>
+            ⚠ That&apos;s not the sentence of this call. Someone may be listening in: hang up and compare the safety code
+            in the chat.
+          </Text>
+        )}
+      </Swap>
     </View>
   );
 }

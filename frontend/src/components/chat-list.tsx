@@ -21,7 +21,7 @@ import Avatar from "@/components/avatar";
 import ChatAvatar from "@/components/chat-avatar";
 import DevBadge from "@/components/dev-badge";
 import IconButton from "@/components/icon-button";
-import Reveal from "@/components/reveal";
+import Reveal, { Swap } from "@/components/reveal";
 import TypingDots from "@/components/typing-dots";
 import Welcome from "@/components/welcome";
 import { noWebOutline } from "@/components/text-field";
@@ -403,11 +403,13 @@ export default function ChatList() {
                   <View
                     style={[styles.startIcon, { backgroundColor: colors.accentSoft }]}
                   >
-                    {starting ? (
-                      <ActivityIndicator color={colors.accent} />
-                    ) : (
-                      <Ionicons name="chatbubble-ellipses" size={22} color={colors.accent} />
-                    )}
+                    <Swap id={starting ? "starting" : "icon"} resize={false}>
+                      {starting ? (
+                        <ActivityIndicator color={colors.accent} />
+                      ) : (
+                        <Ionicons name="chatbubble-ellipses" size={22} color={colors.accent} />
+                      )}
+                    </Swap>
                   </View>
                   <View style={styles.rowText}>
                     <Text style={[styles.name, { color: colors.text }]}>
@@ -436,40 +438,47 @@ export default function ChatList() {
           </>
         }
         ListEmptyComponent={
-          chats === null ? (
-            <ActivityIndicator color={colors.muted} style={styles.loading} />
-          ) : search ? (
-            canStart || shownMatches.length > 0 ? null : (
-              <Text style={[styles.notice, { color: colors.muted }]}>
-                No chats match “{query.trim()}”.
-              </Text>
-            )
-          ) : !wide ? (
-            <Welcome onFindFriend={() => searchRef.current?.focus()} />
-          ) : (
-            // The welcome screen is on the right.
-            <View style={styles.empty}>
-              <Ionicons name="chatbubbles-outline" size={44} color={colors.muted} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                No chats yet
-              </Text>
-              <Text style={[styles.emptyText, { color: colors.muted }]}>
-                Search for a friend by their @username above, or share yours:
-              </Text>
-              <Pressable
-                onPress={copyUsername}
-                accessibilityRole="button"
-                style={[styles.chip, { backgroundColor: colors.accentSoft }]}
-              >
-                <Text style={[styles.chipText, { color: colors.accent }]}>
-                  {copied ? "Copied!" : `@${user.username}`}
+          // Loading, no matches, no chats: one fades into the other.
+          <Swap id={chats === null ? "loading" : search ? "search" : "empty"}>
+            {chats === null ? (
+              <ActivityIndicator color={colors.muted} style={styles.loading} />
+            ) : search ? (
+              canStart || shownMatches.length > 0 ? null : (
+                <Text style={[styles.notice, { color: colors.muted }]}>
+                  No chats match “{query.trim()}”.
                 </Text>
-                {copied ? null : (
-                  <Ionicons name="copy-outline" size={15} color={colors.accent} />
-                )}
-              </Pressable>
-            </View>
-          )
+              )
+            ) : !wide ? (
+              <Welcome onFindFriend={() => searchRef.current?.focus()} />
+            ) : (
+              // The welcome screen is on the right.
+              <View style={styles.empty}>
+                <Ionicons name="chatbubbles-outline" size={44} color={colors.muted} />
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                  No chats yet
+                </Text>
+                <Text style={[styles.emptyText, { color: colors.muted }]}>
+                  Search for a friend by their @username above, or share yours:
+                </Text>
+                <Pressable
+                  onPress={copyUsername}
+                  accessibilityRole="button"
+                  style={[styles.chip, { backgroundColor: colors.accentSoft }]}
+                >
+                  <Swap id={copied ? "copied" : "name"} resize={false}>
+                    <View style={styles.chipContent}>
+                      <Text style={[styles.chipText, { color: colors.accent }]}>
+                        {copied ? "Copied!" : `@${user.username}`}
+                      </Text>
+                      {copied ? null : (
+                        <Ionicons name="copy-outline" size={15} color={colors.accent} />
+                      )}
+                    </View>
+                  </Swap>
+                </Pressable>
+              </View>
+            )}
+          </Swap>
         }
         renderItem={({ item }) => (
           <ChatRow
@@ -748,34 +757,37 @@ function ChatRow({
         </View>
         {minimal ? null : (
           <View style={styles.rowLine}>
-            {typing ? (
-              <View style={styles.typing}>
-                <Text style={[styles.preview, styles.typingText, { color: colors.accent, fontSize: 14 * textScale }]}>
-                  typing
+            {/* "typing", a draft or a new last message fades in. */}
+            <Swap id={typing ? "typing" : draft ? "draft" : (last?.id ?? "none")} resize={false} style={styles.flex}>
+              {typing ? (
+                <View style={styles.typing}>
+                  <Text style={[styles.preview, styles.typingText, { color: colors.accent, fontSize: 14 * textScale }]}>
+                    typing
+                  </Text>
+                  <TypingDots color={colors.accent} />
+                </View>
+              ) : (
+                <Text numberOfLines={1} style={[styles.preview, { color: colors.muted, fontSize: 14 * textScale }]}>
+                  {draft ? (
+                    <>
+                      <Text style={{ color: colors.danger }}>Draft: </Text>
+                      {previewText(draft)}
+                    </>
+                  ) : last && shownLast ? (
+                    <>
+                      {shownLast.status === "system" || chat.type === "saved" ? null : own ? (
+                        <Text style={{ color: colors.textSoft }}>You: </Text>
+                      ) : group ? (
+                        <Text style={{ color: colors.textSoft }}>@{last.sender_username}: </Text>
+                      ) : null}
+                      {previewText(messagePreview(shownLast))}
+                    </>
+                  ) : (
+                    <Text style={styles.italic}>No messages yet</Text>
+                  )}
                 </Text>
-                <TypingDots color={colors.accent} />
-              </View>
-            ) : (
-              <Text numberOfLines={1} style={[styles.preview, { color: colors.muted, fontSize: 14 * textScale }]}>
-                {draft ? (
-                  <>
-                    <Text style={{ color: colors.danger }}>Draft: </Text>
-                    {previewText(draft)}
-                  </>
-                ) : last && shownLast ? (
-                  <>
-                    {shownLast.status === "system" || chat.type === "saved" ? null : own ? (
-                      <Text style={{ color: colors.textSoft }}>You: </Text>
-                    ) : group ? (
-                      <Text style={{ color: colors.textSoft }}>@{last.sender_username}: </Text>
-                    ) : null}
-                    {previewText(messagePreview(shownLast))}
-                  </>
-                ) : (
-                  <Text style={styles.italic}>No messages yet</Text>
-                )}
-              </Text>
-            )}
+              )}
+            </Swap>
             {badges}
           </View>
         )}
@@ -902,6 +914,10 @@ const styles = StyleSheet.create({
     gap: 1,
   },
 
+  flex: {
+    flex: 1,
+  },
+
   rowLine: {
     flexDirection: "row",
     alignItems: "center",
@@ -1012,6 +1028,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.pill,
     marginTop: 4,
+  },
+
+  chipContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 
   chipText: {

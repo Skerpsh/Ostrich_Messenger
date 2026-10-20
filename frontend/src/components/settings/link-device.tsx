@@ -3,7 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Button from "@/components/button";
 import QrScanner from "@/components/qr-scanner";
-import Reveal from "@/components/reveal";
+import Reveal, { Swap } from "@/components/reveal";
 import { useAuth, usePrivateKey } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { approveDeviceLink, getDeviceLink } from "@/lib/api";
@@ -102,40 +102,42 @@ export function LinkDeviceRow({
                 color={colors.accent}
               />
             </View>
-            {done ? (
-              <>
-                <Text style={[styles.title, { color: colors.text }]}>Device linked</Text>
-                <Text style={[styles.text, { color: colors.muted }]}>
-                  It is logged in to your account now. You can log it out in Devices at any time.
-                </Text>
-                <Button title="Done" onPress={close} />
-              </>
-            ) : scanned?.client ? (
-              <>
-                <Text style={[styles.title, { color: colors.text }]}>
-                  Log in on {clientName(scanned.client)}?
-                </Text>
-                <Text style={[styles.text, { color: colors.muted }]}>
-                  It gets full access to your account and messages, as this device has.
-                </Text>
-                <Text style={[styles.warning, { color: colors.danger }]}>
-                  Only scan codes shown on your own devices. Nobody from Ostrich will ever ask you to scan one.
-                </Text>
-                <Reveal>
-                  {error ? <Text style={[styles.text, { color: colors.danger }]}>{error}</Text> : null}
-                </Reveal>
-                <View style={styles.buttons}>
-                  <Button title="Cancel" variant="secondary" onPress={close} disabled={busy} />
-                  <Button title="Log in" onPress={approve} loading={busy} />
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.title, { color: colors.text }]}>Can’t link the device</Text>
-                <Text style={[styles.text, { color: colors.danger }]}>{error ?? "Something went wrong"}</Text>
-                <Button title="Close" variant="secondary" onPress={close} />
-              </>
-            )}
+            <Swap id={done ? "done" : scanned?.client ? "confirm" : "scan"} step={1}>
+              {done ? (
+                <>
+                  <Text style={[styles.title, { color: colors.text }]}>Device linked</Text>
+                  <Text style={[styles.text, { color: colors.muted }]}>
+                    It is logged in to your account now. You can log it out in Devices at any time.
+                  </Text>
+                  <Button title="Done" onPress={close} />
+                </>
+              ) : scanned?.client ? (
+                <>
+                  <Text style={[styles.title, { color: colors.text }]}>
+                    Log in on {clientName(scanned.client)}?
+                  </Text>
+                  <Text style={[styles.text, { color: colors.muted }]}>
+                    It gets full access to your account and messages, as this device has.
+                  </Text>
+                  <Text style={[styles.warning, { color: colors.danger }]}>
+                    Only scan codes shown on your own devices. Nobody from Ostrich will ever ask you to scan one.
+                  </Text>
+                  <Reveal>
+                    {error ? <Text style={[styles.text, { color: colors.danger }]}>{error}</Text> : null}
+                  </Reveal>
+                  <View style={styles.buttons}>
+                    <Button title="Cancel" variant="secondary" onPress={close} disabled={busy} />
+                    <Button title="Log in" onPress={approve} loading={busy} />
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.title, { color: colors.text }]}>Can’t link the device</Text>
+                  <Text style={[styles.text, { color: colors.danger }]}>{error ?? "Something went wrong"}</Text>
+                  <Button title="Close" variant="secondary" onPress={close} />
+                </>
+              )}
+            </Swap>
           </Pressable>
         </Pressable>
       </Modal>

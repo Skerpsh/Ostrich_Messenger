@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import AnimatedPressable from "@/components/animated-pressable";
+import { Swap } from "@/components/reveal";
 import { useAppTheme } from "@/context/theme";
 import { pressStyle, useMotion, usePressed } from "@/lib/motion";
 import { radius } from "@/theme/colors";
@@ -70,14 +71,16 @@ export default function Button({
       ]}
       {...props}
     >
-      {loading ? (
-        <ActivityIndicator color={textColor} />
-      ) : (
-        <View style={styles.content}>
-          {icon ? <Ionicons name={icon} size={18} color={textColor} /> : null}
-          <Text style={[styles.text, { color: textColor }]}>{title}</Text>
-        </View>
-      )}
+      <Swap id={loading ? "loading" : title} resize={false}>
+        {loading ? (
+          <ActivityIndicator color={textColor} />
+        ) : (
+          <View style={styles.content}>
+            {icon ? <Ionicons name={icon} size={18} color={textColor} /> : null}
+            <Text style={[styles.text, { color: textColor }]}>{title}</Text>
+          </View>
+        )}
+      </Swap>
     </AnimatedPressable>
   );
 }

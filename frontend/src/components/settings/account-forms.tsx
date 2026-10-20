@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Text } from "react-native";
 import Animated from "react-native-reanimated";
 import Button from "@/components/button";
-import Reveal from "@/components/reveal";
+import Reveal, { Swap } from "@/components/reveal";
 import TextField from "@/components/text-field";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
@@ -94,41 +94,43 @@ export function UsernameForm() {
         ) : null}
       </Reveal>
 
-      {next ? (
-        <Text style={[styles.formMessage, { color: colors.muted }]}>
-          You can change it again on {formatDate(next)}.
-        </Text>
-      ) : (
-        <>
-          <TextField
-            label="New username"
-            placeholder="@username"
-            value={username}
-            onChangeText={setUsername}
-            maxLength={33}
-          />
-          <TextField
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="current-password"
-            maxLength={MAX_PASSWORD}
-            returnKeyType="go"
-            onSubmitEditing={submit}
-          />
+      <Swap id={next ? "wait" : "form"}>
+        {next ? (
+          <Text style={[styles.formMessage, { color: colors.muted }]}>
+            You can change it again on {formatDate(next)}.
+          </Text>
+        ) : (
+          <>
+            <TextField
+              label="New username"
+              placeholder="@username"
+              value={username}
+              onChangeText={setUsername}
+              maxLength={33}
+            />
+            <TextField
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="current-password"
+              maxLength={MAX_PASSWORD}
+              returnKeyType="go"
+              onSubmitEditing={submit}
+            />
 
-          <Reveal>
-            {error ? (
-              <Text style={[styles.formMessage, { color: colors.danger }]}>
-                {error}
-              </Text>
-            ) : null}
-          </Reveal>
+            <Reveal>
+              {error ? (
+                <Text style={[styles.formMessage, { color: colors.danger }]}>
+                  {error}
+                </Text>
+              ) : null}
+            </Reveal>
 
-          <Button title="Change username" loading={saving} onPress={submit} />
-        </>
-      )}
+            <Button title="Change username" loading={saving} onPress={submit} />
+          </>
+        )}
+      </Swap>
     </Animated.View>
   );
 }

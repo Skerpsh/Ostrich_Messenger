@@ -32,7 +32,7 @@ import GroupInfo from "@/components/group-info";
 import IconButton from "@/components/icon-button";
 import MessageBubble from "@/components/message-bubble";
 import PhotoViewer from "@/components/photo-viewer";
-import Reveal, { Collapse } from "@/components/reveal";
+import Reveal, { Collapse, Swap } from "@/components/reveal";
 import SafetyCode from "@/components/safety-code";
 import TypingDots from "@/components/typing-dots";
 import ScreenEnter, { useLeaveScreen } from "@/components/screen-enter";
@@ -1549,15 +1549,17 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
               onPress={() => setForwarding(chosen)}
             />
             {canDeleteChosen ? (
-              confirmingDelete ? (
-                <Pressable onPress={deleteChosen} accessibilityRole="button" style={styles.confirmDelete}>
-                  <Text style={[styles.confirmDeleteText, { color: colors.danger }]}>
-                    Delete {chosen.length} for everyone?
-                  </Text>
-                </Pressable>
-              ) : (
-                <IconButton icon="trash-outline" label="Delete" color={colors.danger} onPress={deleteChosen} />
-              )
+              <Swap id={confirmingDelete ? "confirm" : "delete"} step={confirmingDelete ? 1 : -1}>
+                {confirmingDelete ? (
+                  <Pressable onPress={deleteChosen} accessibilityRole="button" style={styles.confirmDelete}>
+                    <Text style={[styles.confirmDeleteText, { color: colors.danger }]}>
+                      Delete {chosen.length} for everyone?
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <IconButton icon="trash-outline" label="Delete" color={colors.danger} onPress={deleteChosen} />
+                )}
+              </Swap>
             ) : null}
           </View>
         ) : null}
@@ -1589,6 +1591,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           )
         }
         subtitleAccessory={typingText ? <TypingDots color={colors.accent} /> : null}
+        subtitleKey={typingText ? "typing" : peerOnline ? "online" : undefined}
         right={
           chat ? (
             <>
@@ -1722,7 +1725,8 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         {messages === null ? (
           <ActivityIndicator color={colors.muted} style={styles.screen} />
         ) : (
-          <View ref={listWrapRef} style={styles.screen}>
+          // The messages fade in as they load.
+          <Reanimated.View ref={listWrapRef} style={[styles.screen, enterStyle("fade", motion)]}>
             <FlatList
               ref={listRef}
               inverted
@@ -1900,7 +1904,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                 />
               ) : null}
             </Reveal>
-          </View>
+          </Reanimated.View>
         )}
 
         <Reveal>
@@ -1945,263 +1949,266 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           ) : null}
         </Reveal>
 
-        {chat && composerBlocked ? (
-          <View
-            style={[
-              styles.composer,
-              styles.blockedBar,
-              {
-                paddingBottom: insets.bottom + 10,
-                backgroundColor: colors.surface,
-                borderTopColor: colors.line,
-              },
-            ]}
-          >
-            <Text style={[styles.blockedText, { color: colors.muted }]}>
-              {composerBlocked === "byMe"
-                ? `You blocked @${chat.username}`
-                : `You can't message @${chat.username}`}
-            </Text>
-            {composerBlocked === "byMe" ? (
-              <Button title="Unblock" variant="secondary" onPress={toggleBlocked} />
-            ) : null}
-          </View>
-        ) : (
-          <View
-            style={[
-              styles.composer,
-              {
-                paddingBottom: insets.bottom + 10,
-                backgroundColor: colors.surface,
-                borderTopColor: colors.line,
-              },
-            ]}
-          >
-            <Reveal>
-              {suggestions.length > 0 ? (
-                <View style={[styles.suggestions, { borderBottomColor: colors.line }]}>
-                  {suggestions.map((member) => (
-                    <Pressable
-                      key={member.id}
-                      onPress={() => pickMention(member.username)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Mention @${member.username}`}
-                      style={({ hovered, pressed }) => [
-                        styles.suggestion,
-                        (hovered || pressed) && { backgroundColor: colors.hover },
-                      ]}
-                    >
-                      <Avatar name={member.username} avatarId={member.avatar_id} size={26} />
-                      <Text style={[styles.suggestionName, { color: colors.text }]}>@{member.username}</Text>
-                    </Pressable>
-                  ))}
-                </View>
+        <Swap id={chat && composerBlocked ? "blocked" : "composer"}>
+          {chat && composerBlocked ? (
+            <View
+              style={[
+                styles.composer,
+                styles.blockedBar,
+                {
+                  paddingBottom: insets.bottom + 10,
+                  backgroundColor: colors.surface,
+                  borderTopColor: colors.line,
+                },
+              ]}
+            >
+              <Text style={[styles.blockedText, { color: colors.muted }]}>
+                {composerBlocked === "byMe"
+                  ? `You blocked @${chat.username}`
+                  : `You can't message @${chat.username}`}
+              </Text>
+              {composerBlocked === "byMe" ? (
+                <Button title="Unblock" variant="secondary" onPress={toggleBlocked} />
               ) : null}
-            </Reveal>
-
-            <Reveal>
-              {editing ? (
-                <View style={styles.replyBar}>
-                  <Ionicons name="create-outline" size={18} color={colors.accent} />
-                  <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
-                    <Text style={[styles.replyBarName, { color: colors.accent }]}>
-                      Edit message
-                    </Text>
-                    <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
-                      {previewText(messagePreview(textOf(editing)))}
-                    </Text>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.composer,
+                {
+                  paddingBottom: insets.bottom + 10,
+                  backgroundColor: colors.surface,
+                  borderTopColor: colors.line,
+                },
+              ]}
+            >
+              <Reveal>
+                {suggestions.length > 0 ? (
+                  <View style={[styles.suggestions, { borderBottomColor: colors.line }]}>
+                    {suggestions.map((member) => (
+                      <Pressable
+                        key={member.id}
+                        onPress={() => pickMention(member.username)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Mention @${member.username}`}
+                        style={({ hovered, pressed }) => [
+                          styles.suggestion,
+                          (hovered || pressed) && { backgroundColor: colors.hover },
+                        ]}
+                      >
+                        <Avatar name={member.username} avatarId={member.avatar_id} size={26} />
+                        <Text style={[styles.suggestionName, { color: colors.text }]}>@{member.username}</Text>
+                      </Pressable>
+                    ))}
                   </View>
-                  <IconButton
-                    icon="close"
-                    label="Cancel editing"
-                    size={18}
-                    color={colors.muted}
-                    onPress={cancelEdit}
-                  />
-                </View>
-              ) : null}
-            </Reveal>
+                ) : null}
+              </Reveal>
 
-            <Reveal>
-              {replyTo ? (
-                <View style={styles.replyBar}>
-                  <Ionicons name="arrow-undo" size={18} color={colors.accent} />
-                  <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
-                    <View style={styles.replyBarNameRow}>
-                      <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
-                        Reply to{" "}
-                        {replyTo.sender_id === user?.id ? "yourself" : replyTo.sender_username}
+              <Reveal>
+                {editing ? (
+                  <View style={styles.replyBar}>
+                    <Ionicons name="create-outline" size={18} color={colors.accent} />
+                    <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
+                      <Text style={[styles.replyBarName, { color: colors.accent }]}>
+                        Edit message
                       </Text>
-                      {(replyTo.sender_id === user?.id
-                        ? user?.is_developer
-                        : chat?.is_developer) ? <DevBadge /> : null}
+                      <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
+                        {previewText(messagePreview(textOf(editing)))}
+                      </Text>
                     </View>
-                    <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
-                      {previewText(messagePreview(textOf(replyTo)))}
-                    </Text>
-                  </View>
-                  <IconButton
-                    icon="close"
-                    label="Cancel reply"
-                    size={18}
-                    color={colors.muted}
-                    onPress={() => setReplyTo(null)}
-                  />
-                </View>
-              ) : null}
-            </Reveal>
-
-            <Reveal>
-              {linkPreview.preview ? (
-                <View style={styles.replyBar}>
-                  <Ionicons name="link" size={18} color={colors.accent} />
-                  <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
-                    <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
-                      {linkPreview.preview.meta.site ?? linkPreview.preview.meta.title}
-                    </Text>
-                    <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
-                      {linkPreview.preview.meta.title}
-                    </Text>
-                  </View>
-                  <IconButton
-                    icon="close"
-                    label="Send without the link preview"
-                    size={18}
-                    color={colors.muted}
-                    onPress={linkPreview.dismiss}
-                  />
-                </View>
-              ) : null}
-            </Reveal>
-
-            <Reveal>
-              {picked.length > 0 ? (
-                <View style={styles.pickedBar}>
-                  {picked.map((file, i) => (
-                    <View key={i} style={[styles.picked, { backgroundColor: colors.panelAlt }]}>
-                      {file.previewUri ? (
-                        <Image source={{ uri: file.previewUri }} style={styles.pickedThumb} contentFit="cover" />
-                      ) : (
-                        <Ionicons name="document-outline" size={20} color={colors.muted} />
-                      )}
-                      <View style={styles.pickedText}>
-                        <Text numberOfLines={1} style={[styles.pickedName, { color: colors.text }]}>
-                          {file.name}
-                        </Text>
-                        <Text style={[styles.pickedSize, { color: colors.muted }]}>
-                          {uploading
-                            ? uploadProgress === null
-                              ? "Uploading…"
-                              : `Uploading… ${Math.round(uploadProgress * 100)}%`
-                            : formatSize(file.bytes.length)}
-                        </Text>
-                      </View>
-                      <IconButton
-                        icon="close"
-                        label={`Remove ${file.name}`}
-                        size={16}
-                        color={colors.muted}
-                        disabled={uploading}
-                        onPress={() => setPicked((current) => current.filter((_, j) => j !== i))}
-                      />
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-            </Reveal>
-
-            <Reveal>
-              {emojiOpen ? (
-                <View style={styles.emojiPanel}>
-                  <EmojiPicker onPick={insertEmoji} />
-                </View>
-              ) : null}
-            </Reveal>
-
-            <View style={styles.composerRow}>
-              {voice.active ? (
-                <RecordingBar voice={voice} />
-              ) : (
-                <>
-                  <IconButton
-                    icon={emojiOpen ? "happy" : "happy-outline"}
-                    label="Emoji"
-                    size={22}
-                    color={emojiOpen ? colors.accent : colors.muted}
-                    onPress={() => setEmojiOpen((open) => !open)}
-                  />
-                  {editing ? null : (
                     <IconButton
-                      icon="attach"
-                      label="Attach a photo or file"
-                      size={22}
+                      icon="close"
+                      label="Cancel editing"
+                      size={18}
                       color={colors.muted}
-                      disabled={uploading || picked.length >= MAX_ATTACHMENTS}
-                      onPress={() => setAttachMenu(true)}
+                      onPress={cancelEdit}
+                    />
+                  </View>
+                ) : null}
+              </Reveal>
+
+              <Reveal>
+                {replyTo ? (
+                  <View style={styles.replyBar}>
+                    <Ionicons name="arrow-undo" size={18} color={colors.accent} />
+                    <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
+                      <View style={styles.replyBarNameRow}>
+                        <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
+                          Reply to{" "}
+                          {replyTo.sender_id === user?.id ? "yourself" : replyTo.sender_username}
+                        </Text>
+                        {(replyTo.sender_id === user?.id
+                          ? user?.is_developer
+                          : chat?.is_developer) ? <DevBadge /> : null}
+                      </View>
+                      <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
+                        {previewText(messagePreview(textOf(replyTo)))}
+                      </Text>
+                    </View>
+                    <IconButton
+                      icon="close"
+                      label="Cancel reply"
+                      size={18}
+                      color={colors.muted}
+                      onPress={() => setReplyTo(null)}
+                    />
+                  </View>
+                ) : null}
+              </Reveal>
+
+              <Reveal>
+                {linkPreview.preview ? (
+                  <View style={styles.replyBar}>
+                    <Ionicons name="link" size={18} color={colors.accent} />
+                    <View style={[styles.replyBarText, { borderLeftColor: colors.accent }]}>
+                      <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
+                        {linkPreview.preview.meta.site ?? linkPreview.preview.meta.title}
+                      </Text>
+                      <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
+                        {linkPreview.preview.meta.title}
+                      </Text>
+                    </View>
+                    <IconButton
+                      icon="close"
+                      label="Send without the link preview"
+                      size={18}
+                      color={colors.muted}
+                      onPress={linkPreview.dismiss}
+                    />
+                  </View>
+                ) : null}
+              </Reveal>
+
+              <Reveal>
+                {picked.length > 0 ? (
+                  <View style={styles.pickedBar}>
+                    {picked.map((file, i) => (
+                      <View key={i} style={[styles.picked, { backgroundColor: colors.panelAlt }]}>
+                        {file.previewUri ? (
+                          <Image source={{ uri: file.previewUri }} style={styles.pickedThumb} contentFit="cover" />
+                        ) : (
+                          <Ionicons name="document-outline" size={20} color={colors.muted} />
+                        )}
+                        <View style={styles.pickedText}>
+                          <Text numberOfLines={1} style={[styles.pickedName, { color: colors.text }]}>
+                            {file.name}
+                          </Text>
+                          <Text style={[styles.pickedSize, { color: colors.muted }]}>
+                            {uploading
+                              ? uploadProgress === null
+                                ? "Uploading…"
+                                : `Uploading… ${Math.round(uploadProgress * 100)}%`
+                              : formatSize(file.bytes.length)}
+                          </Text>
+                        </View>
+                        <IconButton
+                          icon="close"
+                          label={`Remove ${file.name}`}
+                          size={16}
+                          color={colors.muted}
+                          disabled={uploading}
+                          onPress={() => setPicked((current) => current.filter((_, j) => j !== i))}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </Reveal>
+
+              <Reveal>
+                {emojiOpen ? (
+                  <View style={styles.emojiPanel}>
+                    <EmojiPicker onPick={insertEmoji} />
+                  </View>
+                ) : null}
+              </Reveal>
+
+              <View style={styles.composerRow}>
+                {voice.active ? (
+                  <RecordingBar voice={voice} />
+                ) : (
+                  <>
+                    <IconButton
+                      icon={emojiOpen ? "happy" : "happy-outline"}
+                      label="Emoji"
+                      size={22}
+                      color={emojiOpen ? colors.accent : colors.muted}
+                      onPress={() => setEmojiOpen((open) => !open)}
+                    />
+                    {editing ? null : (
+                      <IconButton
+                        icon="attach"
+                        label="Attach a photo or file"
+                        size={22}
+                        color={colors.muted}
+                        disabled={uploading || picked.length >= MAX_ATTACHMENTS}
+                        onPress={() => setAttachMenu(true)}
+                      />
+                    )}
+                    {/* Back after a recording: it fades in. */}
+                    <Reanimated.View style={[styles.inputBox, { backgroundColor: colors.panelAlt }, enterStyle("fade", motion)]}>
+                      <TextInput
+                        ref={inputRef}
+                        value={draft}
+                        onChangeText={onDraftChange}
+                        onKeyPress={onKeyPress}
+                        onSelectionChange={(event) => setCursor(event.nativeEvent.selection.end)}
+                        placeholder="Message"
+                        placeholderTextColor={colors.muted}
+                        multiline
+                        // One row on web (textarea defaults to two); grows while typing.
+                        numberOfLines={1}
+                        maxLength={MAX_MESSAGE_LENGTH}
+                        autoFocus={!TOUCH_UI}
+                        onContentSizeChange={(event) =>
+                          setInputHeight(
+                            Math.min(
+                              INPUT_MAX_HEIGHT,
+                              Math.max(
+                                INPUT_MIN_HEIGHT,
+                                event.nativeEvent.contentSize.height,
+                              ),
+                            ),
+                          )
+                        }
+                        style={[
+                          styles.input,
+                          { color: colors.text, height: inputHeight },
+                          noWebOutline,
+                        ]}
+                      />
+                    </Reanimated.View>
+                  </>
+                )}
+
+                {/* The button turns into another as the draft changes. */}
+                <Reanimated.View key={composerAction} style={enterStyle("grow", motion)}>
+                  {voice.active ? (
+                    <IconButton
+                      icon="arrow-up"
+                      label="Send the voice message"
+                      filled
+                      size={22}
+                      onPress={voice.finish}
+                      disabled={uploading}
+                    />
+                  ) : !draft.trim() && picked.length === 0 && !editing ? (
+                    <RecordButton voice={voice} disabled={sending || uploading || keyChanged} />
+                  ) : (
+                    <IconButton
+                      icon={editing ? "checkmark" : "arrow-up"}
+                      label={editing ? "Save" : "Send"}
+                      filled
+                      size={22}
+                      onPress={() => send()}
+                      disabled={!canSend}
                     />
                   )}
-                  <View style={[styles.inputBox, { backgroundColor: colors.panelAlt }]}>
-                    <TextInput
-                      ref={inputRef}
-                      value={draft}
-                      onChangeText={onDraftChange}
-                      onKeyPress={onKeyPress}
-                      onSelectionChange={(event) => setCursor(event.nativeEvent.selection.end)}
-                      placeholder="Message"
-                      placeholderTextColor={colors.muted}
-                      multiline
-                      // One row on web (textarea defaults to two); grows while typing.
-                      numberOfLines={1}
-                      maxLength={MAX_MESSAGE_LENGTH}
-                      autoFocus={!TOUCH_UI}
-                      onContentSizeChange={(event) =>
-                        setInputHeight(
-                          Math.min(
-                            INPUT_MAX_HEIGHT,
-                            Math.max(
-                              INPUT_MIN_HEIGHT,
-                              event.nativeEvent.contentSize.height,
-                            ),
-                          ),
-                        )
-                      }
-                      style={[
-                        styles.input,
-                        { color: colors.text, height: inputHeight },
-                        noWebOutline,
-                      ]}
-                    />
-                  </View>
-                </>
-              )}
-
-              {/* The button turns into another as the draft changes. */}
-              <Reanimated.View key={composerAction} style={enterStyle("grow", motion)}>
-                {voice.active ? (
-                  <IconButton
-                    icon="arrow-up"
-                    label="Send the voice message"
-                    filled
-                    size={22}
-                    onPress={voice.finish}
-                    disabled={uploading}
-                  />
-                ) : !draft.trim() && picked.length === 0 && !editing ? (
-                  <RecordButton voice={voice} disabled={sending || uploading || keyChanged} />
-                ) : (
-                  <IconButton
-                    icon={editing ? "checkmark" : "arrow-up"}
-                    label={editing ? "Save" : "Send"}
-                    filled
-                    size={22}
-                    onPress={() => send()}
-                    disabled={!canSend}
-                  />
-                )}
-              </Reanimated.View>
+                </Reanimated.View>
+              </View>
             </View>
-          </View>
-        )}
+          )}
+        </Swap>
       </KeyboardAvoidingView>
 
       {/* Plain overlays rather than Modals: on web a Modal hands the focus

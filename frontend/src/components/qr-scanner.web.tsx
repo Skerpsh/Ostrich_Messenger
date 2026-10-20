@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import IconButton from "@/components/icon-button";
+import { Swap } from "@/components/reveal";
 import { useAppTheme } from "@/context/theme";
 import { useEscape } from "@/lib/keys";
 
@@ -120,19 +121,21 @@ export default function QrScanner({
         <Text style={styles.title}>{title}</Text>
         <IconButton icon="close" label="Close" color="#ffffff" onPress={onClose} />
       </View>
-      {error ? (
-        <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
-      ) : (
-        <View style={styles.view}>
-          <video
-            ref={video}
-            muted
-            playsInline
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-          <View style={styles.frame} pointerEvents="none" />
-        </View>
-      )}
+      <Swap id={error ? "error" : "camera"} fill>
+        {error ? (
+          <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
+        ) : (
+          <View style={styles.view}>
+            <video
+              ref={video}
+              muted
+              playsInline
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+            <View style={styles.frame} pointerEvents="none" />
+          </View>
+        )}
+      </Swap>
       <Text style={styles.hint}>Point the camera at the QR code</Text>
     </View>
   );

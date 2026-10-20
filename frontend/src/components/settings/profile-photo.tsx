@@ -2,7 +2,7 @@ import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import Avatar from "@/components/avatar";
-import Reveal from "@/components/reveal";
+import Reveal, { Swap } from "@/components/reveal";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { removeAvatar, uploadAvatar } from "@/lib/api";
@@ -69,11 +69,13 @@ export function ProfilePhoto() {
             { backgroundColor: colors.accent, borderColor: colors.panel },
           ]}
         >
-          {busy ? (
-            <ActivityIndicator size="small" color={colors.onAccent} />
-          ) : (
-            <Ionicons name="camera" size={16} color={colors.onAccent} />
-          )}
+          <Swap id={busy ? "busy" : "camera"} resize={false}>
+            {busy ? (
+              <ActivityIndicator size="small" color={colors.onAccent} />
+            ) : (
+              <Ionicons name="camera" size={16} color={colors.onAccent} />
+            )}
+          </Swap>
         </View>
       </Pressable>
 

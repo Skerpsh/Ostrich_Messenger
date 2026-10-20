@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import AppHeader from "@/components/app-header";
 import Button from "@/components/button";
+import { Swap } from "@/components/reveal";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { openSavedChat } from "@/lib/api";
@@ -41,14 +42,16 @@ export default function ProfileLinkScreen() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <AppHeader onBack={wide ? undefined : close} onClose={wide ? close : undefined} title={`@${username}`} />
       <View style={styles.center}>
-        {error ? (
-          <>
-            <Text style={[styles.text, { color: colors.danger }]}>{error}</Text>
-            <Button title="Back to chats" variant="secondary" onPress={() => router.replace("/chats")} />
-          </>
-        ) : (
-          <ActivityIndicator color={colors.muted} />
-        )}
+        <Swap id={error ? "error" : "loading"}>
+          {error ? (
+            <View style={styles.failed}>
+              <Text style={[styles.text, { color: colors.danger }]}>{error}</Text>
+              <Button title="Back to chats" variant="secondary" onPress={() => router.replace("/chats")} />
+            </View>
+          ) : (
+            <ActivityIndicator color={colors.muted} />
+          )}
+        </Swap>
       </View>
     </View>
   );
@@ -65,6 +68,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 16,
     padding: 24,
+  },
+
+  failed: {
+    alignItems: "center",
+    gap: 16,
   },
 
   text: {

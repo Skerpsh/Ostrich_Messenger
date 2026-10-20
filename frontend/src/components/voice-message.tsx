@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAudioPlayer, useAudioPlayerStatus, type AudioPlayer } from "expo-audio";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { Swap } from "@/components/reveal";
 import { useAuth } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
 import { formatDuration, loadAttachment } from "@/lib/attachments";
@@ -121,16 +122,18 @@ export default function VoiceMessage({
         accessibilityLabel={status.playing ? "Pause the voice message" : "Play the voice message"}
         style={[styles.play, { backgroundColor: fg }]}
       >
-        {loading ? (
-          <ActivityIndicator size="small" color={own ? colors.accent : colors.onAccent} />
-        ) : (
-          <Ionicons
-            name={status.playing ? "pause" : "play"}
-            size={20}
-            color={own ? colors.accent : colors.onAccent}
-            style={status.playing ? undefined : styles.playIcon}
-          />
-        )}
+        <Swap id={loading ? "loading" : status.playing ? "pause" : "play"} resize={false}>
+          {loading ? (
+            <ActivityIndicator size="small" color={own ? colors.accent : colors.onAccent} />
+          ) : (
+            <Ionicons
+              name={status.playing ? "pause" : "play"}
+              size={20}
+              color={own ? colors.accent : colors.onAccent}
+              style={status.playing ? undefined : styles.playIcon}
+            />
+          )}
+        </Swap>
       </Pressable>
       <View style={styles.body}>
         <Pressable
