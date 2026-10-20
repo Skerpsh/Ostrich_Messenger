@@ -1,5 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, Text } from "react-native";
+import { WithTooltip } from "@/context/tooltip";
 
 // The "DEV" badge next to the names of developer accounts. The flag comes
 // from the server only; usernames cannot contain spaces or brackets, so
@@ -17,24 +18,30 @@ const SIZES = {
   lg: { fontSize: 13, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 7 },
 };
 
+// Pointing at it or tapping it says what it means.
+const DEV_TIP = {
+  title: "Ostrich developer",
+  text: "This person works on Ostrich. Only the server can give this badge: it can't be faked.",
+};
+
 export default function DevBadge({ size = "sm" }: { size?: keyof typeof SIZES }) {
   const { fontSize, ...box } = SIZES[size];
 
   return (
-    <LinearGradient
-      colors={GRADIENT}
-      locations={LOCATIONS}
-      // About 120°, as in the preview.
-      start={{ x: 0, y: 0.2 }}
-      end={{ x: 1, y: 0.8 }}
-      style={[styles.badge, box]}
-      accessibilityRole="text"
-      accessibilityLabel="Developer"
-    >
-      <Text style={[styles.text, { fontSize, lineHeight: fontSize * 1.15 }]}>
-        DEV
-      </Text>
-    </LinearGradient>
+    <WithTooltip {...DEV_TIP}>
+      <LinearGradient
+        colors={GRADIENT}
+        locations={LOCATIONS}
+        // About 120°, as in the preview.
+        start={{ x: 0, y: 0.2 }}
+        end={{ x: 1, y: 0.8 }}
+        style={[styles.badge, box]}
+      >
+        <Text style={[styles.text, { fontSize, lineHeight: fontSize * 1.15 }]}>
+          DEV
+        </Text>
+      </LinearGradient>
+    </WithTooltip>
   );
 }
 

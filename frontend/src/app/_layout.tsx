@@ -18,6 +18,7 @@ import { OutboxProvider } from "@/context/outbox";
 import { RealtimeProvider } from "@/context/realtime";
 import { ChatLooksProvider } from "@/context/chat-looks";
 import { AppThemeProvider, useAppTheme } from "@/context/theme";
+import { TooltipProvider } from "@/context/tooltip";
 import { restoreAppIcon, setAppIcon } from "@/lib/app-icon";
 import { rememberLink } from "@/lib/links";
 import { preventZoom } from "@/lib/no-zoom";
@@ -33,20 +34,22 @@ preventZoom();
 export default function RootLayout() {
   return (
     <AppThemeProvider>
-      <AuthProvider>
-        <RealtimeProvider>
-          <ChatsProvider>
-            <OutboxProvider>
-              <CallsProvider>
-                <ChatLooksProvider>
-                  <SettingsSync />
-                  <RootNavigator />
-                </ChatLooksProvider>
-              </CallsProvider>
-            </OutboxProvider>
-          </ChatsProvider>
-        </RealtimeProvider>
-      </AuthProvider>
+      <TooltipProvider>
+        <AuthProvider>
+          <RealtimeProvider>
+            <ChatsProvider>
+              <OutboxProvider>
+                <CallsProvider>
+                  <ChatLooksProvider>
+                    <SettingsSync />
+                    <RootNavigator />
+                  </ChatLooksProvider>
+                </CallsProvider>
+              </OutboxProvider>
+            </ChatsProvider>
+          </RealtimeProvider>
+        </AuthProvider>
+      </TooltipProvider>
     </AppThemeProvider>
   );
 }

@@ -179,7 +179,8 @@ export function leaveStyle(kind: keyof typeof LEAVING, motion: Motion): Animatio
 }
 
 // Leaving with an animation: leave(then) shows it, then calls then (the
-// navigation, onClose). leaving: whether it is on its way out.
+// navigation, onClose). leaving: whether it is on its way out; stay()
+// brings back what stays around to be shown again (the tooltip).
 export function useLeave() {
   const motion = useMotion();
   const [leaving, setLeaving] = useState(false);
@@ -202,7 +203,16 @@ export function useLeave() {
     }, LEAVE_MS[motion]);
   };
 
-  return { motion, leaving, leave };
+  const stay = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+
+    setLeaving(false);
+  };
+
+  return { motion, leaving, leave, stay };
 }
 
 // The style that animates a view in as it appears (Animated.View).
