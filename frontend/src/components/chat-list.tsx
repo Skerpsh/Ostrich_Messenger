@@ -239,7 +239,7 @@ export default function ChatList() {
     return null;
   }
 
-  const settingsOpen = pathname === "/chats/settings";
+  const settingsOpen = pathname.startsWith("/chats/settings");
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.surface }]}>
@@ -580,9 +580,11 @@ function ChatRow({
   // Long press / right click: pin, mute, delete.
   onMenu: () => void;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, density, textScale } = useAppTheme();
   const { decrypt } = useChatCrypto(chat);
   const last = chat.last_message;
+  // Settings → Personalization → Chats list.
+  const minimal = density === "minimal";
   const own = last?.sender_id === ownId;
   const group = chat.type === "group";
   const title = chatTitle(chat);
@@ -591,6 +593,49 @@ function ChatRow({
     own &&
     chat.peer_last_read_at !== null &&
     new Date(chat.peer_last_read_at) >= new Date(last!.created_at);
+
+  const badges = (
+    <>
+      {chat.pinned && chat.unread_count === 0 ? (
+        <Ionicons name="pin" size={14} color={colors.muted} accessibilityLabel="pinned" />
+      ) : null}
+      {chat.unread_mentions ? (
+        <View
+          accessibilityLabel="you were mentioned"
+          style={[styles.badge, { backgroundColor: colors.accent }]}
+        >
+          <Text style={[styles.badgeText, { color: colors.onAccent }]}>@</Text>
+        </View>
+      ) : null}
+      {chat.join_requests ? (
+        <View
+          accessibilityLabel={`${chat.join_requests} asking to join`}
+          style={[styles.badge, { backgroundColor: colors.accentSoft }]}
+        >
+          <Ionicons name="person-add" size={11} color={colors.accent} />
+          <Text style={[styles.badgeText, { color: colors.accent }]}>{chat.join_requests}</Text>
+        </View>
+      ) : null}
+      {chat.unread_count > 0 ? (
+        <View
+          style={[
+            styles.badge,
+            // Muted chats count quietly.
+            { backgroundColor: chat.muted ? colors.muted : colors.accent },
+          ]}
+        >
+          <Text
+            style={[
+              styles.badgeText,
+              { color: chat.muted ? colors.bg : colors.onAccent },
+            ]}
+          >
+            {chat.unread_count > 99 ? "99+" : chat.unread_count}
+          </Text>
+        </View>
+      ) : null}
+    </>
+  );
 
   return (
     <Pressable
@@ -607,16 +652,22 @@ function ChatRow({
       accessibilityLabel={`${chat.type === "direct" ? `Chat with ${chat.username}` : title}${chat.unread_count ? `, ${chat.unread_count} unread` : ""}`}
       style={({ hovered, pressed }) => [
         styles.row,
+        density !== "comfortable" && styles.rowDense,
         selected
           ? { backgroundColor: colors.accentSoft }
           : (hovered || pressed) && { backgroundColor: colors.hover },
       ]}
     >
-      <ChatAvatar chat={chat} online={online} ringColor={selected ? colors.surface : undefined} />
-      <View style={styles.rowText}>
+      <ChatAvatar
+        chat={chat}
+        online={online}
+        size={AVATAR_SIZES[density]}
+        ringColor={selected ? colors.surface : undefined}
+      />
+      <View style={[styles.rowText, density !== "comfortable" && styles.rowTextDense]}>
         <View style={styles.rowLine}>
           <View style={styles.nameWrap}>
-            <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>
+            <Text numberOfLines={1} style={[styles.name, { color: colors.text, fontSize: 16 * textScale }]}>
               {chat.type === "direct" ? chat.username : title}
             </Text>
             {chat.is_developer ? <DevBadge /> : null}
@@ -640,73 +691,42 @@ function ChatRow({
             <Text style={[styles.time, { color: chat.unread_count ? colors.accent : colors.muted }]}>
               {formatChatDate(last?.created_at ?? chat.created_at)}
             </Text>
+            {minimal ? badges : null}
           </View>
         </View>
-        <View style={styles.rowLine}>
-          <Text numberOfLines={1} style={[styles.preview, { color: colors.muted }]}>
-            {typing ? (
-              <Text style={{ color: colors.accent }}>typing…</Text>
-            ) : draft ? (
-              <>
-                <Text style={{ color: colors.danger }}>Draft: </Text>
-                {previewText(draft)}
-              </>
-            ) : last && shownLast ? (
-              <>
-                {shownLast.status === "system" || chat.type === "saved" ? null : own ? (
-                  <Text style={{ color: colors.textSoft }}>You: </Text>
-                ) : group ? (
-                  <Text style={{ color: colors.textSoft }}>@{last.sender_username}: </Text>
-                ) : null}
-                {previewText(messagePreview(shownLast))}
-              </>
-            ) : (
-              <Text style={styles.italic}>No messages yet</Text>
-            )}
-          </Text>
-          {chat.pinned && chat.unread_count === 0 ? (
-            <Ionicons name="pin" size={14} color={colors.muted} accessibilityLabel="pinned" />
-          ) : null}
-          {chat.unread_mentions ? (
-            <View
-              accessibilityLabel="you were mentioned"
-              style={[styles.badge, { backgroundColor: colors.accent }]}
-            >
-              <Text style={[styles.badgeText, { color: colors.onAccent }]}>@</Text>
-            </View>
-          ) : null}
-          {chat.join_requests ? (
-            <View
-              accessibilityLabel={`${chat.join_requests} asking to join`}
-              style={[styles.badge, { backgroundColor: colors.accentSoft }]}
-            >
-              <Ionicons name="person-add" size={11} color={colors.accent} />
-              <Text style={[styles.badgeText, { color: colors.accent }]}>{chat.join_requests}</Text>
-            </View>
-          ) : null}
-          {chat.unread_count > 0 ? (
-            <View
-              style={[
-                styles.badge,
-                // Muted chats count quietly.
-                { backgroundColor: chat.muted ? colors.muted : colors.accent },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: chat.muted ? colors.bg : colors.onAccent },
-                ]}
-              >
-                {chat.unread_count > 99 ? "99+" : chat.unread_count}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+        {minimal ? null : (
+          <View style={styles.rowLine}>
+            <Text numberOfLines={1} style={[styles.preview, { color: colors.muted, fontSize: 14 * textScale }]}>
+              {typing ? (
+                <Text style={{ color: colors.accent }}>typing…</Text>
+              ) : draft ? (
+                <>
+                  <Text style={{ color: colors.danger }}>Draft: </Text>
+                  {previewText(draft)}
+                </>
+              ) : last && shownLast ? (
+                <>
+                  {shownLast.status === "system" || chat.type === "saved" ? null : own ? (
+                    <Text style={{ color: colors.textSoft }}>You: </Text>
+                  ) : group ? (
+                    <Text style={{ color: colors.textSoft }}>@{last.sender_username}: </Text>
+                  ) : null}
+                  {previewText(messagePreview(shownLast))}
+                </>
+              ) : (
+                <Text style={styles.italic}>No messages yet</Text>
+              )}
+            </Text>
+            {badges}
+          </View>
+        )}
       </View>
     </Pressable>
   );
 }
+
+// Avatars per density of the list.
+const AVATAR_SIZES = { comfortable: 48, compact: 40, minimal: 32 };
 
 const styles = StyleSheet.create({
   screen: {
@@ -766,6 +786,14 @@ const styles = StyleSheet.create({
   rowText: {
     flex: 1,
     gap: 3,
+  },
+
+  rowDense: {
+    paddingVertical: 5,
+  },
+
+  rowTextDense: {
+    gap: 1,
   },
 
   rowLine: {

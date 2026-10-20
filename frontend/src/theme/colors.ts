@@ -146,19 +146,164 @@ export const accents: {
 
 export const DEFAULT_ACCENT: AccentId = "orange";
 
+// The accent as chosen: one of the accents, or "#rrggbb" of the user's own
+// color (Settings → Personalization), from which both variants are made.
+export type AccentChoice = AccentId | `#${string}`;
+
+export const isCustomAccent = (choice: string): choice is `#${string}` => /^#[0-9a-f]{6}$/i.test(choice);
+
+export function isAccentChoice(value: unknown): value is AccentChoice {
+  return typeof value === "string" && (isCustomAccent(value) || accents.some((a) => a.id === value));
+}
+
+// Dark theme with a pure black page (OLED screens).
+const pureBlack: Partial<ThemeColors> = {
+  bg: "#000000",
+  surface: "#000000",
+  panel: "#141416",
+  panelAlt: "#1e1e21",
+  hover: "#141416",
+  line: "rgba(255, 255, 255, 0.1)",
+};
+
 // "#rrggbb" → "rgba(r, g, b, alpha)".
-function withAlpha(hex: string, alpha: number) {
+export function withAlpha(hex: string, alpha: number) {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
+// --- the user's own accent ---
+
+function rgbOf(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+const hex2 = (v: number) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0");
+
+function hexOf([r, g, b]: [number, number, number]): `#${string}` {
+  return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+}
+
+// WCAG relative luminance and contrast ratio.
+function luminance(hex: string) {
+  const [r, g, b] = rgbOf(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+export function contrast(a: string, b: string) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+export function hslOf(hex: string): [number, number, number] {
+  const [r, g, b] = rgbOf(hex).map((v) => v / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+
+  if (max === min) {
+    return [0, 0, l];
+  }
+
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h =
+    max === r ? ((g - b) / d + (g < b ? 6 : 0)) * 60 : max === g ? ((b - r) / d + 2) * 60 : ((r - g) / d + 4) * 60;
+
+  return [h, s, l];
+}
+
+export function hslToHex(h: number, s: number, l: number): `#${string}` {
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return hexOf([f(0) * 255, f(8) * 255, f(4) * 255]);
+}
+
+// Both variants of the user's color: for the dark theme it is lightened
+// until it stands out from the page with dark text on it, for the light
+// theme darkened until white text reads on it, both to WCAG AA (4.5:1).
+export function customAccentVariants(hex: string): Record<ThemeMode, AccentVariant> {
+  const [h, s, ownL] = hslOf(hex);
+
+  let dark = hex;
+  for (let l = Math.max(0.55, ownL); l <= 1; l += 0.02) {
+    dark = hslToHex(h, s, l);
+    if (contrast(dark, themes.dark.bg) >= 4.5 && contrast(dark, "#111113") >= 4.5) {
+      break;
+    }
+  }
+
+  let light = hex;
+  for (let l = Math.min(0.5, ownL); l >= 0; l -= 0.02) {
+    light = hslToHex(h, s, l);
+    if (contrast(light, themes.light.bg) >= 4.5 && contrast(light, "#ffffff") >= 4.5) {
+      break;
+    }
+  }
+
+  return {
+    dark: { accent: dark, onAccent: hslToHex(h, Math.min(s, 0.8), 0.07) },
+    light: { accent: light, onAccent: "#ffffff" },
+  };
+}
+
+// The accent's variant for the theme.
+export function accentVariant(choice: AccentChoice, mode: ThemeMode): AccentVariant {
+  if (isCustomAccent(choice)) {
+    return customAccentVariants(choice)[mode];
+  }
+
+  return (accents.find((a) => a.id === choice) ?? accents[0])[mode];
+}
+
+// The preset nearest to a color (the app icons exist for the presets only).
+export function nearestAccent(choice: AccentChoice): AccentId {
+  if (!isCustomAccent(choice)) {
+    return choice;
+  }
+
+  const [h, s] = hslOf(choice);
+
+  if (s < 0.15) {
+    return "mono";
+  }
+
+  let best: AccentId = "orange";
+  let bestDistance = Infinity;
+
+  for (const accent of accents) {
+    if (accent.id === "mono") {
+      continue;
+    }
+
+    const [ah] = hslOf(accent.dark.accent);
+    const distance = Math.min(Math.abs(ah - h), 360 - Math.abs(ah - h));
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = accent.id;
+    }
+  }
+
+  return best;
+}
+
 // The theme's colors with the chosen accent.
-export function themeColors(mode: ThemeMode, accentId: AccentId): ThemeColors {
-  const accent = accents.find((a) => a.id === accentId) ?? accents[0];
-  const variant = accent[mode];
+export function themeColors(
+  mode: ThemeMode,
+  choice: AccentChoice,
+  black = false,
+): ThemeColors {
+  const variant = accentVariant(choice, mode);
 
   return {
     ...themes[mode],
+    ...(mode === "dark" && black ? pureBlack : {}),
     accent: variant.accent,
     onAccent: variant.onAccent,
     accentSoft: withAlpha(variant.accent, mode === "dark" ? 0.14 : 0.1),

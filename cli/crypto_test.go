@@ -344,6 +344,27 @@ func TestDeviceLink(t *testing.T) {
 	}
 }
 
+// A chat's new look (wallpaper, accent), written by the app: the CLI shows
+// its text.
+func TestLookEntryVector(t *testing.T) {
+	data, err := os.ReadFile("../testdata/crypto-vectors.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var v struct {
+		Payload string `json:"payload_look"`
+	}
+
+	if err := json.Unmarshal(data, &v); err != nil {
+		t.Fatal(err)
+	}
+
+	if p := decodePayload(v.Payload); p.text != "🎨 Set a new wallpaper for the chat" {
+		t.Fatalf("text: %q", p.text)
+	}
+}
+
 // A call entry written by the app (testdata/crypto-vectors.json).
 func TestCallEntryVector(t *testing.T) {
 	data, err := os.ReadFile("../testdata/crypto-vectors.json")

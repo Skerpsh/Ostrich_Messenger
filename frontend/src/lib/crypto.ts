@@ -73,6 +73,12 @@
 // put itself in the middle of a call without swapping the account keys,
 // which the safety code and the call's handshake (lib/handshake.ts) show.
 //
+// Settings synced between the user's devices (lib/settings-sync.ts),
+// encrypted with a key only the account's private key gives:
+//   settings key = HKDF(private key, salt user id, info "ostrich/v1 settings", 32)
+//   settings     = "s1:" + base64(nonce(24) ‖ XChaCha20-Poly1305(settings
+//                  key, nonce, JSON, aad "ostrich/v1 settings" 0 user id))
+//
 // The OstrichID is ~99 random bits, so a fast KDF is enough: it cannot be
 // guessed from the auth key or from anything the server stores.
 
@@ -91,6 +97,8 @@ const ATTACHMENT_AAD = utf8("ostrich/v1 attachment");
 const GROUP_WRAP_INFO = utf8("ostrich/v1 group key-wrap");
 const LINK_INFO = "ostrich/v1 device link";
 const CALL_INFO = utf8("ostrich/v1 call");
+const SETTINGS_INFO = "ostrich/v1 settings";
+const PREFIX_SETTINGS = "s1:";
 const PREFIX_CALL = "c1:";
 const PREFIX_GROUP = "e3:";
 const PREFIX_INFO = "i1:";
@@ -487,6 +495,37 @@ export function decryptAttachment(sealed: Uint8Array, key: string): Uint8Array {
   return xchacha20poly1305(fromBase64(key), sealed.subarray(0, 24), ATTACHMENT_AAD).decrypt(
     sealed.subarray(24),
   );
+}
+
+// --- settings ---
+
+function settingsKey(privateKey: Uint8Array, userId: string) {
+  return hkdf(sha256, privateKey, utf8(userId), utf8(SETTINGS_INFO), 32);
+}
+
+const settingsAad = (userId: string) => utf8(`${SETTINGS_INFO}\0${userId}`);
+
+export function encryptSettings(json: string, privateKey: Uint8Array, userId: string): string {
+  const nonce = randomBytes(24);
+  const sealed = xchacha20poly1305(settingsKey(privateKey, userId), nonce, settingsAad(userId)).encrypt(
+    utf8(json),
+  );
+
+  return PREFIX_SETTINGS + toBase64(concat(nonce, sealed));
+}
+
+// Throws if the settings were not encrypted by this account for this user.
+export function decryptSettings(encrypted: string, privateKey: Uint8Array, userId: string): string {
+  if (!encrypted.startsWith(PREFIX_SETTINGS)) {
+    throw new Error("Unknown settings format");
+  }
+
+  const data = fromBase64(encrypted.slice(PREFIX_SETTINGS.length));
+  const plain = xchacha20poly1305(settingsKey(privateKey, userId), data.subarray(0, 24), settingsAad(userId)).decrypt(
+    data.subarray(24),
+  );
+
+  return new TextDecoder().decode(plain);
 }
 
 // --- groups ---

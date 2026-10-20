@@ -17,6 +17,7 @@ import attachmentsRoutes from "./routes/attachments.js";
 import groupsRoutes from "./routes/groups.js";
 import monitorRoutes from "./routes/monitor.js";
 import callsRoutes from "./routes/calls.js";
+import settingsRoutes from "./routes/settings.js";
 import { cleanupAttachments, ensureAttachmentsDir } from "./attachments.js";
 import { listenForEvents } from "./realtime.js";
 import { setUpSharedState, sharedRedis } from "./shared-state.js";
@@ -196,6 +197,7 @@ const start = async () => {
     await server.register(groupsRoutes);
     await server.register(monitorRoutes);
     await server.register(callsRoutes);
+    await server.register(settingsRoutes);
 
     await ensureAttachmentsDir();
 

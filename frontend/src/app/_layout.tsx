@@ -16,9 +16,13 @@ import { CallsProvider } from "@/context/calls";
 import { ChatsProvider } from "@/context/chats";
 import { OutboxProvider } from "@/context/outbox";
 import { RealtimeProvider } from "@/context/realtime";
+import { ChatLooksProvider } from "@/context/chat-looks";
 import { AppThemeProvider, useAppTheme } from "@/context/theme";
+import { restoreAppIcon, setAppIcon } from "@/lib/app-icon";
 import { rememberLink } from "@/lib/links";
 import { registerServiceWorker } from "@/lib/pwa";
+import SettingsSync from "@/lib/settings-sync";
+import { nearestAccent } from "@/theme/colors";
 
 // Keep the splash screen until the saved session has been checked.
 SplashScreen.preventAutoHideAsync();
@@ -32,7 +36,10 @@ export default function RootLayout() {
           <ChatsProvider>
             <OutboxProvider>
               <CallsProvider>
-                <RootNavigator />
+                <ChatLooksProvider>
+                  <SettingsSync />
+                  <RootNavigator />
+                </ChatLooksProvider>
               </CallsProvider>
             </OutboxProvider>
           </ChatsProvider>
@@ -44,7 +51,7 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { state } = useAuth();
-  const { mode, colors } = useAppTheme();
+  const { mode, colors, accent, accentPicked } = useAppTheme();
 
   useEffect(() => {
     if (state.status !== "loading") {
@@ -65,6 +72,15 @@ function RootNavigator() {
         ?.setAttribute("content", colors.surface);
     }
   }, [mode, colors.bg, colors.surface]);
+
+  // The app's icon follows the accent the user chose (lib/app-icon.ts).
+  useEffect(() => {
+    if (accentPicked > 0) {
+      setAppIcon(nearestAccent(accent));
+    } else {
+      restoreAppIcon();
+    }
+  }, [accent, accentPicked]);
 
   // Web: an invite or profile link opened while logged out is opened
   // after logging in (components/chat-list.tsx).

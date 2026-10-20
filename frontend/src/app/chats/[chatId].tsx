@@ -22,6 +22,8 @@ import AppHeader, { HEADER_HEIGHT } from "@/components/app-header";
 import Button from "@/components/button";
 import Avatar from "@/components/avatar";
 import ChatAvatar from "@/components/chat-avatar";
+import ChatLookSheet from "@/components/chat-look";
+import ChatWallpaper from "@/components/chat-wallpaper";
 import DevBadge from "@/components/dev-badge";
 import EmojiPicker from "@/components/emoji-picker";
 import ForwardPicker from "@/components/forward-picker";
@@ -37,7 +39,8 @@ import { useCalls } from "@/context/calls";
 import { useChats } from "@/context/chats";
 import { outgoingAsMessage, useOutbox, type Outgoing } from "@/context/outbox";
 import { usePresence, useRealtime } from "@/context/realtime";
-import { useAppTheme } from "@/context/theme";
+import { useChatLook, useChatLooks, type ResolvedLook } from "@/context/chat-looks";
+import { ChatAccentProvider, useAppTheme } from "@/context/theme";
 import {
   deleteMessage,
   editMessage,
@@ -77,7 +80,9 @@ import { chatTitle, isGroupDistrusted } from "@/lib/groups";
 import { loadCachedMessages, saveCachedMessages } from "@/lib/local-cache";
 import { mentionedUsernames, plainText } from "@/lib/markup";
 import { linkImage } from "@/lib/link-preview";
-import { encodePayload, type Attachment, type LinkPreview } from "@/lib/payload";
+import { encodePayload, type Attachment, type LinkPreview, type LookEntry } from "@/lib/payload";
+import type { ChatLook } from "@/lib/personalization";
+import { photoBytes } from "@/lib/wallpaper-photo";
 import { useLinkPreview } from "@/lib/use-link-preview";
 import { fromWebFile, pickDocument, pickPhoto } from "@/lib/pick-attachment";
 import { useLatest } from "@/lib/use-latest";
@@ -116,10 +121,17 @@ export default function ChatRoute() {
   // message: a message to show (a search result).
   const { chatId, message } = useLocalSearchParams<{ chatId: string; message?: string }>();
 
-  return <ChatScreen key={`${chatId}:${message ?? ""}`} chatId={chatId} focusId={message} />;
+  // The chat's own accent and wallpaper, if it has them.
+  const look = useChatLook(chatId);
+
+  return (
+    <ChatAccentProvider accent={look.accent}>
+      <ChatScreen key={`${chatId}:${message ?? ""}`} chatId={chatId} focusId={message} look={look} />
+    </ChatAccentProvider>
+  );
 }
 
-function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
+function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: string; look: ResolvedLook }) {
   const router = useRouter();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -189,6 +201,8 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
   // Groups: the members (for names, presence and the group's screen).
   const [members, setMembers] = useState<GroupMember[] | null>(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  // The chat's "Wallpaper & color".
+  const [showLook, setShowLook] = useState(false);
   // The messages being forwarded (choosing the chat).
   const [forwarding, setForwarding] = useState<Message[] | null>(null);
   // Choosing messages (copy, forward, delete several): their ids; null
@@ -492,6 +506,74 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
 
   const showError = (e: unknown, fallback: string) =>
     setError(e instanceof Error ? e.message : fallback);
+
+  // "Wallpaper & color" for everyone in the chat: a message carrying the
+  // look, its photo encrypted and uploaded like a file. null: reset.
+  const shareLook = async (chosen: ChatLook | null, photo: string | null) => {
+    if (!user || !crypto.canEncrypt) {
+      throw new Error(
+        group ? "The group's key has not loaded yet" : `@${chat?.username ?? "…"} has not set up end-to-end encryption yet`,
+      );
+    }
+
+    const uploaded = photo
+      ? await withToken((t) => uploadAttachment(t, { bytes: photoBytes(photo), name: "wallpaper.jpg", mime: "image/jpeg" }))
+      : null;
+    const id = newMessageId();
+    const content = crypto.encrypt(
+      encodePayload({
+        text: chosen ? "🎨 Set a new wallpaper for the chat" : "🎨 Reset the chat's wallpaper",
+        look: chosen
+          ? {
+              ...(chosen.accent ? { accent: chosen.accent } : {}),
+              ...(chosen.wallpaper ? { wallpaper: chosen.wallpaper } : {}),
+              ...(uploaded ? { photo: uploaded } : {}),
+            }
+          : {},
+      }),
+      id,
+    );
+
+    outbox.send({
+      id,
+      chatId,
+      senderId: user.id,
+      content,
+      replyTo: null,
+      attachments: uploaded ? [uploaded.id] : [],
+    });
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
+  // The newest look set for everyone (in groups: by an admin) is the chat's.
+  const { recordShared } = useChatLooks();
+
+  useEffect(() => {
+    if (group && !members) {
+      return;
+    }
+
+    const admins = new Set(
+      (members ?? []).filter((m) => m.role === "owner" || m.role === "admin").map((m) => m.id),
+    );
+    let newest: { message: Message; look: LookEntry } | null = null;
+
+    for (const message of shownMessages) {
+      const look = texts.get(message.id)?.look;
+
+      if (
+        look &&
+        (!group || admins.has(message.sender_id)) &&
+        (!newest || message.created_at > newest.message.created_at)
+      ) {
+        newest = { message, look };
+      }
+    }
+
+    if (newest) {
+      recordShared(chatId, newest.look, newest.message);
+    }
+  }, [shownMessages, texts, members, group, chatId, recordShared]);
 
   const startCall = async (video = false) => {
     if (!chat) {
@@ -1380,6 +1462,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
 
   return (
     <View ref={screenRef} style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ChatWallpaper wallpaper={look.wallpaper} photo={look.photo} />
       {dragging ? (
         <View pointerEvents="none" style={[styles.dropZone, { borderColor: colors.accent, backgroundColor: colors.bg }]}>
           <Ionicons name="cloud-upload-outline" size={44} color={colors.accent} />
@@ -1699,6 +1782,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
                     onError={setError}
                     onOpenPhoto={(attachment) => setViewing(attachment.id)}
                     onCall={chat?.type === "direct" ? startCall : undefined}
+                    onLook={() => setShowLook(true)}
                     selected={selected && !outgoingOf(item.message) ? selected.has(item.message.id) : undefined}
                     onToggle={() => toggleChosen(item.message)}
                   />
@@ -2125,6 +2209,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
               },
             },
             { icon: "search", label: "Search in chat", onPress: openSearch },
+            { icon: "color-palette-outline", label: "Wallpaper & color", onPress: () => setShowLook(true) },
             ...(chat.pinned_message && groupAdmin
               ? [{ icon: "pin-outline" as const, label: "Unpin message", onPress: () => togglePin(null) }]
               : []),
@@ -2192,6 +2277,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
           onClose={() => setChatMenu(false)}
           items={[
             { icon: "search", label: "Search in chat", onPress: openSearch },
+            { icon: "color-palette-outline", label: "Wallpaper & color", onPress: () => setShowLook(true) },
             ...(chat.pinned_message
               ? [{ icon: "pin-outline" as const, label: "Unpin message", onPress: () => togglePin(null) }]
               : []),
@@ -2217,6 +2303,7 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
           onClose={() => setChatMenu(false)}
           items={[
             { icon: "search", label: "Search in chat", onPress: openSearch },
+            { icon: "color-palette-outline", label: "Wallpaper & color", onPress: () => setShowLook(true) },
             ...(chat.pinned_message
               ? [{ icon: "pin-outline" as const, label: "Unpin message", onPress: () => togglePin(null) }]
               : []),
@@ -2264,6 +2351,15 @@ function ChatScreen({ chatId, focusId }: { chatId: string; focusId?: string }) {
               onPress: () => deleteChat("everyone"),
             },
           ]}
+        />
+      ) : null}
+
+      {showLook && chat ? (
+        <ChatLookSheet
+          chatId={chatId}
+          everyoneLabel={group ? "For everyone" : "For both"}
+          share={saved || (group && !groupAdmin) ? undefined : shareLook}
+          onClose={() => setShowLook(false)}
         />
       ) : null}
 

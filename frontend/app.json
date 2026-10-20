@@ -49,7 +49,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Ostrich uses your photos to set your profile picture.",
+          "photosPermission": "Ostrich uses your photos to set your profile picture and chat wallpapers.",
           "cameraPermission": false,
           "microphonePermission": false
         }
@@ -84,6 +84,75 @@
           "cameraPermission": "Ostrich uses the camera to scan QR codes: invites, contacts and safety codes.",
           "microphonePermission": "Ostrich uses the microphone for voice messages and calls."
         }
+      ],
+      [
+        "expo-alternate-app-icons",
+        [
+          {
+            "name": "AccentOrange",
+            "ios": "./assets/images/app-icons/icon-orange.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground.png",
+              "backgroundColor": "#b84e08"
+            }
+          },
+          {
+            "name": "AccentRed",
+            "ios": "./assets/images/app-icons/icon-red.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground.png",
+              "backgroundColor": "#c0262d"
+            }
+          },
+          {
+            "name": "AccentPink",
+            "ios": "./assets/images/app-icons/icon-pink.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground.png",
+              "backgroundColor": "#b3206a"
+            }
+          },
+          {
+            "name": "AccentPurple",
+            "ios": "./assets/images/app-icons/icon-purple.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground.png",
+              "backgroundColor": "#6a3cd0"
+            }
+          },
+          {
+            "name": "AccentBlue",
+            "ios": "./assets/images/app-icons/icon-blue.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground.png",
+              "backgroundColor": "#1c5fc4"
+            }
+          },
+          {
+            "name": "AccentTeal",
+            "ios": "./assets/images/app-icons/icon-teal.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground.png",
+              "backgroundColor": "#0a756a"
+            }
+          },
+          {
+            "name": "AccentGreen",
+            "ios": "./assets/images/app-icons/icon-green.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground.png",
+              "backgroundColor": "#2b7a30"
+            }
+          },
+          {
+            "name": "AccentGold",
+            "ios": "./assets/images/app-icons/icon-gold.png",
+            "android": {
+              "foregroundImage": "./assets/images/android-icon-foreground.png",
+              "backgroundColor": "#856400"
+            }
+          }
+        ]
       ]
     ],
     "experiments": {

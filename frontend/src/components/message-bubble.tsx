@@ -12,11 +12,11 @@ import { formatDuration } from "@/lib/attachments";
 import { callEntryText } from "@/lib/calls";
 import { isLegacyMessage } from "@/lib/crypto";
 import type { MessageRow } from "@/lib/chat-rows";
-import type { Attachment, CallEntry } from "@/lib/payload";
+import type { Attachment, CallEntry, LookEntry } from "@/lib/payload";
 import { formatTime, previewText } from "@/lib/format";
 import { messagePreview } from "@/lib/preview";
 import type { Shown } from "@/lib/use-chat-crypto";
-import { radius } from "@/theme/colors";
+import { accentVariant, isAccentChoice, radius, type AccentChoice } from "@/theme/colors";
 
 // Phones and tablets (also their browsers): swipe left to reply, long press
 // for the menu. Mouse users get a reply button on hover instead, and can
@@ -46,6 +46,7 @@ export default function MessageBubble({
   onError,
   onOpenPhoto,
   onCall,
+  onLook,
   selected,
   onToggle,
 }: {
@@ -73,13 +74,17 @@ export default function MessageBubble({
   // A call entry was tapped: call back.
   // Calls back (video: as a video call).
   onCall?: (video: boolean) => void;
+  // A chat look entry was tapped: open the chat's "Wallpaper & color".
+  onLook?: () => void;
   // Choosing messages: whether this one is chosen (undefined: not
   // choosing); a tap chooses it or not.
   selected?: boolean;
   onToggle?: () => void;
 }) {
   const selecting = selected !== undefined;
-  const { colors } = useAppTheme();
+  const { colors, textScale } = useAppTheme();
+  // Settings → Personalization → Text size.
+  const contentSize = { fontSize: 16 * textScale, lineHeight: 22 * textScale };
   const [hovered, setHovered] = useState(false);
   const { message, own, joinedAbove, joinedBelow } = row;
   const swipe = useSwipeToReply(onReply);
@@ -193,6 +198,7 @@ export default function MessageBubble({
                 numberOfLines={2}
                 style={[
                   styles.quoteText,
+                  { fontSize: 13 * textScale, lineHeight: 18 * textScale },
                   { color: own ? colors.onAccent : colors.textSoft },
                   quoteText.status === "error" && styles.unreadable,
                 ]}
@@ -212,20 +218,22 @@ export default function MessageBubble({
           ) : null}
           {text.status === "ok" && text.call ? (
             <CallEntryView entry={text.call} own={own} onCall={selecting ? undefined : onCall} />
+          ) : text.status === "ok" && text.look ? (
+            <LookEntryView entry={text.look} label={text.text} own={own} onPress={selecting ? undefined : onLook} />
           ) : text.status === "ok" && !text.text && text.attachments?.length ? null : text.status === "ok" ? (
             <MarkupText
               text={text.text}
               // Touch screens copy through the long-press menu; selecting
               // text there would take over the long press.
               selectable={!TOUCH_UI}
-              style={[styles.content, { color: textColor }]}
+              style={[styles.content, contentSize, { color: textColor }]}
               codeBackground={own ? "rgba(0, 0, 0, 0.16)" : colors.panelAlt}
               linkColor={own ? colors.onAccent : colors.accent}
             />
           ) : (
             <Text
               selectable={!TOUCH_UI}
-              style={[styles.content, { color: textColor }, text.status === "error" && styles.unreadable]}
+              style={[styles.content, contentSize, { color: textColor }, text.status === "error" && styles.unreadable]}
             >
               {text.text}
             </Text>
@@ -364,6 +372,49 @@ function CallEntryView({ entry, own, onCall }: { entry: CallEntry; own: boolean;
   );
 }
 
+// "🎨 Set a new wallpaper for the chat": a small preview of the colors.
+function LookEntryView({
+  entry,
+  label,
+  own,
+  onPress,
+}: {
+  entry: LookEntry;
+  label: string;
+  own: boolean;
+  onPress?: () => void;
+}) {
+  const { colors, mode } = useAppTheme();
+  const accent = isAccentChoice(entry.accent) ? accentVariant(entry.accent, mode).accent : null;
+  const color = own ? colors.onAccent : colors.text;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={label}
+      style={styles.callEntry}
+    >
+      <View style={[styles.callIcon, { backgroundColor: accent ?? (own ? "rgba(0, 0, 0, 0.14)" : colors.panelAlt) }]}>
+        <Ionicons
+          name={entry.wallpaper?.pattern === "photo" ? "image" : "color-palette"}
+          size={18}
+          color={accent ? accentVariant(entry.accent as AccentChoice, mode).onAccent : color}
+        />
+      </View>
+      <View style={styles.lookText}>
+        <Text style={[styles.callLabel, { color }]}>{label.replace(/^🎨\s*/, "")}</Text>
+        {onPress ? (
+          <Text style={[styles.callDetail, { color: own ? colors.onAccent : colors.muted }]}>
+            Tap to change yours
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 function groupReactions(reactions: Reaction[], ownId: string | undefined) {
   const groups = new Map<string, { emoji: string; count: number; mine: boolean }>();
 
@@ -460,6 +511,10 @@ const styles = StyleSheet.create({
   callLabel: {
     fontSize: 15,
     fontWeight: "600",
+  },
+
+  lookText: {
+    flexShrink: 1,
   },
 
   callDetail: {

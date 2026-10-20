@@ -34,7 +34,9 @@ export type ChatEvent =
   | { type: "reactions"; chatId: string; messageId: string; reactions: Reaction[] }
   | { type: "chat_deleted"; chatId: string }
   | { type: "pinned_message"; chatId: string; message: LastMessage | null }
-  | { type: "chats_changed" };
+  | { type: "chats_changed" }
+  // The synced settings were saved (lib/settings-sync.ts).
+  | { type: "settings_changed"; updatedAt: string };
 
 // Calls (context/calls.tsx); `data` is an encrypted signal (crypto.ts).
 export type CallEvent =
@@ -60,6 +62,7 @@ const CHAT_EVENTS = new Set([
   "chat_deleted",
   "pinned_message",
   "chats_changed",
+  "settings_changed",
 ]);
 
 type Handlers = {

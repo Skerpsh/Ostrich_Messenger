@@ -123,6 +123,26 @@ test("call entries", () => {
   assert.deepEqual(decodePayload(broken), { text: "📞 Missed call" });
 });
 
+test("chat look entries", () => {
+  const v = JSON.parse(
+    readFileSync(new URL("../../../testdata/crypto-vectors.json", import.meta.url), "utf8"),
+  );
+  const payload = decodePayload(v.payload_look);
+
+  assert.deepEqual(payload, {
+    text: "🎨 Set a new wallpaper for the chat",
+    look: { accent: "teal", wallpaper: { pattern: "heads", brightness: 3 } },
+  });
+  assert.equal(encodePayload(payload), v.payload_look);
+
+  // A reset carries no look values.
+  const reset = encodePayload({ text: "🎨 Reset the chat's wallpaper", look: {} });
+  assert.deepEqual(decodePayload(reset).look, {});
+
+  // Malformed values are left out.
+  assert.deepEqual(decodePayload('\u001eostrich1:{"t":"x","w":{"a":5,"i":{"i":"nope"}}}').look, {});
+});
+
 // The same cases as the CLI's (cli/markup_test.go).
 test("mentions", () => {
   const { mentions } = JSON.parse(

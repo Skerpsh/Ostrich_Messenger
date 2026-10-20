@@ -97,6 +97,7 @@ export function Row({
   label,
   value,
   expanded,
+  opens = false,
   danger = false,
   loading = false,
   onPress,
@@ -106,6 +107,8 @@ export function Row({
   value?: string;
   // Rows that open a form show a chevron pointing down / up.
   expanded?: boolean;
+  // Rows that open a screen show a chevron pointing right.
+  opens?: boolean;
   danger?: boolean;
   loading?: boolean;
   onPress: () => void;
@@ -139,8 +142,69 @@ export function Row({
           size={18}
           color={colors.muted}
         />
+      ) : opens ? (
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       ) : null}
     </Pressable>
+  );
+}
+
+// One choice of a few, side by side (theme, text size, ...).
+export function Segmented<T extends string | number>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string; icon?: IconName }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  const { colors } = useAppTheme();
+
+  return (
+    <View style={[styles.segmented, { backgroundColor: colors.panelAlt }]}>
+      {options.map((option) => {
+        const selected = value === option.value;
+
+        return (
+          <Pressable
+            key={String(option.value)}
+            onPress={() => onChange(option.value)}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            style={[
+              styles.segment,
+              selected && {
+                backgroundColor: colors.panel,
+                boxShadow: `0 1px 4px ${colors.shadow}`,
+              },
+            ]}
+          >
+            {option.icon ? (
+              <Ionicons name={option.icon} size={16} color={selected ? colors.accent : colors.muted} />
+            ) : null}
+            <Text
+              numberOfLines={1}
+              style={[styles.segmentText, { color: selected ? colors.text : colors.muted }]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// A labelled block inside a section (accent colors, wallpapers, ...).
+export function Block({ label, children }: { label: string; children: ReactNode }) {
+  const { colors } = useAppTheme();
+
+  return (
+    <View style={styles.accentBlock}>
+      <Text style={[styles.accentLabel, { color: colors.textSoft }]}>{label}</Text>
+      {children}
+    </View>
   );
 }
 

@@ -576,6 +576,18 @@ export function removePushToken(token: string) {
   return request<unknown>("DELETE", "/api/push/token", { token });
 }
 
+// Settings synced between the user's devices, encrypted (lib/settings-sync.ts).
+export type SyncedSettings = { data: string; updated_at: string };
+
+export async function getSettings(token: string) {
+  const { settings } = await request<{ settings: SyncedSettings | null }>("GET", "/api/settings", { token });
+  return settings;
+}
+
+export function saveSettings(token: string, data: string) {
+  return request<{ updated_at: string }>("PUT", "/api/settings", { token, body: { data } });
+}
+
 // Marks the chat read up to and including the message.
 export function markRead(token: string, chatId: string, messageId: string) {
   return request<{ last_read_at: string }>(

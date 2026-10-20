@@ -60,6 +60,13 @@
 - ⌨️ Typing indicators, read receipts, unread counters, jump to the first unread message
 - 📌 Pin, mute, clear and delete chats
 
+**Personalization**
+- 🎨 Light, dark and **pure black** themes, nine accent colors or **your own**, with contrast checked in both themes
+- 🐦 **Chat wallpapers**: ostrich patterns in the accent color or your own photo, three brightness levels
+- 🖼 A **look for each chat**: its own accent and wallpaper, for you or for everyone in it (sent end-to-end encrypted)
+- 🔠 Text size, a compact or minimal chats list, and an **app icon** that follows the accent
+- 🔄 Optional **sync across devices**, encrypted with your account's key
+
 **Everywhere**
 - 🌐 Installable **web app** (PWA) that works offline
 - 📱 **iOS and Android** apps from the same code, with push notifications
@@ -207,10 +214,14 @@ flowchart LR
   code. The device that scans it sends the account's private key encrypted for that key, so the
   server only relays ciphertext. The session goes to the device that holds the link's secret,
   which is not in the code, so seeing the code is not enough to log in.
+- **Settings sync.** If you turn it on, your personalization is stored on the server encrypted
+  with a key derived from your account's private key, so only your devices can read it. A chat's
+  wallpaper set "for everyone" is an ordinary encrypted message.
 
 **What the server can see:** usernames, who talks to whom and when (calls included), message
 sizes, profile photos, and IP addresses. **What it cannot see:** message text, files, what is
-said and shown in calls, group names and photos, your OstrichID or your private key.
+said and shown in calls, group names and photos, synced settings and chat wallpapers, your
+OstrichID or your private key.
 
 > [!NOTE]
 > Ostrich has not had an independent security audit. Read

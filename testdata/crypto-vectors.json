@@ -30,6 +30,7 @@
   "payload_with_attachments": "\u001eostrich1:{\"t\":\"caption\",\"f\":\"carol\",\"a\":[{\"i\":\"6f2b4ad0-8a3e-4c51-9d7b-1e2f3a4b5c6d\",\"k\":\"gyniWIOAD0EF64MYjNzYlamC0bJZ8+RlmfWvYKc0Atc=\",\"n\":\"photo.jpg\",\"m\":\"image/jpeg\",\"s\":110,\"w\":640,\"h\":480}]}",
   "payload_call": "\u001eostrich1:{\"t\":\"📞 Call, 4:12\",\"c\":{\"i\":\"0d9f8e7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f\",\"o\":\"answered\",\"d\":252000}}",
   "payload_video_call": "\u001eostrich1:{\"t\":\"🎥 Missed video call\",\"c\":{\"i\":\"0d9f8e7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f\",\"o\":\"missed\",\"v\":true}}",
+  "payload_look": "\u001eostrich1:{\"t\":\"🎨 Set a new wallpaper for the chat\",\"w\":{\"a\":\"teal\",\"p\":\"heads\",\"b\":3}}",
   "group_id": "9d8e7f60-5a4b-4c3d-9e2f-1a0b9c8d7e6f",
   "group_epoch": 3,
   "group_key": "Y5VunWIN1DUzKlinvkvdJCFmymJgGNXKFveTR4slLBI=",

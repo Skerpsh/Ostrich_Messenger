@@ -35,6 +35,19 @@ export type Payload = {
   // The chat's entry for a call, sent by the caller's app when it ends
   // (lib/calls.ts); `text` says the same for clients that do not know it.
   call?: CallEntry;
+  // A new look of the chat for all its members (wallpaper, accent), sent
+  // from the chat's "Wallpaper & color" screen; `text` says it for clients
+  // that do not know it.
+  look?: LookEntry;
+};
+
+// Empty (no accent, no wallpaper): the chat's look was reset.
+export type LookEntry = {
+  // An accent's id or "#rrggbb".
+  accent?: string;
+  wallpaper?: { pattern: string; brightness: number };
+  // The "photo" wallpaper's picture, encrypted and uploaded like a file.
+  photo?: Attachment;
 };
 
 export type CallOutcome = "answered" | "missed" | "declined";
@@ -73,7 +86,8 @@ type WireAttachment = {
 };
 type WireLink = { u: string; t: string; d?: string; s?: string; i?: WireAttachment };
 type WireCall = { i: string; o: CallOutcome; d?: number; v?: boolean };
-type Wire = { t: string; f?: string; a?: WireAttachment[]; l?: WireLink; c?: WireCall };
+type WireLook = { a?: string; p?: string; b?: number; i?: WireAttachment };
+type Wire = { t: string; f?: string; a?: WireAttachment[]; l?: WireLink; c?: WireCall; w?: WireLook };
 
 const wireAttachment = (a: Attachment): WireAttachment => ({
   i: a.id,
@@ -89,7 +103,7 @@ const wireAttachment = (a: Attachment): WireAttachment => ({
 export function encodePayload(payload: Payload): string {
   const attachments = payload.attachments ?? [];
 
-  if (!payload.forwardedFrom && attachments.length === 0 && !payload.link && !payload.call) {
+  if (!payload.forwardedFrom && attachments.length === 0 && !payload.link && !payload.call && !payload.look) {
     return payload.text;
   }
 
@@ -121,6 +135,15 @@ export function encodePayload(payload: Payload): string {
       o: outcome,
       ...(duration !== undefined ? { d: Math.round(duration) } : {}),
       ...(video ? { v: true } : {}),
+    };
+  }
+
+  if (payload.look) {
+    const { accent, wallpaper, photo } = payload.look;
+    wire.w = {
+      ...(accent ? { a: accent } : {}),
+      ...(wallpaper ? { p: wallpaper.pattern, b: wallpaper.brightness } : {}),
+      ...(photo ? { i: wireAttachment(photo) } : {}),
     };
   }
 
@@ -206,6 +229,28 @@ function readCall(value: unknown): CallEntry | null {
   };
 }
 
+// What the app does not know is left out (lib/personalization.ts checks
+// the values).
+function readLook(value: unknown): LookEntry | null {
+  const w = value as Partial<WireLook> | null;
+
+  if (!w || typeof w !== "object") {
+    return null;
+  }
+
+  const photo = w.i ? readAttachment(w.i) : null;
+
+  return {
+    ...(typeof w.a === "string" && w.a.length <= 16 ? { accent: w.a } : {}),
+    ...(typeof w.p === "string" && w.p.length <= 16
+      ? { wallpaper: { pattern: w.p, brightness: typeof w.b === "number" ? w.b : 2 } }
+      : {}),
+    ...(photo && isPicture(photo.mime) ? { photo } : {}),
+  };
+}
+
+const isPicture = (mime: string) => /^image\/(jpeg|png|webp)$/.test(mime);
+
 // Anything that is not a well-formed payload is shown as text; malformed
 // attachments and link previews are left out.
 export function decodePayload(plain: string): Payload {
@@ -226,6 +271,7 @@ export function decodePayload(plain: string): Payload {
 
     const link = wire.l ? readLink(wire.l, wire.t) : null;
     const call = wire.c ? readCall(wire.c) : null;
+    const look = wire.w ? readLook(wire.w) : null;
 
     return {
       text: wire.t,
@@ -233,6 +279,7 @@ export function decodePayload(plain: string): Payload {
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(link ? { link } : {}),
       ...(call ? { call } : {}),
+      ...(look ? { look } : {}),
     };
   } catch {
     return { text: plain };
