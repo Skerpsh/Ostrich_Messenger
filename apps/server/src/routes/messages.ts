@@ -206,11 +206,12 @@ export default async function messagesRoutes(server: FastifyInstance) {
       const { chatId } = request.params;
       const { limit, before } = request.query;
 
-      // In a group, members see the messages since they joined.
+      // In a group, members see the whole history (its older keys are
+      // passed on to them by the others, routes/groups.ts).
       const member = await db.query(
         `
         SELECT chat_members.cleared_at,
-               CASE WHEN chats.type = 'group' THEN chat_members.joined_at END AS joined_at
+               NULL::timestamptz AS joined_at
         FROM chat_members
         JOIN chats ON chats.id = chat_members.chat_id
         WHERE chat_members.chat_id = $1 AND chat_members.user_id = $2

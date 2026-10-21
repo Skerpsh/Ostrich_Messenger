@@ -359,7 +359,6 @@ export default async function chatsRoutes(server: FastifyInstance) {
               chat_members.cleared_at IS NULL
               OR messages.created_at > chat_members.cleared_at
             )
-            AND (chats.type = 'direct' OR messages.created_at >= chat_members.joined_at)
           ORDER BY created_at DESC, id DESC
           LIMIT 1
         ) last_message ON TRUE

@@ -54,6 +54,8 @@ export function groupKeyOf(chatId: string, epoch: number) {
 
 export function clearGroupKeys() {
   keys.clear();
+  fetchedAt.clear();
+  sharedOnce.clear();
   distrusted.clear();
   loading.clear();
   changed();
@@ -115,9 +117,46 @@ async function unwrapAll(
 }
 
 const loading = new Map<string, Promise<void>>();
+// When each group's keys were last fetched, and its older keys passed on.
+const fetchedAt = new Map<string, number>();
+const sharedOnce = new Set<string>();
+
+// Fetched again after this, for older keys passed on meanwhile.
+const REFETCH_MS = 60_000;
+
+// Members without some of this user's keys (e.g. they joined after the
+// keys were made) get them, wrapped for them, so they can read the
+// group's whole history. Once per group and session.
+async function shareOlderKeys(
+  chatId: string,
+  privateKey: Uint8Array,
+  withToken: <T>(call: (token: string) => Promise<T>) => Promise<T>,
+) {
+  if (sharedOnce.has(chatId)) {
+    return;
+  }
+
+  sharedOnce.add(chatId);
+
+  const members = await withToken((token) => api.getMissingGroupKeys(token, chatId));
+  const wrapped = members.flatMap((member) =>
+    member.epochs.flatMap((epoch) => {
+      const key = groupKeyOf(chatId, epoch);
+
+      return key
+        ? [{ user_id: member.user_id, epoch, wrapped_key: wrapGroupKey(key, epoch, chatId, privateKey, member.user_id, member.public_key) }]
+        : [];
+    }),
+  );
+
+  if (wrapped.length > 0) {
+    await withToken((token) => api.shareGroupKeys(token, chatId, wrapped.slice(0, 500)));
+  }
+}
 
 // Loads the group's keys: those saved on the device first (they are
-// wrapped), then the server's if the current one is missing.
+// wrapped), then the server's if the current one is missing or a while
+// has passed (older ones may have been passed on).
 function loadGroupKeys(
   chatId: string,
   epoch: number,
@@ -138,13 +177,16 @@ function loadGroupKeys(
       await unwrapAll(chatId, cached, ownId, privateKey);
     }
 
-    if (groupKeyOf(chatId, epoch)) {
-      return;
+    if (!groupKeyOf(chatId, epoch) || Date.now() - (fetchedAt.get(chatId) ?? 0) > REFETCH_MS) {
+      const fetched = await withToken((token) => api.getGroupKeys(token, chatId));
+      fetchedAt.set(chatId, Date.now());
+      await cacheSet(wrappedCacheKey(ownId, chatId), fetched);
+      await unwrapAll(chatId, fetched, ownId, privateKey);
     }
 
-    const fetched = await withToken((token) => api.getGroupKeys(token, chatId));
-    await cacheSet(wrappedCacheKey(ownId, chatId), fetched);
-    await unwrapAll(chatId, fetched, ownId, privateKey);
+    if (groupKeyOf(chatId, epoch)) {
+      shareOlderKeys(chatId, privateKey, withToken).catch(() => sharedOnce.delete(chatId));
+    }
   })().finally(() => loading.delete(chatId));
 
   loading.set(chatId, load);
@@ -165,8 +207,10 @@ export function useGroupKeys(chat: Chat | null | undefined) {
   const privateKey = signedIn?.privateKey ?? null;
   const ownId = signedIn?.user.id ?? null;
 
+  // Also when the current key is here: opening the group picks up older
+  // keys passed on meanwhile, and passes on this user's.
   useEffect(() => {
-    if (missing && chatId && privateKey && ownId) {
+    if (chatId && privateKey && ownId) {
       loadGroupKeys(chatId, epoch, ownId, privateKey, withToken).catch(() => {});
     }
   }, [chatId, epoch, missing, privateKey, ownId, withToken]);

@@ -272,7 +272,94 @@ export default async function groupsRoutes(server: FastifyInstance) {
     },
   );
 
-  // KEYS of a group wrapped for this user, every epoch since they joined.
+  // OLDER KEYS for members who do not have them (e.g. joined after they
+  // were made): which of the user's epochs each other member lacks. The
+  // user's app wraps them for those members (POST below), so everyone can
+  // read the group's whole history.
+  server.get<{ Params: { chatId: string } }>(
+    "/api/chats/:chatId/keys/missing",
+    { preHandler: authenticate, schema: { params: chatParams } },
+    async (request, reply) => {
+      const { chatId } = request.params;
+
+      if (!(await groupMembership(chatId, request.user.id))) {
+        return reply.status(404).send({ error: "Group not found" });
+      }
+
+      const result = await db.query(
+        `
+        SELECT member.user_id, users.public_key, array_agg(mine.epoch ORDER BY mine.epoch) AS epochs
+        FROM chat_members member
+        JOIN users ON users.id = member.user_id AND users.public_key IS NOT NULL
+        JOIN group_keys mine ON mine.chat_id = member.chat_id AND mine.user_id = $2
+        WHERE member.chat_id = $1
+          AND member.user_id <> $2
+          AND NOT EXISTS (
+            SELECT 1 FROM group_keys theirs
+            WHERE theirs.chat_id = member.chat_id AND theirs.user_id = member.user_id AND theirs.epoch = mine.epoch
+          )
+        GROUP BY member.user_id, users.public_key
+        `,
+        [chatId, request.user.id],
+      );
+
+      return { members: result.rows };
+    },
+  );
+
+  server.post<{ Params: { chatId: string }; Body: { keys: { user_id: string; epoch: number; wrapped_key: string }[] } }>(
+    "/api/chats/:chatId/keys/share",
+    {
+      preHandler: authenticate,
+      config: groupRateLimit,
+      schema: {
+        params: chatParams,
+        body: {
+          type: "object",
+          required: ["keys"],
+          properties: {
+            keys: {
+              type: "array",
+              maxItems: 500,
+              items: {
+                type: "object",
+                required: ["user_id", "epoch", "wrapped_key"],
+                properties: { user_id: UUID, epoch: { type: "integer", minimum: 1 }, wrapped_key: WRAPPED_KEY },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { chatId } = request.params;
+      const me = request.user.id;
+
+      if (!(await groupMembership(chatId, me))) {
+        return reply.status(404).send({ error: "Group not found" });
+      }
+
+      // Only epochs the user has, to members, and never in place of a key
+      // a member already has.
+      const result = await db.query(
+        `
+        INSERT INTO group_keys (chat_id, user_id, epoch, wrapped_key, wrapper_id, wrapper_public_key)
+        SELECT $1, k.user_id, k.epoch, k.wrapped_key, $2, wrapper.public_key
+        FROM jsonb_to_recordset($3::jsonb) AS k(user_id uuid, epoch int, wrapped_key text)
+        JOIN users wrapper ON wrapper.id = $2
+        WHERE EXISTS (SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = k.user_id)
+          AND EXISTS (SELECT 1 FROM group_keys WHERE chat_id = $1 AND user_id = $2 AND epoch = k.epoch)
+        ON CONFLICT DO NOTHING
+        RETURNING user_id
+        `,
+        [chatId, me, JSON.stringify(request.body.keys)],
+      );
+
+      return { shared: result.rows.length };
+    },
+  );
+
+  // KEYS of a group wrapped for this user, every epoch they were given.
   server.get<{ Params: { chatId: string } }>(
     "/api/chats/:chatId/keys",
     { preHandler: authenticate, schema: { params: chatParams } },
@@ -295,8 +382,8 @@ export default async function groupsRoutes(server: FastifyInstance) {
     },
   );
 
-  // ADD a member (admins), with the current key wrapped for them. New
-  // members see the group's messages from now on.
+  // ADD a member (admins), with the current key wrapped for them. The
+  // older keys, for the history, come from the members' apps (keys/missing).
   server.post<{ Params: { chatId: string }; Body: { user_id: string; wrapped_key: string; epoch: number } }>(
     "/api/chats/:chatId/members",
     {

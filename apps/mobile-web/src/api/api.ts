@@ -822,7 +822,7 @@ export async function getGroupMembers(token: string, chatId: string) {
   return members;
 }
 
-// The group's keys wrapped for this user, every epoch since they joined.
+// The group's keys wrapped for this user: every epoch they were given (older ones are passed on by other members, features/groups/groups.ts).
 export type WrappedGroupKey = {
   epoch: number;
   wrapped_key: string;
@@ -830,6 +830,24 @@ export type WrappedGroupKey = {
   wrapper_id: string | null;
   wrapper_public_key: string;
 };
+
+// Which of this user's epochs other members lack, to wrap for them.
+export async function getMissingGroupKeys(token: string, chatId: string) {
+  const { members } = await request<{ members: { user_id: string; public_key: string; epochs: number[] }[] }>(
+    "GET",
+    `/api/chats/${encodeURIComponent(chatId)}/keys/missing`,
+    { token },
+  );
+
+  return members;
+}
+
+export function shareGroupKeys(token: string, chatId: string, keys: { user_id: string; epoch: number; wrapped_key: string }[]) {
+  return request<{ shared: number }>("POST", `/api/chats/${encodeURIComponent(chatId)}/keys/share`, {
+    token,
+    body: { keys },
+  });
+}
 
 export async function getGroupKeys(token: string, chatId: string) {
   const { keys } = await request<{ keys: WrappedGroupKey[] }>(

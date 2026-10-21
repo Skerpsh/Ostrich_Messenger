@@ -65,7 +65,6 @@ export default async function serverViewRoutes(server: FastifyInstance) {
         FROM messages m
         JOIN users sender ON sender.id = m.sender_id
         WHERE m.id = $1 AND m.chat_id = $2
-          AND ($3::text <> 'group' OR m.created_at >= $4)
           AND ${deliveredTo("m", "$5")}
         `,
         [messageId, chatId, member.type, member.joined_at, request.user.id],

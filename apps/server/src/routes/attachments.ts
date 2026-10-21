@@ -55,7 +55,6 @@ const CAN_READ = `
         WHERE cm.chat_id = m.chat_id
           AND cm.user_id = $2
           AND (cm.cleared_at IS NULL OR m.created_at > cm.cleared_at)
-          AND (c.type <> 'group' OR m.created_at >= cm.joined_at)
       )
       OR EXISTS (
         SELECT 1 FROM chat_members cm

@@ -170,6 +170,40 @@ func (m *model) addGroupKey(chatID string, epoch int, key []byte) {
 	}
 
 	m.groupKeys[chatID][epoch] = key
+
+	// Messages that could not be read may be readable now.
+	if m.chat != nil && m.chat.id == chatID {
+		m.chat.cache = map[string][]string{}
+	}
+}
+
+// refreshGroupKeys fetches an open group's keys again: older ones may
+// have been passed on by other members (the apps do), for its history.
+func (m *model) refreshGroupKeys(chatID string) tea.Cmd {
+	if m.user == nil || m.groupKeysLoading[chatID] {
+		return nil
+	}
+
+	token := m.user.Token
+	m.groupKeysLoading[chatID] = true
+
+	return task(func() func(*model) tea.Cmd {
+		keys, err := getGroupKeys(token, chatID)
+
+		return func(m *model) tea.Cmd {
+			if m.user == nil || m.user.Token != token {
+				return nil
+			}
+
+			delete(m.groupKeysLoading, chatID)
+
+			if err == nil {
+				m.unwrapGroupKeys(chatID, keys)
+			}
+
+			return nil
+		}
+	})
 }
 
 // unwrapGroupKeys keeps the keys wrapped for this user. A key counts only

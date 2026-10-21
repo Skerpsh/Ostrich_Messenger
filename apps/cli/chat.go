@@ -289,7 +289,13 @@ func (m *model) openChat(chat Chat) tea.Cmd {
 	m.focus = paneChat
 	m.list.selectChat(*m, chat.ID)
 
-	return tea.Batch(m.chat.composer.Focus(), m.loadHistory(chat.ID, ""), m.loadMembers())
+	var keys tea.Cmd
+
+	if chat.Type == "group" {
+		keys = m.refreshGroupKeys(chat.ID)
+	}
+
+	return tea.Batch(m.chat.composer.Focus(), m.loadHistory(chat.ID, ""), m.loadMembers(), keys)
 }
 
 // saveDraft keeps the open chat's unsent text for when it is opened
