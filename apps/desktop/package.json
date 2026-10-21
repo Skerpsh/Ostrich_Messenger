@@ -1,0 +1,92 @@
+{
+  "name": "ostrich-desktop",
+  "productName": "Ostrich",
+  "version": "0.0.0",
+  "description": "Ostrich for Windows and Linux: the end-to-end encrypted messenger in its own window",
+  "homepage": "https://ostrich-messenger.online",
+  "author": "Ostrich <hello@ostrich-messenger.com>",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "main.js",
+  "desktopName": "ostrich-desktop.desktop",
+  "scripts": {
+    "web": "node scripts/build-web.mjs",
+    "start": "electron .",
+    "dist": "electron-builder --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10"
+  },
+  "devDependencies": {
+    "electron": "44.6.0",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "com.ostrich.messenger",
+    "productName": "Ostrich",
+    "files": [
+      "main.js",
+      "web/**"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "protocols": [
+      {
+        "name": "Ostrich",
+        "schemes": [
+          "ostrich"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Skerpsh",
+        "repo": "Ostrich_Messenger"
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "category": "Network;InstantMessaging",
+      "synopsis": "End-to-end encrypted messenger",
+      "artifactName": "Ostrich-Linux.${ext}",
+      "executableName": "ostrich-desktop",
+      "maintainer": "Ostrich <hello@ostrich-messenger.com>",
+      "syncDesktopName": true
+    },
+    "flatpak": {
+      "artifactName": "Ostrich-Linux.${ext}",
+      "runtimeVersion": "24.08",
+      "baseVersion": "24.08",
+      "finishArgs": [
+        "--share=ipc",
+        "--share=network",
+        "--socket=x11",
+        "--socket=wayland",
+        "--socket=pulseaudio",
+        "--device=dri",
+        "--device=all",
+        "--talk-name=org.freedesktop.Notifications",
+        "--talk-name=org.kde.StatusNotifierWatcher"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Ostrich-Windows-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Ostrich"
+    }
+  }
+}

@@ -80,8 +80,8 @@
 | System | Get Ostrich |
 |---|---|
 | 🤖 **Android** | [**Download the APK**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Android.apk) — open it on the phone and allow installing when asked |
-| 🪟 **Windows** | The app: coming soon · Terminal: [ostrich-windows-amd64.exe](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-windows-amd64.exe) |
-| 🐧 **Linux** | The app: coming soon · Terminal: [x86-64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-amd64), [ARM64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-arm64) or the [one-line install](#terminal-client-cli) |
+| 🪟 **Windows** | [**Download the installer**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Windows-Setup.exe) · Terminal: [ostrich-windows-amd64.exe](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-windows-amd64.exe) |
+| 🐧 **Linux** | [**AppImage**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.AppImage) (any distribution, updates itself) · [.deb](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.deb) (Ubuntu, Debian) · [.rpm](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.rpm) (Fedora, openSUSE) · [Flatpak](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.flatpak) · Terminal: [x86-64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-amd64), [ARM64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-arm64) or the [one-line install](#terminal-client-cli) |
 | 🍎 **macOS** | Terminal: [Apple silicon](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-arm64), [Intel](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-amd64) |
 | 📱 **iOS** | Coming to the App Store |
 | 🌐 **Web** | [ostrich-messenger.online](https://ostrich-messenger.online): nothing to install, and installable as an app from the browser |
@@ -569,8 +569,9 @@ git tag v1.3.0 && git push origin v1.3.0   # the next version after the latest r
 ```
 
 The [Release](.github/workflows/release.yml) workflow publishes every app under that version:
-the CLI for Linux, macOS and Windows on x86-64 and ARM64 (tested first), and the Android app,
-an APK built with EAS (the app's version is the tag's; the build number counts up by itself).
+the CLI for Linux, macOS and Windows on x86-64 and ARM64 (tested first), the Android app,
+an APK built with EAS (the app's version is the tag's; the build number counts up by itself),
+and the desktop app for Linux (AppImage, .deb, .rpm, Flatpak) and Windows (an installer).
 The release gets the files, `install.sh` and `SHA256SUMS`, a table of what to download for
 which system, and notes generated from the commits. The [Download](#download) links always
 point at the latest release.
@@ -597,7 +598,7 @@ what they share (the protocol, the encryption) is checked against the same test 
 │   │       ├── ui/         buttons, headers, animations, theme
 │   │       └── platform/   what differs between the phones and the web
 │   │                       (*.web.ts / *.native.ts next to each other)
-│   ├── desktop/            Windows and Linux app (planned: Electron)
+│   ├── desktop/            Windows and Linux app (Electron around the web build)
 │   ├── server/             Fastify API, WebSockets, PostgreSQL
 │   │   ├── migrations/     numbered SQL migrations
 │   │   ├── src/routes/     HTTP and WebSocket endpoints

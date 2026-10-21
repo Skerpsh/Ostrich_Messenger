@@ -5,7 +5,7 @@
 | Android | Expo app | [`apps/mobile-web`](../apps/mobile-web) | an APK in each release (`.github/workflows/release.yml`, EAS profile `github`); by hand: `npx eas-cli build --platform android --profile preview` |
 | iOS | Expo app | [`apps/mobile-web`](../apps/mobile-web) | EAS: `npx eas-cli build --platform ios --profile production` |
 | Web (PWA) | Expo app | [`apps/mobile-web`](../apps/mobile-web) | `npm run build:web`, published by [`deploy/deploy.sh`](../deploy/deploy.sh) |
-| Windows, Linux | desktop app (planned) | [`apps/desktop`](../apps/desktop) | Electron around the web build |
+| Windows, Linux | desktop app | [`apps/desktop`](../apps/desktop) | Electron around the web build: `npm run web && npm run dist`; in each release (AppImage, .deb, .rpm, Flatpak, a Windows installer) |
 | Linux, macOS, Windows terminal | CLI | [`apps/cli`](../apps/cli) | `go build`; releases on version tags (`.github/workflows/release.yml`) |
 | Server | API and WebSockets | [`apps/server`](../apps/server) | `npm run build`, run by systemd, see [`deploy/`](../deploy) |
 

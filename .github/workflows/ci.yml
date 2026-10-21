@@ -1,4 +1,4 @@
-# Type checks, lint and tests of the server, the app and the CLI (apps/).
+# Type checks, lint and tests of the server, the apps and the CLI (apps/).
 name: CI
 
 on:
@@ -40,6 +40,21 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+
+  desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - run: npm ci
+      - run: node --check main.js && node --check scripts/build-web.mjs
 
   cli:
     runs-on: ubuntu-latest

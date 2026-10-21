@@ -41,8 +41,13 @@ function parseTrustProxy(value: string): boolean | string {
 
 // Origins allowed to call the API from a browser (Ostrich Web), comma
 // separated. Any origin by default: auth uses bearer tokens, not cookies,
-// so other sites cannot act on behalf of a user.
-const CORS_ORIGINS = process.env.CORS_ORIGINS?.split(",").map((o) => o.trim());
+// so other sites cannot act on behalf of a user. The desktop app
+// (apps/desktop) is always allowed: its pages come from app://ostrich,
+// which no website can be.
+const DESKTOP_ORIGIN = "app://ostrich";
+const CORS_ORIGINS = process.env.CORS_ORIGINS?.split(",")
+  .map((o) => o.trim())
+  .concat(DESKTOP_ORIGIN);
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 

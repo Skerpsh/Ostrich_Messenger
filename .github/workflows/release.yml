@@ -1,7 +1,10 @@
 # Publishes a release of every app when a version tag is pushed
 # (git tag v1.3.0 && git push origin v1.3.0): the CLI for Linux, macOS and
-# Windows, and the Android app (an APK built with EAS), all under the same
-# version, with SHA-256 checksums and a table of what to download.
+# Windows, the Android app (an APK built with EAS) and the desktop app for
+# Linux (AppImage, .deb, .rpm, Flatpak) and Windows (an installer), all
+# under the same version, with SHA-256 checksums and a table of what to
+# download. The desktop app updates itself from these releases
+# (latest*.yml).
 #
 # The Android build needs EXPO_TOKEN in the repository's secrets (Settings →
 # Secrets and variables → Actions); without it the release has the CLI only.
@@ -92,9 +95,85 @@ jobs:
           name: android
           path: apps/mobile-web/dist/Ostrich-Android.apk
 
+  # The desktop app: the web app built into it (apps/desktop/scripts/
+  # build-web.mjs), packed by electron-builder. Its version is the tag's.
+  desktop-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build
+        run: |
+          sudo apt-get update && sudo apt-get install -y rpm
+          (cd apps/mobile-web && npm ci)
+          cd apps/desktop
+          npm ci
+          npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+          npm run web
+          npx electron-builder --linux AppImage deb rpm --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: |
+            apps/desktop/dist/Ostrich-Linux.*
+            apps/desktop/dist/latest-linux.yml
+
+  # Flatpak needs the Flathub runtimes, a large download: when it fails,
+  # the release goes out without it.
+  desktop-flatpak:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build
+        run: |
+          sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          (cd apps/mobile-web && npm ci)
+          cd apps/desktop
+          npm ci
+          npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+          npm run web
+          npx electron-builder --linux flatpak --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-flatpak
+          path: apps/desktop/dist/Ostrich-Linux.flatpak
+
+  desktop-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build
+        run: |
+          (cd apps/mobile-web && npm ci)
+          cd apps/desktop
+          npm ci
+          npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+          npm run web
+          npx electron-builder --win nsis --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: |
+            apps/desktop/dist/Ostrich-Windows-Setup.exe
+            apps/desktop/dist/Ostrich-Windows-Setup.exe.blockmap
+            apps/desktop/dist/latest.yml
+
   publish:
-    needs: [cli, android]
-    # The CLI is enough to publish; the Android app joins when it was built.
+    needs: [cli, android, desktop-linux, desktop-flatpak, desktop-windows]
+    # The CLI is enough to publish; the apps join when they were built.
     if: ${{ !cancelled() && needs.cli.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -106,21 +185,28 @@ jobs:
       - name: Notes
         run: |
           base="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
-          android="[Ostrich-Android.apk]($base/Ostrich-Android.apk)"
-          [ -f release/Ostrich-Android.apk ] || android="not in this release"
+          # A link to a file of this release, if it was built.
+          file() { [ -f "release/$1" ] && printf '[%s](%s/%s)' "$2" "$base" "$1"; }
+          soon() { [ -n "$1" ] && printf '%s' "$1" || printf 'coming soon'; }
+          android=$(soon "$(file Ostrich-Android.apk Ostrich-Android.apk)")
+          windows=$(soon "$(file Ostrich-Windows-Setup.exe Ostrich-Windows-Setup.exe)")
+          linux=$(soon "$(for f in AppImage deb rpm flatpak; do file "Ostrich-Linux.$f" ".$f"; printf ' '; done | sed 's/  */ /g; s/ $//; s/) \[/), [/g')")
           cat > notes.md <<EOF
           ## Download
 
-          | System | File |
-          |---|---|
-          | **Android** | $android |
-          | **Windows** | the app: coming soon · terminal: [ostrich-windows-amd64.exe]($base/ostrich-windows-amd64.exe) |
-          | **Linux** | the app: coming soon · terminal: [x86-64]($base/ostrich-linux-amd64), [ARM64]($base/ostrich-linux-arm64) or \`curl -fsSL $base/install.sh \| sh\` |
-          | **macOS** | terminal: [Apple silicon]($base/ostrich-darwin-arm64), [Intel]($base/ostrich-darwin-amd64) |
-          | **iOS** | coming to the App Store |
-          | **Web** | [ostrich-messenger.online](https://ostrich-messenger.online), nothing to install |
+          | System | The app | Terminal (CLI) |
+          |---|---|---|
+          | **Android** | $android | |
+          | **Windows** | $windows | [ostrich-windows-amd64.exe]($base/ostrich-windows-amd64.exe) |
+          | **Linux** | $linux | [x86-64]($base/ostrich-linux-amd64), [ARM64]($base/ostrich-linux-arm64) or \`curl -fsSL $base/install.sh \| sh\` |
+          | **macOS** | | [Apple silicon]($base/ostrich-darwin-arm64), [Intel]($base/ostrich-darwin-amd64) |
+          | **iOS** | coming to the App Store | |
+          | **Web** | [ostrich-messenger.online](https://ostrich-messenger.online), nothing to install | |
 
-          On Android, open the APK on the phone and allow installing from that app when asked.
+          - **Android:** open the APK on the phone and allow installing from that app when asked.
+          - **Windows:** run the installer; Windows may warn about an unknown publisher: More info → Run anyway.
+          - **Linux:** the AppImage runs anywhere (\`chmod +x Ostrich-Linux.AppImage\`, then open it) and updates itself; the \`.deb\` is for Ubuntu and Debian, the \`.rpm\` for Fedora and openSUSE.
+
           Check a download with \`sha256sum -c SHA256SUMS\`.
 
           EOF

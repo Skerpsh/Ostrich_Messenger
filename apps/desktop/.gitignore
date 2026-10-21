@@ -1,0 +1,4 @@
+# The web build it carries (npm run web) and the packages (npm run dist).
+web/
+dist/
+node_modules/
