@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -128,5 +129,52 @@ func TestQr(t *testing.T) {
 
 	if next.(model).qr != nil {
 		t.Error("Esc did not close the QR code")
+	}
+}
+
+func TestServerView(t *testing.T) {
+	var view messageServerView
+	view.Message.ID = "33333333-3333-4333-8333-333333333333"
+	view.Message.SenderUsername = "ann"
+	view.Message.Kind = "text"
+	view.Message.Content = "e2:" + strings.Repeat("A", 400)
+	view.Message.ContentLength = len(view.Message.Content)
+	view.Message.CreatedAt = "2026-10-21T10:00:00Z"
+	view.Reactions = append(view.Reactions, struct {
+		Emoji  string `json:"emoji"`
+		UserID string `json:"user_id"`
+	}{"👍", "22222222-2222-4222-8222-222222222222"})
+
+	state := messageServerViewState(view, shownMessage{text: "hi", status: decryptOK})
+
+	if !state.readable || len(state.hidden) != 1 || state.hidden[0] != "The text" {
+		t.Fatalf("readable %v, hidden %v", state.readable, state.hidden)
+	}
+
+	for _, size := range [][2]int{{100, 40}, {60, 16}} {
+		m := testModel(t, size[0], size[1], "dark")
+		m.serverView = state
+		checkView(t, fmt.Sprintf("server view %dx%d", size[0], size[1]), m.View(), size[0], size[1])
+
+		if !strings.Contains(ansi.Strip(m.View()), "What the server sees") {
+			t.Error("no title")
+		}
+
+		// Scrolling stops at the last line.
+		for range 100 {
+			m.scrollServerView(1)
+		}
+
+		_, inner := m.serverViewWidth()
+
+		if want := max(len(m.serverViewLines(inner))-m.serverViewRoom(), 0); m.serverView.scroll != want {
+			t.Errorf("scrolled to %d, want %d", m.serverView.scroll, want)
+		}
+
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+
+		if next.(model).serverView != nil {
+			t.Error("Esc did not close it")
+		}
 	}
 }

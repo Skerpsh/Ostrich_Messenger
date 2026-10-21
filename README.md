@@ -49,6 +49,7 @@
 - 🛡 **Safety codes**: compare 40 digits with a contact to make sure nobody swapped your keys
 - ⚠️ **Key change warnings**: sending is paused until you confirm a contact's new key
 - 👁 Optional online status and read receipts, blocking, per-device sessions with remote log out
+- 🗄 **What the server sees**: any message or chat exactly as the server stores it, fetched from it, next to what stays encrypted
 - 📲 **Log in with a QR code**: a logged-in device scans it and sends the account's key encrypted for the new device only
 
 **Messaging**
@@ -161,7 +162,7 @@ in a narrow terminal. The keyboard and the mouse both work.
 | Login screen | `Tab` log in / create account · `Ctrl+L` log in with a QR code · `Ctrl+R` remember me |
 | Chats list | `↑↓` move · `Enter` open · `/` search · `n` new chat · `m` chat menu · `s` settings · `t` theme · `q` quit |
 | Chat | `Enter` send · `Alt+Enter` new line · `Ctrl+A` attach a file · `↑` choose a message · `Ctrl+F` search · `Ctrl+K` safety code · `Esc` back |
-| Chosen message | `r` reply · `e` edit · `d` delete · `c` copy · `1`–`8` react · `Enter` more |
+| Chosen message | `r` reply · `e` edit · `d` delete · `c` copy · `s` what the server sees · `1`–`8` react · `Enter` more |
 
 Voice messages are shown with their waveform and length; play them in the web or mobile app.
 Calls are answered in the web or mobile app; the CLI says who is calling and shows the chat's

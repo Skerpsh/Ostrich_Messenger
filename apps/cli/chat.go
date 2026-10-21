@@ -531,7 +531,7 @@ func (m *model) updateSelectingKey(msg tea.KeyMsg, chat Chat) tea.Cmd {
 	// A group event can only be passed by.
 	if message.Kind == "system" {
 		switch msg.String() {
-		case "up", "k", "down", "j", "esc", "i":
+		case "up", "k", "down", "j", "esc", "i", "s":
 		default:
 			return nil
 		}
@@ -581,6 +581,8 @@ func (m *model) updateSelectingKey(msg tea.KeyMsg, chat Chat) tea.Cmd {
 		}
 	case "c":
 		return m.copyMessage(chat, message)
+	case "s":
+		return m.openMessageServerView(chat, message)
 	case "esc", "i":
 		return m.stopSelecting()
 	case "pgup":

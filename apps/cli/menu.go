@@ -137,6 +137,10 @@ func (m *model) messageMenu(chat Chat, message Message) *menuState {
 		}})
 	}
 
+	items = append(items, menuItem{icon: "🗄", label: "What the server sees (s)", action: func(m *model) tea.Cmd {
+		return m.openMessageServerView(chat, message)
+	}})
+
 	if own && shown.status == decryptOK && shown.forwardedFrom == "" {
 		items = append(items, menuItem{icon: "✎", label: "Edit", action: func(m *model) tea.Cmd { return m.startEdit(chat, message) }})
 	}
@@ -283,6 +287,9 @@ func (m *model) chatMenu(chat Chat, inChat bool) *menuState {
 	if inChat {
 		items = append(items, menuItem{icon: "🔍", label: "Search in chat", action: func(m *model) tea.Cmd {
 			return m.openChatSearch()
+		}})
+		items = append(items, menuItem{icon: "🗄", label: "What the server sees", action: func(m *model) tea.Cmd {
+			return m.openChatServerView(chat)
 		}})
 
 		if chat.PinnedMessage != nil {

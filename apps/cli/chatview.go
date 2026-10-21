@@ -716,7 +716,7 @@ func (m model) composerView(chat Chat, w int) []string {
 	case len(c.picked) > 0:
 		hints = "Enter Send with the files  Ctrl+A Another  Ctrl+X Remove the last  Esc Back"
 	case c.selecting:
-		hints = "↑↓ Choose  Enter Menu  r Reply  e Edit  d Delete  c Copy  1–8 React  Esc Back"
+		hints = "↑↓ Choose  Enter Menu  r Reply  e Edit  d Delete  c Copy  s Server  1–8 React  Esc Back"
 	case c.searching:
 		hints = "Enter/↑ Older match  ↓ Newer match  Ctrl+L Load older  Esc Close search"
 	}

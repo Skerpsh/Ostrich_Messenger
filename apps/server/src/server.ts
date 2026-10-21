@@ -11,6 +11,7 @@ import deviceLinksRoutes from "./routes/device-links.js";
 import usersRoutes from "./routes/users.js";
 import chatsRoutes from "./routes/chats.js";
 import messagesRoutes from "./routes/messages.js";
+import serverViewRoutes from "./routes/server-view.js";
 import avatarsRoutes from "./routes/avatars.js";
 import pushRoutes from "./routes/push.js";
 import attachmentsRoutes from "./routes/attachments.js";
@@ -196,6 +197,7 @@ const start = async () => {
     await server.register(usersRoutes);
     await server.register(chatsRoutes);
     await server.register(messagesRoutes);
+    await server.register(serverViewRoutes);
     await server.register(avatarsRoutes);
     await server.register(pushRoutes);
     await server.register(attachmentsRoutes);

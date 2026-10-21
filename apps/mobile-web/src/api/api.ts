@@ -469,6 +469,64 @@ export function deleteMessage(token: string, chatId: string, messageId: string) 
   return request<unknown>("DELETE", messagePath(chatId, messageId), { token });
 }
 
+// "What the server sees": the database's rows as they are stored.
+export type MessageServerView = {
+  message: {
+    id: string;
+    chat_id: string;
+    sender_id: string;
+    sender_username: string;
+    kind: "text" | "system";
+    content: string;
+    content_length: number;
+    reply_to_id: string | null;
+    created_at: string;
+    edited_at: string | null;
+  };
+  attachments: { id: string; size: number; created_at: string }[];
+  reactions: { emoji: string; user_id: string; created_at: string }[];
+  mentions: string[];
+};
+
+export function getMessageServerView(token: string, chatId: string, messageId: string) {
+  return request<MessageServerView>("GET", `${messagePath(chatId, messageId)}/server-view`, { token });
+}
+
+export type ChatServerView = {
+  chat: {
+    id: string;
+    type: "direct" | "group" | "saved";
+    created_at: string;
+    updated_at: string;
+    encrypted_info: string | null;
+    key_epoch: number;
+    pinned_message_id: string | null;
+  };
+  members: { user_id: string; username: string; role: string; joined_at: string }[];
+  // The user's own row: read position and settings in the chat.
+  me: {
+    joined_at: string;
+    last_read_at: string;
+    pinned_at: string | null;
+    muted: boolean;
+    hidden: boolean;
+    cleared_at: string | null;
+    role: string;
+  };
+  stats: {
+    messages: number;
+    files: number;
+    file_bytes: number;
+    group_keys: number;
+    invite_link: boolean;
+    join_requests: number;
+  };
+};
+
+export function getChatServerView(token: string, chatId: string) {
+  return request<ChatServerView>("GET", `/api/chats/${encodeURIComponent(chatId)}/server-view`, { token });
+}
+
 // null removes the user's reaction.
 export async function setReaction(
   token: string,

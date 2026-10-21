@@ -130,6 +130,8 @@ type model struct {
 	safetyOpen bool
 	safetyPeer *foundUser
 	prompt     *promptState
+	// "What the server sees" of a message or a chat (serverview.go).
+	serverView *serverViewState
 	// A QR code shown (invite and profile links).
 	qr *qrState
 
@@ -394,6 +396,10 @@ func (m *model) updateKey(msg tea.KeyMsg) tea.Cmd {
 		return m.updateSafetyKey(msg)
 	}
 
+	if m.serverView != nil {
+		return m.updateServerViewKey(msg)
+	}
+
 	switch m.focus {
 	case paneChat:
 		if m.chat != nil {
@@ -434,6 +440,10 @@ func (m *model) updateMouse(msg tea.MouseMsg) tea.Cmd {
 
 	if m.safetyOpen {
 		return m.updateSafetyMouse(msg)
+	}
+
+	if m.serverView != nil {
+		return m.updateServerViewMouse(msg)
 	}
 
 	if cmd, ok := m.updateListMouse(msg); ok {
@@ -597,6 +607,7 @@ func (m *model) signOut(notice string) tea.Cmd {
 	m.qr = nil
 	m.safetyOpen = false
 	m.safetyPeer = nil
+	m.serverView = nil
 	m.knownKeys = nil
 	m.keyChanged = nil
 	m.presence = map[string]presence{}
@@ -729,6 +740,8 @@ func (m model) mainView() string {
 		view = overlay(view, m.menuView(), m.width, m.height)
 	case m.safetyOpen && (m.chat != nil || m.safetyPeer != nil):
 		view = overlay(view, m.safetyView(), m.width, m.height)
+	case m.serverView != nil:
+		view = overlay(view, m.serverViewView(), m.width, m.height)
 	}
 
 	return view

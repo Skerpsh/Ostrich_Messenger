@@ -34,6 +34,7 @@ import MessageBubble from "@/features/chat/message-bubble";
 import PhotoViewer from "@/features/chat/photo-viewer";
 import Reveal, { Collapse, Swap } from "@/ui/reveal";
 import SafetyCode from "@/features/chat/safety-code";
+import ServerView, { type ServerViewTarget } from "@/features/chat/server-view";
 import TypingDots from "@/ui/typing-dots";
 import ScreenEnter, { useLeaveScreen } from "@/ui/screen-enter";
 import { RecordButton, RecordingBar, useVoiceRecorder } from "@/features/chat/voice-recorder";
@@ -214,6 +215,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   // The chat's menu (search, safety code, pin, mute, block, delete).
   const [chatMenu, setChatMenu] = useState(false);
   const [showSafetyCode, setShowSafetyCode] = useState(false);
+  const [serverView, setServerView] = useState<ServerViewTarget | null>(null);
   // Groups: the members (for names, presence and the group's screen).
   const [members, setMembers] = useState<GroupMember[] | null>(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
@@ -1359,6 +1361,14 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
             onPress: () => togglePin(pinned ? null : message),
           }]
         : []),
+      {
+        icon: "server-outline",
+        label: "What the server sees",
+        onPress: () => {
+          setMenuFor(null);
+          setServerView({ kind: "message", chatId, messageId: message.id, shown });
+        },
+      },
       ...(own && !shown.forwardedFrom && shown.status === "ok" && !shown.attachments?.some(isVoice)
         ? [{ icon: "create-outline" as const, label: "Edit", onPress: () => startEdit(message) }]
         : []),
@@ -1372,6 +1382,11 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           }]
         : []),
     ];
+  };
+
+  const openChatServerView = () => {
+    setChatMenu(false);
+    setServerView({ kind: "chat", chatId });
   };
 
   const copyText = async (message: Message) => {
@@ -2321,6 +2336,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
             },
             { icon: "search", label: "Search in chat", onPress: openSearch },
             { icon: "color-palette-outline", label: "Wallpaper & color", onPress: () => setShowLook(true) },
+            { icon: "server-outline", label: "What the server sees", onPress: openChatServerView },
             ...(chat.pinned_message && groupAdmin
               ? [{ icon: "pin-outline" as const, label: "Unpin message", onPress: () => togglePin(null) }]
               : []),
@@ -2389,6 +2405,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           items={[
             { icon: "search", label: "Search in chat", onPress: openSearch },
             { icon: "color-palette-outline", label: "Wallpaper & color", onPress: () => setShowLook(true) },
+            { icon: "server-outline", label: "What the server sees", onPress: openChatServerView },
             ...(chat.pinned_message
               ? [{ icon: "pin-outline" as const, label: "Unpin message", onPress: () => togglePin(null) }]
               : []),
@@ -2415,6 +2432,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           items={[
             { icon: "search", label: "Search in chat", onPress: openSearch },
             { icon: "color-palette-outline", label: "Wallpaper & color", onPress: () => setShowLook(true) },
+            { icon: "server-outline", label: "What the server sees", onPress: openChatServerView },
             ...(chat.pinned_message
               ? [{ icon: "pin-outline" as const, label: "Unpin message", onPress: () => togglePin(null) }]
               : []),
@@ -2473,6 +2491,8 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           onClose={() => setShowLook(false)}
         />
       ) : null}
+
+      {serverView ? <ServerView target={serverView} onClose={() => setServerView(null)} /> : null}
 
       {showSafetyCode && chat && crypto.safetyCode ? (
         <SafetyCode

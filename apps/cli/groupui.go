@@ -286,6 +286,9 @@ func (m *model) savedMenu(chat Chat, inChat bool) *menuState {
 		items = append(items, menuItem{icon: "🔍", label: "Search in chat", action: func(m *model) tea.Cmd {
 			return m.openChatSearch()
 		}})
+		items = append(items, menuItem{icon: "🗄", label: "What the server sees", action: func(m *model) tea.Cmd {
+			return m.openChatServerView(chat)
+		}})
 	}
 
 	pinLabel := "Pin to top"
@@ -314,6 +317,9 @@ func (m *model) groupMenu(chat Chat, inChat bool) *menuState {
 	if inChat {
 		items = append(items, menuItem{icon: "🔍", label: "Search in chat", action: func(m *model) tea.Cmd {
 			return m.openChatSearch()
+		}})
+		items = append(items, menuItem{icon: "🗄", label: "What the server sees", action: func(m *model) tea.Cmd {
+			return m.openChatServerView(chat)
 		}})
 
 		if chat.PinnedMessage != nil && chat.isAdmin() {
