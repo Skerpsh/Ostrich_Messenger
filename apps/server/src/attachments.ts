@@ -60,6 +60,8 @@ export async function cleanupAttachments() {
     WHERE message_id IS NULL
       AND chat_id IS NULL
       AND created_at < NOW() - INTERVAL '${UNLINKED_TTL}'
+      -- Waiting in a message of "If I disappear".
+      AND NOT EXISTS (SELECT 1 FROM disappear_messages d WHERE attachments.id = ANY(d.attachments))
     RETURNING id
     `,
   );

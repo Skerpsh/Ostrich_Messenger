@@ -97,3 +97,35 @@ export function notifyNewMessage(chatId: string, senderId: string, mentions: str
     }
   })().catch((error) => log.error(error, "failed to send push notifications"));
 }
+
+// A notice for all of a user's phones, e.g. "If I disappear" is about to
+// go off (disappear.ts); also to the ones with the app open (the app
+// shows it in a banner too).
+export function notifyUser(userId: string, body: string, data: Record<string, string> = {}) {
+  (async () => {
+    const result = await db.query(
+      `
+      SELECT push_tokens.token
+      FROM sessions
+      JOIN push_tokens ON push_tokens.session_id = sessions.id
+      WHERE sessions.user_id = $1
+        AND sessions.expires_at > NOW()
+      `,
+      [userId],
+    );
+
+    const messages = result.rows.map((row) => ({
+      to: row.token,
+      title: "Ostrich",
+      body,
+      sound: "default",
+      priority: "high",
+      channelId: "messages",
+      data,
+    }));
+
+    if (messages.length > 0) {
+      await send(messages);
+    }
+  })().catch((error) => log.error(error, "failed to send push notifications"));
+}

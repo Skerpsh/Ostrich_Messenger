@@ -13,6 +13,8 @@ import chatsRoutes from "./routes/chats.js";
 import messagesRoutes from "./routes/messages.js";
 import serverViewRoutes from "./routes/server-view.js";
 import drandRoutes from "./routes/drand.js";
+import disappearRoutes from "./routes/disappear.js";
+import { checkSwitches, CHECK_INTERVAL_MS } from "./disappear.js";
 import { deliverDue, DELIVERY_INTERVAL_MS } from "./deliveries.js";
 import avatarsRoutes from "./routes/avatars.js";
 import pushRoutes from "./routes/push.js";
@@ -176,6 +178,25 @@ async function deliverSurprises() {
   }
 }
 
+// "If I disappear": warnings and switches that go off (disappear.ts).
+let checkingDisappear = false;
+
+async function checkDisappear() {
+  if (checkingDisappear) {
+    return;
+  }
+
+  checkingDisappear = true;
+
+  try {
+    await checkSwitches();
+  } catch (error) {
+    server.log.error(error, "failed to check \"If I disappear\"");
+  } finally {
+    checkingDisappear = false;
+  }
+}
+
 const start = async () => {
   try {
     if (!CORS_ORIGINS && process.env.NODE_ENV === "production") {
@@ -220,6 +241,7 @@ const start = async () => {
     await server.register(messagesRoutes);
     await server.register(serverViewRoutes);
     await server.register(drandRoutes);
+    await server.register(disappearRoutes);
     await server.register(avatarsRoutes);
     await server.register(pushRoutes);
     await server.register(attachmentsRoutes);
@@ -238,6 +260,7 @@ const start = async () => {
     deleteExpired();
     setInterval(deleteExpired, CLEANUP_INTERVAL_MS).unref();
     setInterval(deliverSurprises, DELIVERY_INTERVAL_MS).unref();
+    setInterval(checkDisappear, CHECK_INTERVAL_MS).unref();
   } catch (error) {
     server.log.error(error);
     process.exit(1);

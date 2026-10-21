@@ -44,6 +44,9 @@ export type Payload = {
   // A sealed letter (sealed.ts): the real payload, time-locked; `text`
   // says so for clients that do not know it.
   sealed?: SealedLetter;
+  // "If I disappear": the sender's OstrichID, left to the chat
+  // (features/disappear).
+  heir?: string;
 };
 
 // Empty (no accent, no wallpaper): the chat's look was reset.
@@ -93,7 +96,16 @@ type WireLink = { u: string; t: string; d?: string; s?: string; i?: WireAttachme
 type WireCall = { i: string; o: CallOutcome; d?: number; v?: boolean };
 type WireLook = { a?: string; p?: string; b?: number; i?: WireAttachment };
 type WireSealed = { r: number; b: string; s?: boolean };
-type Wire = { t: string; f?: string; a?: WireAttachment[]; l?: WireLink; c?: WireCall; w?: WireLook; z?: WireSealed };
+type Wire = {
+  t: string;
+  f?: string;
+  a?: WireAttachment[];
+  l?: WireLink;
+  c?: WireCall;
+  w?: WireLook;
+  z?: WireSealed;
+  h?: string;
+};
 
 const wireAttachment = (a: Attachment): WireAttachment => ({
   i: a.id,
@@ -109,7 +121,7 @@ const wireAttachment = (a: Attachment): WireAttachment => ({
 export function encodePayload(payload: Payload): string {
   const attachments = payload.attachments ?? [];
 
-  if (!payload.forwardedFrom && attachments.length === 0 && !payload.link && !payload.call && !payload.look && !payload.sealed) {
+  if (!payload.forwardedFrom && attachments.length === 0 && !payload.link && !payload.call && !payload.look && !payload.sealed && !payload.heir) {
     return payload.text;
   }
 
@@ -156,6 +168,10 @@ export function encodePayload(payload: Payload): string {
   if (payload.sealed) {
     const { round, box, surprise } = payload.sealed;
     wire.z = { r: round, b: box, ...(surprise ? { s: true } : {}) };
+  }
+
+  if (payload.heir) {
+    wire.h = payload.heir;
   }
 
   return MARKER + JSON.stringify(wire);
@@ -312,6 +328,8 @@ export function decodePayload(plain: string): Payload {
       ...(call ? { call } : {}),
       ...(look ? { look } : {}),
       ...(sealed ? { sealed } : {}),
+      // An OstrichID: 20 characters of its alphabet (crypto.ts).
+      ...(typeof wire.h === "string" && /^[2-9A-HJKMNP-Z]{20}$/.test(wire.h) ? { heir: wire.h } : {}),
     };
   } catch {
     return { text: plain };

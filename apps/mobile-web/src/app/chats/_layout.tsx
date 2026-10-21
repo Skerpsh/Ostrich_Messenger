@@ -1,6 +1,7 @@
 import { Slot, Stack } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import ChatList from "@/features/chats/chat-list";
+import { DisappearWatch } from "@/features/disappear/disappear";
 import { useAppTheme } from "@/ui/theme";
 import { useIsWide, useSidebarWidth } from "@/ui/layout";
 import { useScreenAnimation } from "@/ui/motion";
@@ -16,23 +17,27 @@ export default function ChatsLayout() {
 
   if (!wide) {
     return (
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation,
-          contentStyle: { backgroundColor: colors.bg },
-        }}
-      >
-        <Stack.Screen name="index" />
-        <Stack.Screen name="[chatId]" />
-        <Stack.Screen name="new" options={{ presentation: "modal" }} />
-        <Stack.Screen name="settings" />
-      </Stack>
+      <>
+        <DisappearWatch />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation,
+            contentStyle: { backgroundColor: colors.bg },
+          }}
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen name="[chatId]" />
+          <Stack.Screen name="new" options={{ presentation: "modal" }} />
+          <Stack.Screen name="settings" />
+        </Stack>
+      </>
     );
   }
 
   return (
     <View style={[styles.split, { backgroundColor: colors.bg }]}>
+      <DisappearWatch />
       <View
         style={[
           styles.sidebar,

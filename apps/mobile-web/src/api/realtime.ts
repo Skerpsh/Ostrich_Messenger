@@ -37,7 +37,9 @@ export type ChatEvent =
   | { type: "pinned_message"; chatId: string; message: LastMessage | null }
   | { type: "chats_changed" }
   // The synced settings were saved (lib/settings-sync.ts).
-  | { type: "settings_changed"; updatedAt: string };
+  | { type: "settings_changed"; updatedAt: string }
+  // "If I disappear" changed or warns (features/disappear).
+  | { type: "disappear" };
 
 // Calls (features/calls/calls-context.tsx); `data` is an encrypted signal (crypto.ts).
 export type CallEvent =
@@ -64,6 +66,7 @@ const CHAT_EVENTS = new Set([
   "pinned_message",
   "chats_changed",
   "settings_changed",
+  "disappear",
 ]);
 
 type Handlers = {

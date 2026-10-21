@@ -137,6 +137,11 @@ type model struct {
 	// message id.
 	sealedSeen map[string]sealedLetter
 	letters    map[string]*letterState
+
+	// "If I disappear" (disappear.go): when the server was last told the
+	// user is here, and whether its going off was shown.
+	aliveAt        time.Time
+	disappearShown bool
 	// A QR code shown (invite and profile links).
 	qr *qrState
 
@@ -354,12 +359,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		cmd := m.updateMouse(msg)
 
-		return m, tea.Batch(cmd, m.updateTitle())
+		return m, tea.Batch(cmd, m.updateTitle(), m.stillHere())
 
 	case tea.KeyMsg:
 		cmd := m.updateKey(msg)
 
-		return m, tea.Batch(cmd, m.updateTitle())
+		return m, tea.Batch(cmd, m.updateTitle(), m.stillHere())
 	}
 
 	return m, nil
@@ -617,6 +622,8 @@ func (m *model) signOut(notice string) tea.Cmd {
 	m.serverView = nil
 	m.sealedSeen = map[string]sealedLetter{}
 	m.letters = map[string]*letterState{}
+	m.aliveAt = time.Time{}
+	m.disappearShown = false
 	m.knownKeys = nil
 	m.keyChanged = nil
 	m.presence = map[string]presence{}

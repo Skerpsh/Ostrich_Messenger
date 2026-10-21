@@ -54,6 +54,8 @@ export type ChatMessage = {
   edited_at: Date | null;
   // A surprise not delivered yet (only its sender gets it).
   deliver_at: Date | null;
+  // Sent by "If I disappear": the days the sender had not opened Ostrich.
+  sent_after_days: number | null;
   reply_to: ReplyPreview | null;
   reactions: Reaction[];
   // Groups: the members it mentions.
@@ -107,6 +109,7 @@ export const MESSAGE_SELECT = `
     m.created_at,
     m.edited_at,
     m.deliver_at,
+    m.sent_after_days,
     ${REPLY_COLUMNS},
     COALESCE(
       (
@@ -253,6 +256,8 @@ export async function createMessage(
   // Groups: members the message mentions (others are ignored).
   mentionIds: string[] = [],
   deliverAt: Date | null = null,
+  // Sent by "If I disappear" (disappear.ts): the days the sender was away.
+  sentAfterDays: number | null = null,
 ): Promise<CreateMessageResult> {
   let result;
 
@@ -267,9 +272,10 @@ export async function createMessage(
           content,
           reply_to_id,
           created_at,
-          deliver_at
+          deliver_at,
+          sent_after_days
         )
-        SELECT COALESCE($5::uuid, gen_random_uuid()), $1, $2, $3, $4, COALESCE($9::timestamptz, NOW()), $9
+        SELECT COALESCE($5::uuid, gen_random_uuid()), $1, $2, $3, $4, COALESCE($9::timestamptz, NOW()), $9, $10::int
         WHERE EXISTS (
           SELECT 1
           FROM chat_members
@@ -289,7 +295,7 @@ export async function createMessage(
         AND NOT ${BLOCKED_IN_CHAT}
         AND ${attachmentsFree("$6")}
         AND ${ENCRYPTION_FITS}
-        RETURNING id, chat_id, sender_id, content, created_at, deliver_at, reply_to_id
+        RETURNING id, chat_id, sender_id, content, created_at, deliver_at, sent_after_days, reply_to_id
       ),
       linked AS (
         UPDATE attachments
@@ -338,6 +344,7 @@ export async function createMessage(
         inserted.content,
         inserted.created_at,
         inserted.deliver_at,
+        inserted.sent_after_days,
         ${REPLY_COLUMNS},
         COALESCE((SELECT array_agg(user_id) FROM mentioned), '{}') AS mentions,
         -- The statement's snapshot does not contain the new row yet.
@@ -362,6 +369,7 @@ export async function createMessage(
         groupEpochOf(content),
         mentionIds.slice(0, MAX_MENTIONS),
         deliverAt,
+        sentAfterDays,
       ],
     );
   } catch (error) {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DisappearBanner } from "@/features/disappear/disappear";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { usePathname, useRouter } from "expo-router";
@@ -292,6 +293,8 @@ export default function ChatList() {
           }
         />
       )}
+
+      <DisappearBanner />
 
       <View style={[styles.searchWrap, wide && styles.searchRow]}>
         <View style={[styles.search, wide && styles.searchWide, { backgroundColor: colors.panelAlt }]}>

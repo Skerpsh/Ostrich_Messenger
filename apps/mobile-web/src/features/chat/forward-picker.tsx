@@ -18,9 +18,14 @@ import { radius } from "@/ui/colors";
 export default function ForwardPicker({
   onPick,
   onClose,
+  title = "Forward to…",
+  allow = () => true,
 }: {
   onPick: (chat: Chat) => void;
   onClose: () => void;
+  // Picking for something else (e.g. "If I disappear").
+  title?: string;
+  allow?: (chat: Chat) => boolean;
 }) {
   const { colors } = useAppTheme();
   const { motion, leaving, leave } = useLeave();
@@ -38,10 +43,11 @@ export default function ForwardPicker({
     return (chats ?? []).filter(
       (chat) =>
         !chat.blocked &&
+        allow(chat) &&
         (chat.type === "group" ? groupKeyOf(chat.id, chat.key_epoch) : chat.public_key) &&
         chatTitle(chat).toLowerCase().includes(needle),
     );
-  }, [chats, query]);
+  }, [chats, query, allow]);
 
   return (
     <AnimatedPressable
@@ -54,7 +60,7 @@ export default function ForwardPicker({
         style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
         onPress={() => {}}
       >
-        <Text style={[styles.title, { color: colors.text }]}>Forward to…</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         <View style={[styles.search, { backgroundColor: colors.panelAlt }]}>
           <TextInput
             value={query}
@@ -77,7 +83,7 @@ export default function ForwardPicker({
             <Pressable
               onPress={() => onPick(item)}
               accessibilityRole="button"
-              accessibilityLabel={`Forward to ${chatTitle(item)}`}
+              accessibilityLabel={`${title.replace("…", "")} ${chatTitle(item)}`}
               style={({ hovered, pressed }) => [
                 styles.row,
                 (hovered || pressed) && { backgroundColor: colors.hover },

@@ -13,7 +13,7 @@ import { useAppTheme } from "@/ui/theme";
 import type { Reaction } from "@/api/api";
 import { formatDuration } from "./attachments";
 import { callEntryText } from "@/features/calls/calls";
-import { isLegacyMessage } from "@/crypto/crypto";
+import { formatOstrichId, isLegacyMessage } from "@/crypto/crypto";
 import type { MessageRow } from "./chat-rows";
 import type { Attachment, CallEntry, LookEntry } from "./payload";
 import { formatTime, previewText } from "@/ui/format";
@@ -218,6 +218,14 @@ export default function MessageBubble({
             </Pressable>
           ) : null}
 
+          {message.sent_after_days ? (
+            <View style={styles.automatic}>
+              <Ionicons name="hourglass-outline" size={12} color={own ? colors.onAccent : colors.accent} />
+              <Text style={[styles.forwarded, styles.automaticText, { color: own ? colors.onAccent : colors.accent }]}>
+                Sent automatically: @{message.sender_username} had not opened Ostrich for {message.sent_after_days} days
+              </Text>
+            </View>
+          ) : null}
           {text.status === "ok" && text.sealed?.opened ? <OpenedNote letter={text.sealed} own={own} /> : null}
           {text.forwardedFrom ? (
             <Text style={[styles.forwarded, { color: own ? colors.onAccent : colors.accent }]}>
@@ -252,6 +260,20 @@ export default function MessageBubble({
             </Text>
           )}
           {text.status === "ok" && text.link ? <LinkCard link={text.link} own={own} /> : null}
+          {text.status === "ok" && text.heir ? (
+            <View style={[styles.heir, { backgroundColor: own ? "rgba(0, 0, 0, 0.14)" : colors.panelAlt }]}>
+              <Text style={[styles.heirTitle, { color: textColor }]}>
+                🔑 {own ? "Your OstrichID" : `@${message.sender_username} left you their OstrichID`}
+              </Text>
+              <Text selectable style={[styles.heirId, { color: textColor }]}>
+                {formatOstrichId(text.heir)}
+              </Text>
+              <Text style={[styles.heirText, { color: own ? colors.onAccent : colors.muted }]}>
+                With their username and password it opens their account and all their messages. Keep it
+                somewhere safe.
+              </Text>
+            </View>
+          ) : null}
           {message.reactions.length > 0 ? (
             <View style={styles.reactions}>
               {groupReactions(message.reactions, ownId).map(({ emoji, count, mine }) => (
@@ -635,6 +657,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     marginBottom: 2,
+  },
+
+  automatic: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  automaticText: {
+    flexShrink: 1,
+  },
+
+  heir: {
+    borderRadius: 10,
+    padding: 10,
+    gap: 4,
+    marginTop: 6,
+  },
+
+  heirTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  heirId: {
+    fontSize: 16,
+    fontFamily: "monospace",
+    letterSpacing: 1,
+  },
+
+  heirText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 
   failed: {

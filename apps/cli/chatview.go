@@ -241,6 +241,18 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 		)
 	}
 
+	if message.SentAfterDays != nil {
+		noteFg := p.accent
+
+		if own {
+			noteFg = fg
+		}
+
+		for _, line := range wrap(sentAutomatically(message), maxInner) {
+			content = append(content, bold(line, noteFg, fill))
+		}
+	}
+
 	if shown.sealed != nil && shown.opened {
 		noteFg := p.accent
 
@@ -292,6 +304,18 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 	default:
 		for _, line := range wrap(text, maxInner) {
 			content = append(content, seg(line, fg, fill))
+		}
+	}
+
+	if status == decryptOK && shown.heir != "" {
+		for i, line := range heirLines(shown.heir, own, sanitize(message.SenderUsername)) {
+			for _, part := range wrap(line, maxInner) {
+				if i == 2 {
+					content = append(content, seg(part, meta, fill))
+				} else {
+					content = append(content, bold(part, fg, fill))
+				}
+			}
 		}
 	}
 

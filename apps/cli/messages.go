@@ -27,6 +27,9 @@ type Message struct {
 	// A sealed letter sent as a surprise, not delivered yet: only its
 	// sender gets it.
 	DeliverAt *string `json:"deliver_at"`
+
+	// Sent by "If I disappear": the days the sender had not opened Ostrich.
+	SentAfterDays *int `json:"sent_after_days"`
 }
 
 // ReplyPreview is the message a reply refers to.

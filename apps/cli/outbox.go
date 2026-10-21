@@ -288,6 +288,8 @@ type shownMessage struct {
 	// opened.
 	sealed *sealedLetter
 	opened bool
+	// "If I disappear": an OstrichID left in it.
+	heir string
 }
 
 // show decrypts a message and reads its payload (text, forward); text
@@ -309,11 +311,11 @@ func (m model) show(chat Chat, messageID, senderID, content string) shownMessage
 			p = state.inner
 			p.sealed = s
 
-			return shownMessage{text: p.text, status: status, forwardedFrom: p.forwardedFrom, attachments: p.attachments, link: p.link, call: p.call, sealed: s, opened: true}
+			return shownMessage{text: p.text, status: status, forwardedFrom: p.forwardedFrom, attachments: p.attachments, link: p.link, call: p.call, sealed: s, opened: true, heir: p.heir}
 		}
 
 		return shownMessage{text: p.text, status: status, sealed: s}
 	}
 
-	return shownMessage{text: p.text, status: status, forwardedFrom: p.forwardedFrom, attachments: p.attachments, link: p.link, call: p.call}
+	return shownMessage{text: p.text, status: status, forwardedFrom: p.forwardedFrom, attachments: p.attachments, link: p.link, call: p.call, heir: p.heir}
 }

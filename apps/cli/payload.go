@@ -47,6 +47,8 @@ type payload struct {
 	// A sealed letter (sealed.go): the real payload, time-locked; text
 	// says so for clients that do not know it.
 	sealed *sealedLetter
+	// "If I disappear": the sender's OstrichID, left to the chat.
+	heir string
 }
 
 // callEntry: "answered" (with how long, in milliseconds), "missed" or
@@ -99,6 +101,7 @@ type payloadWire struct {
 	L *wireLink        `json:"l,omitempty"`
 	C *wireCall        `json:"c,omitempty"`
 	Z *wireSealed      `json:"z,omitempty"`
+	H string           `json:"h,omitempty"`
 }
 
 func toWire(a attachment) wireAttachment {
@@ -134,11 +137,11 @@ func fromWire(a wireAttachment) (attachment, bool) {
 }
 
 func encodePayload(p payload) string {
-	if p.forwardedFrom == "" && len(p.attachments) == 0 && p.link == nil && p.call == nil && p.sealed == nil {
+	if p.forwardedFrom == "" && len(p.attachments) == 0 && p.link == nil && p.call == nil && p.sealed == nil && p.heir == "" {
 		return p.text
 	}
 
-	wire := payloadWire{T: p.text, F: p.forwardedFrom}
+	wire := payloadWire{T: p.text, F: p.forwardedFrom, H: p.heir}
 
 	for _, a := range p.attachments {
 		wire.A = append(wire.A, toWire(a))
@@ -171,6 +174,9 @@ func encodePayload(p payload) string {
 	return payloadMarker + string(data)
 }
 
+// An OstrichID: 20 characters of its alphabet (crypto.go).
+var heirRE = regexp.MustCompile(`^[2-9A-HJKMNP-Z]{20}$`)
+
 var attachmentIDRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // decodePayload: anything that is not a well-formed payload is text;
@@ -188,6 +194,7 @@ func decodePayload(plain string) payload {
 		L json.RawMessage   `json:"l"`
 		C json.RawMessage   `json:"c"`
 		Z json.RawMessage   `json:"z"`
+		H string            `json:"h"`
 	}
 
 	if json.Unmarshal([]byte(rest), &wire) != nil || wire.T == nil {
@@ -195,6 +202,10 @@ func decodePayload(plain string) payload {
 	}
 
 	p := payload{text: *wire.T, forwardedFrom: wire.F}
+
+	if heirRE.MatchString(wire.H) {
+		p.heir = wire.H
+	}
 
 	for _, raw := range wire.A {
 		var a wireAttachment

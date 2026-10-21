@@ -120,6 +120,8 @@ export type Message = {
   // A sealed letter sent as a surprise, not delivered yet: only its
   // sender gets it.
   deliver_at?: string | null;
+  // Sent by "If I disappear": the days the sender had not opened Ostrich.
+  sent_after_days?: number | null;
 };
 
 export type Session = {
@@ -470,6 +472,63 @@ export async function editMessage(
 // Own messages, for everyone.
 export function deleteMessage(token: string, chatId: string, messageId: string) {
   return request<unknown>("DELETE", messagePath(chatId, messageId), { token });
+}
+
+// "If I disappear" (features/disappear): messages sent for the user when
+// they have not opened Ostrich for `days` days.
+export type DisappearStatus = {
+  switch: {
+    days: number;
+    last_active_at: string;
+    // When it goes off; null once it has.
+    due_at: string | null;
+    // Warnings sent: 1 a week before, 2 a day before, 3 an hour before.
+    warned: number;
+    triggered_at: string | null;
+  } | null;
+  messages: {
+    id: string;
+    chat_id: string;
+    // Encrypted for the chat, like any message.
+    content: string;
+    attachments: string[];
+    created_at: string;
+    // Not sendable as it is (left the chat, the group's key changed).
+    stale: boolean;
+  }[];
+};
+
+export function getDisappear(token: string) {
+  return request<DisappearStatus>("GET", "/api/disappear", { token });
+}
+
+// On, or a new period: the days start again.
+export function setDisappear(token: string, days: number) {
+  return request<DisappearStatus>("PUT", "/api/disappear", { token, body: { days } });
+}
+
+export function turnOffDisappear(token: string) {
+  return request<DisappearStatus>("DELETE", "/api/disappear", { token });
+}
+
+// "I'm here": sent when the app is opened.
+// `was_warned`: the warning sent before it (1–3), or 0.
+export function disappearAlive(token: string) {
+  return request<DisappearStatus & { was_warned: number }>("POST", "/api/disappear/alive", { token });
+}
+
+export function saveDisappearMessage(
+  token: string,
+  message: { id: string; chatId: string; content: string; attachments: string[] },
+) {
+  return request<DisappearStatus>("PUT", `/api/disappear/messages/${encodeURIComponent(message.id)}`, {
+    token,
+    body: { chat_id: message.chatId, content: message.content, attachments: message.attachments },
+  });
+}
+
+export function deleteDisappearMessage(token: string, id: string) {
+  return request<DisappearStatus>("DELETE", `/api/disappear/messages/${encodeURIComponent(id)}`, { token });
 }
 
 // A drand round's signature, the key of the letters sealed to it

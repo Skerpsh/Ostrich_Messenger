@@ -29,6 +29,7 @@ const SECTIONS: { path: Href; label: string; icon: IconName; shown?: () => boole
     shown: notificationsSupported,
   },
   { path: "/chats/settings/privacy", label: "Privacy & security", icon: "lock-closed-outline" },
+  { path: "/chats/settings/disappear", label: "If I disappear", icon: "hourglass-outline" },
   { path: "/chats/settings/devices", label: "Devices", icon: "laptop-outline" },
   { path: "/chats/settings/account", label: "Account", icon: "person-circle-outline" },
   {
