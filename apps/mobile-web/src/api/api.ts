@@ -117,6 +117,9 @@ export type Message = {
   reactions: Reaction[];
   // Groups: the members it mentions.
   mentions?: string[];
+  // A sealed letter sent as a surprise, not delivered yet: only its
+  // sender gets it.
+  deliver_at?: string | null;
 };
 
 export type Session = {
@@ -469,6 +472,18 @@ export function deleteMessage(token: string, chatId: string, messageId: string) 
   return request<unknown>("DELETE", messagePath(chatId, messageId), { token });
 }
 
+// A drand round's signature, the key of the letters sealed to it
+// (features/chat/sealed.ts checks it); refused (425) before the round.
+export async function getDrandSignature(token: string, round: number) {
+  const { signature } = await request<{ round: number; signature: string }>(
+    "GET",
+    `/api/drand/rounds/${encodeURIComponent(String(round))}`,
+    { token },
+  );
+
+  return signature;
+}
+
 // "What the server sees": the database's rows as they are stored.
 export type MessageServerView = {
   message: {
@@ -482,6 +497,8 @@ export type MessageServerView = {
     reply_to_id: string | null;
     created_at: string;
     edited_at: string | null;
+    // A surprise not delivered yet (only its sender sees this).
+    deliver_at: string | null;
   };
   attachments: { id: string; size: number; created_at: string }[];
   reactions: { emoji: string; user_id: string; created_at: string }[];
@@ -669,6 +686,9 @@ export async function sendMessage(
     attachments?: string[];
     // Groups: members it mentions.
     mentions?: string[];
+    // A sealed letter sent as a surprise: kept from the others until then
+    // (ISO time).
+    deliverAt?: string;
   },
 ) {
   const { message: sent } = await request<{ message: Message }>(
@@ -682,6 +702,7 @@ export async function sendMessage(
         ...(message.replyTo ? { reply_to: message.replyTo } : {}),
         ...(message.attachments?.length ? { attachments: message.attachments } : {}),
         ...(message.mentions?.length ? { mentions: message.mentions } : {}),
+        ...(message.deliverAt ? { deliver_at: message.deliverAt } : {}),
       },
     },
   );

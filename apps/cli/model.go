@@ -132,6 +132,11 @@ type model struct {
 	prompt     *promptState
 	// "What the server sees" of a message or a chat (serverview.go).
 	serverView *serverViewState
+
+	// Sealed letters seen in chats, and their opening (sealed.go), by
+	// message id.
+	sealedSeen map[string]sealedLetter
+	letters    map[string]*letterState
 	// A QR code shown (invite and profile links).
 	qr *qrState
 
@@ -151,6 +156,8 @@ func newModel(systemDark bool, saved *LoginResponse) model {
 		systemDark:  systemDark,
 		presence:    map[string]presence{},
 		typingUntil: map[string]time.Time{},
+		sealedSeen:  map[string]sealedLetter{},
+		letters:     map[string]*letterState{},
 	}
 
 	m.resetGroups()
@@ -323,7 +330,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case clockMsg:
-		return m, clockTick()
+		return m, tea.Batch(clockTick(), m.openDueLetters())
 
 	case outboxTickMsg:
 		return m, tea.Batch(m.flushOutbox(), outboxTick())
@@ -608,6 +615,8 @@ func (m *model) signOut(notice string) tea.Cmd {
 	m.safetyOpen = false
 	m.safetyPeer = nil
 	m.serverView = nil
+	m.sealedSeen = map[string]sealedLetter{}
+	m.letters = map[string]*letterState{}
 	m.knownKeys = nil
 	m.keyChanged = nil
 	m.presence = map[string]presence{}

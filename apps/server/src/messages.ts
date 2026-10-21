@@ -10,9 +10,9 @@ import { blockedEitherWay } from "./visibility.js";
 //   "e3:<epoch>:" + base64(…) in groups, with the group key of that epoch.
 // The server cannot read or shorten them; clients limit the text to 4096
 // characters before encrypting, which is at most ~22 000 characters of
-// base64.
+// base64, and ~32 000 for a sealed letter (encrypted twice).
 export const MESSAGE_PATTERN = "^(e2:|e3:[0-9]{1,9}:)[A-Za-z0-9+/]+={0,2}$";
-export const MAX_MESSAGE_LENGTH = 22_000;
+export const MAX_MESSAGE_LENGTH = 32_000;
 
 const MESSAGE_RE = new RegExp(MESSAGE_PATTERN);
 
@@ -52,6 +52,8 @@ export type ChatMessage = {
   content: string;
   created_at: Date;
   edited_at: Date | null;
+  // A surprise not delivered yet (only its sender gets it).
+  deliver_at: Date | null;
   reply_to: ReplyPreview | null;
   reactions: Reaction[];
   // Groups: the members it mentions.
@@ -104,6 +106,7 @@ export const MESSAGE_SELECT = `
     m.content,
     m.created_at,
     m.edited_at,
+    m.deliver_at,
     ${REPLY_COLUMNS},
     COALESCE(
       (
@@ -124,6 +127,24 @@ export const MESSAGE_SELECT = `
   JOIN users sender ON sender.id = m.sender_id
   ${REPLY_JOINS("m")}
 `;
+
+// SQL: whether message `m` is shown to user `userId`: a surprise only to
+// its sender until it is delivered.
+export const deliveredTo = (m: string, userId: string) =>
+  `(${m}.deliver_at IS NULL OR ${m}.sender_id = ${userId})`;
+
+// When a surprise may be delivered: from a minute ahead, as sealed letters
+// open, to ten years and a day.
+export const MIN_DELIVERY_DELAY_MS = 60 * 1000;
+export const MAX_DELIVERY_DELAY_MS = (10 * 365 + 3 + 1) * 24 * 60 * 60 * 1000;
+
+export function deliveryTime(value: string, now = Date.now()): Date | null {
+  const time = Date.parse(value);
+
+  return Number.isFinite(time) && time >= now + MIN_DELIVERY_DELAY_MS && time <= now + MAX_DELIVERY_DELAY_MS
+    ? new Date(time)
+    : null;
+}
 
 export async function getMessage(messageId: string): Promise<ChatMessage | null> {
   const result = await db.query(`${MESSAGE_SELECT} WHERE m.id = $1`, [messageId]);
@@ -220,6 +241,8 @@ const ENCRYPTION_FITS = `(
 // position, unhides the chat for its members and links its attachments,
 // in one statement. A reply must refer to a message of the same chat.
 // `messageId` is the id chosen by the client (required for "e2").
+// `deliverAt`: a sealed letter sent as a surprise, kept from the others
+// until then (deliveries.ts); the chat is bumped and unhidden only then.
 export async function createMessage(
   chatId: string,
   senderId: string,
@@ -229,6 +252,7 @@ export async function createMessage(
   attachmentIds: string[] = [],
   // Groups: members the message mentions (others are ignored).
   mentionIds: string[] = [],
+  deliverAt: Date | null = null,
 ): Promise<CreateMessageResult> {
   let result;
 
@@ -241,9 +265,11 @@ export async function createMessage(
           chat_id,
           sender_id,
           content,
-          reply_to_id
+          reply_to_id,
+          created_at,
+          deliver_at
         )
-        SELECT COALESCE($5::uuid, gen_random_uuid()), $1, $2, $3, $4
+        SELECT COALESCE($5::uuid, gen_random_uuid()), $1, $2, $3, $4, COALESCE($9::timestamptz, NOW()), $9
         WHERE EXISTS (
           SELECT 1
           FROM chat_members
@@ -257,12 +283,13 @@ export async function createMessage(
             FROM messages
             WHERE id = $4
               AND chat_id = $1
+              AND deliver_at IS NULL
           )
         )
         AND NOT ${BLOCKED_IN_CHAT}
         AND ${attachmentsFree("$6")}
         AND ${ENCRYPTION_FITS}
-        RETURNING id, chat_id, sender_id, content, created_at, reply_to_id
+        RETURNING id, chat_id, sender_id, content, created_at, deliver_at, reply_to_id
       ),
       linked AS (
         UPDATE attachments
@@ -277,6 +304,7 @@ export async function createMessage(
         UPDATE chats
         SET updated_at = NOW()
         WHERE id = (SELECT chat_id FROM inserted)
+          AND $9::timestamptz IS NULL
       ),
       mentioned AS (
         INSERT INTO message_mentions (message_id, user_id)
@@ -289,16 +317,17 @@ export async function createMessage(
         ON CONFLICT DO NOTHING
         RETURNING user_id
       ),
-      -- Whoever writes has read the chat up to their own message. A new
-      -- message shows the chat to members who had it hidden.
+      -- Whoever writes has read the chat up to their own message (not into
+      -- the future of a surprise). A new message shows the chat to members
+      -- who had it hidden.
       members AS (
         UPDATE chat_members
         SET last_read_at = CASE
               WHEN user_id = $2
-                THEN GREATEST(last_read_at, (SELECT created_at FROM inserted))
+                THEN GREATEST(last_read_at, LEAST((SELECT created_at FROM inserted), NOW()))
               ELSE last_read_at
             END,
-            hidden = FALSE
+            hidden = hidden AND $9::timestamptz IS NOT NULL
         WHERE chat_id = (SELECT chat_id FROM inserted)
       )
       SELECT
@@ -308,6 +337,7 @@ export async function createMessage(
         users.username AS sender_username,
         inserted.content,
         inserted.created_at,
+        inserted.deliver_at,
         ${REPLY_COLUMNS},
         COALESCE((SELECT array_agg(user_id) FROM mentioned), '{}') AS mentions,
         -- The statement's snapshot does not contain the new row yet.
@@ -331,6 +361,7 @@ export async function createMessage(
         attachmentIds,
         groupEpochOf(content),
         mentionIds.slice(0, MAX_MENTIONS),
+        deliverAt,
       ],
     );
   } catch (error) {

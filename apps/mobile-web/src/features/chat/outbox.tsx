@@ -41,6 +41,8 @@ export type Outgoing = {
   attachments?: string[];
   // Groups: members it mentions.
   mentions?: string[];
+  // A sealed letter sent as a surprise: when the server delivers it.
+  deliverAt?: string;
   createdAt: string;
   // "sending": in flight or waiting for the network; "failed": refused.
   state: "sending" | "failed";
@@ -66,8 +68,10 @@ export function outgoingAsMessage(item: Outgoing): Message & { outgoing: Outgoin
     sender_id: item.senderId,
     sender_username: "",
     content: item.content,
-    created_at: item.createdAt,
+    // A surprise is dated when it arrives, as the server dates it.
+    created_at: item.deliverAt ?? item.createdAt,
     edited_at: null,
+    ...(item.deliverAt ? { deliver_at: item.deliverAt } : {}),
     reply_to: item.replyTo,
     reactions: [],
     outgoing: item,
@@ -152,6 +156,7 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
             replyTo: item.replyTo?.id ?? null,
             attachments: item.attachments,
             mentions: item.mentions,
+            deliverAt: item.deliverAt,
           }),
         );
 

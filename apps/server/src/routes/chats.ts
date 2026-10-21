@@ -301,6 +301,7 @@ export default async function chatsRoutes(server: FastifyInstance) {
             WHERE messages.chat_id = chats.id
               AND messages.sender_id <> $1
               AND messages.kind = 'text'
+              AND messages.deliver_at IS NULL
               AND messages.created_at > chat_members.last_read_at
           ) AS unread_count,
           -- Unread messages that mention the user (groups).
@@ -309,6 +310,7 @@ export default async function chatsRoutes(server: FastifyInstance) {
             FROM messages
             JOIN message_mentions mm ON mm.message_id = messages.id AND mm.user_id = $1
             WHERE messages.chat_id = chats.id
+              AND messages.deliver_at IS NULL
               AND messages.created_at > chat_members.last_read_at
           ) AS unread_mentions,
           -- Admins: people asking to join (invite link).
@@ -349,7 +351,10 @@ export default async function chatsRoutes(server: FastifyInstance) {
           SELECT id, sender_id, kind, content, created_at,
                  (SELECT username FROM users WHERE users.id = messages.sender_id) AS sender_username
           FROM messages
+          -- Surprises not delivered yet are not the last message, even for
+          -- their sender (they are dated when they arrive).
           WHERE messages.chat_id = chats.id
+            AND messages.deliver_at IS NULL
             AND (
               chat_members.cleared_at IS NULL
               OR messages.created_at > chat_members.cleared_at
@@ -519,7 +524,7 @@ export default async function chatsRoutes(server: FastifyInstance) {
         SET pinned_message_id = $2
         WHERE id = $1
           AND ($2::uuid IS NULL OR EXISTS (
-            SELECT 1 FROM messages WHERE id = $2 AND chat_id = $1
+            SELECT 1 FROM messages WHERE id = $2 AND chat_id = $1 AND deliver_at IS NULL
           ))
         RETURNING (
           SELECT json_build_object(

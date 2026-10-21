@@ -3,6 +3,8 @@
 // after a marker instead, so the server sees none of it. The CLI reads the
 // same format (apps/cli/payload.go).
 
+import type { SealedLetter } from "./sealed";
+
 const MARKER = "\u001eostrich1:";
 
 // A file of a message: encrypted with its own key (crypto.ts) and
@@ -39,6 +41,9 @@ export type Payload = {
   // from the chat's "Wallpaper & color" screen; `text` says it for clients
   // that do not know it.
   look?: LookEntry;
+  // A sealed letter (sealed.ts): the real payload, time-locked; `text`
+  // says so for clients that do not know it.
+  sealed?: SealedLetter;
 };
 
 // Empty (no accent, no wallpaper): the chat's look was reset.
@@ -87,7 +92,8 @@ type WireAttachment = {
 type WireLink = { u: string; t: string; d?: string; s?: string; i?: WireAttachment };
 type WireCall = { i: string; o: CallOutcome; d?: number; v?: boolean };
 type WireLook = { a?: string; p?: string; b?: number; i?: WireAttachment };
-type Wire = { t: string; f?: string; a?: WireAttachment[]; l?: WireLink; c?: WireCall; w?: WireLook };
+type WireSealed = { r: number; b: string; s?: boolean };
+type Wire = { t: string; f?: string; a?: WireAttachment[]; l?: WireLink; c?: WireCall; w?: WireLook; z?: WireSealed };
 
 const wireAttachment = (a: Attachment): WireAttachment => ({
   i: a.id,
@@ -103,7 +109,7 @@ const wireAttachment = (a: Attachment): WireAttachment => ({
 export function encodePayload(payload: Payload): string {
   const attachments = payload.attachments ?? [];
 
-  if (!payload.forwardedFrom && attachments.length === 0 && !payload.link && !payload.call && !payload.look) {
+  if (!payload.forwardedFrom && attachments.length === 0 && !payload.link && !payload.call && !payload.look && !payload.sealed) {
     return payload.text;
   }
 
@@ -145,6 +151,11 @@ export function encodePayload(payload: Payload): string {
       ...(wallpaper ? { p: wallpaper.pattern, b: wallpaper.brightness } : {}),
       ...(photo ? { i: wireAttachment(photo) } : {}),
     };
+  }
+
+  if (payload.sealed) {
+    const { round, box, surprise } = payload.sealed;
+    wire.z = { r: round, b: box, ...(surprise ? { s: true } : {}) };
   }
 
   return MARKER + JSON.stringify(wire);
@@ -249,6 +260,25 @@ function readLook(value: unknown): LookEntry | null {
   };
 }
 
+// A sealed letter (sealed.ts), if the wire value is one.
+function readSealed(value: unknown): SealedLetter | null {
+  const z = value as { r?: unknown; b?: unknown; s?: unknown } | null;
+
+  if (
+    !z ||
+    typeof z.r !== "number" ||
+    !Number.isInteger(z.r) ||
+    z.r < 1 ||
+    typeof z.b !== "string" ||
+    z.b.length > 40_000 ||
+    !z.b.startsWith("-----BEGIN AGE ENCRYPTED FILE-----")
+  ) {
+    return null;
+  }
+
+  return { round: z.r, box: z.b, ...(z.s === true ? { surprise: true } : {}) };
+}
+
 const isPicture = (mime: string) => /^image\/(jpeg|png|webp)$/.test(mime);
 
 // Anything that is not a well-formed payload is shown as text; malformed
@@ -272,6 +302,7 @@ export function decodePayload(plain: string): Payload {
     const link = wire.l ? readLink(wire.l, wire.t) : null;
     const call = wire.c ? readCall(wire.c) : null;
     const look = wire.w ? readLook(wire.w) : null;
+    const sealed = wire.z ? readSealed(wire.z) : null;
 
     return {
       text: wire.t,
@@ -280,6 +311,7 @@ export function decodePayload(plain: string): Payload {
       ...(link ? { link } : {}),
       ...(call ? { call } : {}),
       ...(look ? { look } : {}),
+      ...(sealed ? { sealed } : {}),
     };
   } catch {
     return { text: plain };

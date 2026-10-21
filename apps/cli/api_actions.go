@@ -32,8 +32,14 @@ func getMe(token string) (*Account, error) {
 
 // sendMessage sends an encrypted message; id was chosen here (the
 // encryption is bound to it). attachments: ids of its uploaded files.
-func sendMessage(token, chatID, id, content, replyTo string, attachments, mentions []string) (Message, error) {
+// deliverAt: a sealed letter sent as a surprise, kept from the others
+// until then (RFC 3339); "" for any other message.
+func sendMessage(token, chatID, id, content, replyTo string, attachments, mentions []string, deliverAt string) (Message, error) {
 	body := map[string]any{"id": id, "content": content}
+
+	if deliverAt != "" {
+		body["deliver_at"] = deliverAt
+	}
 
 	if len(mentions) > 0 {
 		body["mentions"] = mentions

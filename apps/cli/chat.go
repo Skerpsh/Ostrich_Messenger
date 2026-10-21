@@ -42,6 +42,8 @@ type chatState struct {
 	replyTo  *Message
 	editing  *Message
 	sending  bool
+	// The next message is sent as a sealed letter (sealed.go).
+	sealing *sealing
 
 	// Choosing a message with the keyboard (↑ in an empty composer).
 	selecting  bool
@@ -419,6 +421,8 @@ func (m *model) updateChatKey(msg tea.KeyMsg) tea.Cmd {
 		switch {
 		case c.replyTo != nil:
 			c.replyTo = nil
+		case c.sealing != nil:
+			c.sealing = nil
 		case c.editing != nil:
 			m.cancelEdit()
 		case c.err != "":
@@ -835,10 +839,27 @@ func (m *model) sendComposer(chat Chat) tea.Cmd {
 	})
 }
 
-// queueText encrypts a new message and puts it into the outbox.
+// queueText encrypts a new message and puts it into the outbox; sealed
+// if the chat is sealing the next message.
 func (m *model) queueText(chat Chat, text string, attachments []attachment, replyTo *ReplyPreview) (tea.Cmd, error) {
 	id := newMessageID()
 	content := encodePayload(payload{text: text, attachments: attachments})
+	deliverAt := ""
+
+	if s := m.chat.sealing; s != nil {
+		letter, err := sealLetter(content, s.opensAt, s.surprise)
+		if err != nil {
+			return nil, err
+		}
+
+		opens := openingTime(letter.Round)
+		content = encodePayload(payload{text: sealedText(opens), sealed: &letter})
+
+		// A surprise: the server keeps it from the others until it opens.
+		if s.surprise {
+			deliverAt = opens.UTC().Format(time.RFC3339)
+		}
+	}
 
 	encrypted, err := m.encryptFor(chat, content, id)
 	if err != nil {
@@ -851,7 +872,17 @@ func (m *model) queueText(chat Chat, text string, attachments []attachment, repl
 		ids = append(ids, a.ID)
 	}
 
-	return m.queueMessage(chat.ID, id, encrypted, replyTo, ids, m.mentionsIn(chat, text)...), nil
+	o := m.newOutgoing(chat.ID, id, encrypted, replyTo, ids, m.mentionsIn(chat, text))
+	m.chat.sealing = nil
+
+	if deliverAt != "" {
+		o.deliverAt = deliverAt
+		// Dated when it arrives, as the server dates it.
+		o.message.CreatedAt = deliverAt
+		o.message.DeliverAt = &deliverAt
+	}
+
+	return m.queueOutgoing(o), nil
 }
 
 var mentionTyped = regexp.MustCompile(`(^|[^\w@])@([A-Za-z0-9_.-]{0,32})$`)
@@ -1084,6 +1115,10 @@ func (m *model) startReply(message Message) tea.Cmd {
 }
 
 func (m *model) startEdit(chat Chat, message Message) tea.Cmd {
+	if m.show(chat, message.ID, message.SenderID, message.Content).sealed != nil {
+		return m.showToast("A sealed letter cannot be edited", true)
+	}
+
 	m.saveDraft()
 	c := m.chat
 	c.resetSelection()
@@ -1341,6 +1376,10 @@ func (m *model) updateChatMouse(msg tea.MouseMsg) tea.Cmd {
 		}
 
 		c.replyTo = nil
+
+		return nil
+	case clicked(msg, "chat:unseal"):
+		c.sealing = nil
 
 		return nil
 	case clicked(msg, "chat:pinned"):

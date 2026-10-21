@@ -46,5 +46,13 @@
     "sealed_key": "C1XuqvpPsGUttcdS6mwuF4XEqSyj9m5XBVpC7Foc24oaaEkADBLz2SoRYjbmd8y+imt8K3YYitaF2CPXy5RPy8n+5VbGQ67o",
     "account_private_key": "UGrazyusoMPh+ur7gn9cCP3M2etLQhOGDkofwt6XC/8=",
     "account_public_key": "gXdoQ1DXUrKHTJyN2c5t4VFJ/I96K4bzRHBWyn1IBT8="
+  },
+  "sealed_letter": {
+    "comment": "A payload time-locked to drand quicknet round 1000000 (sealed by the CLI), with that round's real signature: both clients must open it, and open what the other seals",
+    "round": 1000000,
+    "signature": "83ad29e4c409f9470fc2ef02f90214df49e02b441a1a241a82d622d9f608ef98fd8b11a029f1bee9d9e83b45088abe72",
+    "inner": "\u001eostrich1:{\"t\":\"Hello from 2023 🦤\",\"f\":\"ann\"}",
+    "box_go": "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IHRsb2NrIDEwMDAwMDAgNTJkYjliYTcw\nZTBjYzBmNmVhZjc4MDNkZDA3NDQ3YTFmNTQ3NzczNWZkM2Y2NjE3OTJiYTk0NjAw\nYzg0ZTk3MQpxTDBkZnArUWlwemlnKzV2UzNnL2JpcnhueC9uOWxFZ21xUk9xVFhQ\nSmJJWHo4ZHVwVnZDaU9LSVI4QTNDSDBvCkFQK1o2Zkk3NDlzVzJaMTV0NDAwZnFO\nTzBvaE5LaHA3OEphODhlSFRHNUM3TnFNMS94c2dtdzlQOGRNUTU0QVkKWDdGaFNK\na2QwM2hTOHpWYnZ4dUhucTh4ZWxDRkJWOGVFVkozWDEzTWVOVQotLS0gcGExUWJl\nbVp1RmV2cUhtYzhRdUsweXlNQnYyZk1oeGp4a1FMcnZHdC9lMAowl2cEmb7uWDIQ\n5oz5Uff1rdPUK/FrE3DUhVwsl9tfNM6l68HgdjeUyIgIVlp2c1TvtVHm3QQSq9lY\nJ2ajBCkZY5UU/jiSMWM14LAUhC4Acw==\n-----END AGE ENCRYPTED FILE-----\n",
+    "box_js": "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IHRsb2NrIDEwMDAwMDAgNTJkYjliYTcw\nZTBjYzBmNmVhZjc4MDNkZDA3NDQ3YTFmNTQ3NzczNWZkM2Y2NjE3OTJiYTk0NjAw\nYzg0ZTk3MQpxQW9QOTFBQlBFYmVjNW0rdVhWQXQwM3Ftdm9VQ0FXYkVPSStWalll\nZVBOcDRzS3Q5Q2JXc3F5OTJhd1JZMkNDCkE5Y295dHJUMVVyZ1EyeVhvTTZLTmZi\nTllSRFkyVStxeitLN0FWekNSbDNwcm45Q0UwZFhmRUhJT0p0MldhMkgKKzdadnRT\nRVBzL3MxWW1ZU2k0alFXZkF6MWNKUWtlbE5zWkx5SS9GSHBiMAotLS0gVG9kMlJs\nWjVEWTVJVmM1bG84dnFKTVFOWVhDMEgyME5TTTBiZDRHN00wVQp0uXotIHp/Yc43\nkZBnPgvt4b7JR/BSiDjM4Zm9Mw3soyjVpfbqwhgwA/Mlxqcrf7tJiupvxhv9yTvI\n+vzgSTBBdFSTyeWcQJaL/WBo6W4+Lg==\n-----END AGE ENCRYPTED FILE-----\n"
   }
 }

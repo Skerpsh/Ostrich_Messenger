@@ -137,7 +137,7 @@ func (m model) bubble(chat Chat, message Message, w int) []bubbleLine {
 
 	key := strings.Join([]string{
 		message.ID, message.Content, edited, strings.Join(reactions, ","),
-		fmt.Sprint(read, w, p.mode, p.accent, chat.PublicKey, sending),
+		fmt.Sprint(read, w, p.mode, p.accent, chat.PublicKey, sending), m.letterKey(message.ID),
 	}, "|")
 
 	body, ok := c.cache[key]
@@ -241,6 +241,16 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 		)
 	}
 
+	if shown.sealed != nil && shown.opened {
+		noteFg := p.accent
+
+		if own {
+			noteFg = fg
+		}
+
+		content = append(content, bold(clip(openedNote(*shown.sealed), maxInner), noteFg, fill))
+	}
+
 	if shown.forwardedFrom != "" {
 		forwardFg := p.accent
 
@@ -252,6 +262,17 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 	}
 
 	switch {
+	case status == decryptOK && shown.sealed != nil && !shown.opened:
+		for i, line := range m.envelopeLines(message.ID, *shown.sealed, message.DeliverAt != nil) {
+			if i == 0 {
+				content = append(content, bold(clip(line, maxInner), fg, fill))
+				continue
+			}
+
+			for _, part := range wrap(line, maxInner) {
+				content = append(content, seg(part, meta, fill))
+			}
+		}
 	case status == decryptOK && shown.call != nil:
 		content = append(content, bold(clip(callText(*shown.call, own), maxInner), fg, fill))
 	case status == decryptOK && strings.TrimSpace(text) == "" && len(shown.attachments) > 0:
@@ -448,6 +469,17 @@ func (m model) chatBanners(chat Chat, w int) []string {
 	if c.editing != nil {
 		text := oneLine(sanitize(m.textOf(chat, c.editing.ID, c.editing.SenderID, c.editing.Content)))
 		lines = append(lines, row(seg(" ✎ ", p.accent, bg)+bold("Edit message ", p.accent, bg)+seg(text, p.muted, bg), closeButton, w, bg))
+	}
+
+	if s := c.sealing; s != nil {
+		kind := "Sealed letter"
+
+		if s.surprise {
+			kind = "Surprise letter"
+		}
+
+		lines = append(lines, row(seg(" 🔒 ", p.accent, bg)+bold(kind+" ", p.accent, bg)+seg("opens "+s.opensAt.Format("02.01.2006 at 15:04"), p.muted, bg),
+			zone.Mark("chat:unseal", seg(" ✕ ", p.muted, bg)), w, bg))
 	}
 
 	if c.replyTo != nil {

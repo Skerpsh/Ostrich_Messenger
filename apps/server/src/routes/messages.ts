@@ -7,6 +7,8 @@ import {
   CREATE_MESSAGE_ERRORS,
   CREATE_MESSAGE_STATUS,
   createMessage,
+  deliveredTo,
+  deliveryTime,
   getMessage,
   groupEpochOf,
   isBlockedInChat,
@@ -74,6 +76,7 @@ export default async function messagesRoutes(server: FastifyInstance) {
       reply_to?: string;
       attachments?: string[];
       mentions?: string[];
+      deliver_at?: string;
     };
   }>(
     "/api/chats/:chatId/messages",
@@ -109,6 +112,9 @@ export default async function messagesRoutes(server: FastifyInstance) {
               uniqueItems: true,
               items: { type: "string", format: "uuid" },
             },
+            // A sealed letter sent as a surprise: kept from the others
+            // until then (ISO time).
+            deliver_at: { type: "string", maxLength: 40 },
           },
         },
       },
@@ -116,6 +122,13 @@ export default async function messagesRoutes(server: FastifyInstance) {
     async (request, reply) => {
       const { chatId } = request.params;
       const { content, id } = request.body;
+      const deliverAt = request.body.deliver_at === undefined ? null : deliveryTime(request.body.deliver_at);
+
+      if (request.body.deliver_at !== undefined && !deliverAt) {
+        return reply.status(400).send({
+          error: "A surprise is delivered from a minute to ten years from now",
+        });
+      }
 
       if (!id && needsClientId(content)) {
         return reply.status(400).send({
@@ -131,6 +144,7 @@ export default async function messagesRoutes(server: FastifyInstance) {
         id ?? null,
         request.body.attachments ?? [],
         request.body.mentions ?? [],
+        deliverAt,
       );
 
       if ("error" in result) {
@@ -140,13 +154,18 @@ export default async function messagesRoutes(server: FastifyInstance) {
       }
 
       const { message } = result;
-      notifyNewMessage(chatId, request.user.id, message.mentions);
 
-      // Deliver to clients connected over websocket.
-      await sendToChatMembers(chatId, {
-        type: "message",
-        message,
-      });
+      // Deliver to clients connected over websocket; a surprise only to
+      // the sender's other devices until it is delivered (deliveries.ts).
+      if (deliverAt) {
+        sendToUserSockets(request.user.id, { type: "message", message });
+      } else {
+        notifyNewMessage(chatId, request.user.id, message.mentions);
+        await sendToChatMembers(chatId, {
+          type: "message",
+          message,
+        });
+      }
 
       if (result.firstFromSender) {
         await announcePresence(request.user.id, chatId);
@@ -213,6 +232,7 @@ export default async function messagesRoutes(server: FastifyInstance) {
         FROM (
           ${MESSAGE_SELECT}
           WHERE m.chat_id = $1
+            AND ${deliveredTo("m", "$6")}
             AND ($4::timestamptz IS NULL OR m.created_at > $4)
             AND ($5::timestamptz IS NULL OR m.created_at >= $5)
             AND (
@@ -226,7 +246,7 @@ export default async function messagesRoutes(server: FastifyInstance) {
         ) latest
         ORDER BY created_at ASC, id ASC
         `,
-        [chatId, limit, before ?? null, member.rows[0].cleared_at, member.rows[0].joined_at],
+        [chatId, limit, before ?? null, member.rows[0].cleared_at, member.rows[0].joined_at, request.user.id],
       );
 
       const hasMore = result.rows.length > limit;
@@ -308,6 +328,9 @@ export default async function messagesRoutes(server: FastifyInstance) {
           AND chat_id = $2
           AND sender_id = $3
           AND kind = 'text'
+          -- A surprise is not changed before it arrives (the others would
+          -- be told of it).
+          AND deliver_at IS NULL
           -- Not after leaving the chat (e.g. removed from a group).
           AND EXISTS (SELECT 1 FROM chat_members WHERE chat_id = $2 AND user_id = $3)
         RETURNING id
@@ -347,9 +370,9 @@ export default async function messagesRoutes(server: FastifyInstance) {
         DELETE FROM messages
         WHERE id = $1
           AND chat_id = $2
-          AND (sender_id = $3 OR $4::boolean)
+          AND (sender_id = $3 OR ($4::boolean AND deliver_at IS NULL))
           AND EXISTS (SELECT 1 FROM chat_members WHERE chat_id = $2 AND user_id = $3)
-        RETURNING id
+        RETURNING id, deliver_at
         `,
         [messageId, chatId, request.user.id, Boolean(group && isAdmin(group.role))],
       );
@@ -360,11 +383,14 @@ export default async function messagesRoutes(server: FastifyInstance) {
         });
       }
 
-      await sendToChatMembers(chatId, {
-        type: "message_deleted",
-        chatId,
-        messageId,
-      });
+      const event = { type: "message_deleted", chatId, messageId };
+
+      // A surprise not delivered yet: the others never knew of it.
+      if (result.rows[0].deliver_at) {
+        sendToUserSockets(request.user.id, event);
+      } else {
+        await sendToChatMembers(chatId, event);
+      }
 
       return { deleted: true };
     },
@@ -403,6 +429,7 @@ export default async function messagesRoutes(server: FastifyInstance) {
         WHERE messages.id = $1
           AND messages.chat_id = $2
           AND chat_members.user_id = $3
+          AND messages.deliver_at IS NULL
         `,
         [messageId, chatId, request.user.id],
       );
@@ -470,12 +497,14 @@ export default async function messagesRoutes(server: FastifyInstance) {
       const result = await db.query(
         `
         UPDATE chat_members
-        SET last_read_at = GREATEST(chat_members.last_read_at, messages.created_at)
+        -- Not into the future of a surprise.
+        SET last_read_at = GREATEST(chat_members.last_read_at, LEAST(messages.created_at, NOW()))
         FROM messages
         WHERE chat_members.chat_id = $1
           AND chat_members.user_id = $2
           AND messages.id = $3
           AND messages.chat_id = $1
+          AND ${deliveredTo("messages", "$2")}
         RETURNING chat_members.last_read_at
         `,
         [chatId, request.user.id, request.body.message_id],

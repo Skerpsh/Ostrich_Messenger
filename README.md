@@ -49,6 +49,7 @@
 - 🛡 **Safety codes**: compare 40 digits with a contact to make sure nobody swapped your keys
 - ⚠️ **Key change warnings**: sending is paused until you confirm a contact's new key
 - 👁 Optional online status and read receipts, blocking, per-device sessions with remote log out
+- ✉️ **Letters to the future**: seal a message with its files until a date (up to 10 years); nobody can open it before then, the sender and the server neither (time-lock encryption with [drand](https://drand.love)). Send it as an envelope that waits in the chat, or as a surprise that arrives on the day
 - 🗄 **What the server sees**: any message or chat exactly as the server stores it, fetched from it, next to what stays encrypted
 - 📲 **Log in with a QR code**: a logged-in device scans it and sends the account's key encrypted for the new device only
 

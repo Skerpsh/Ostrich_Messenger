@@ -23,6 +23,7 @@ type messageServerView struct {
 		ReplyToID      *string `json:"reply_to_id"`
 		CreatedAt      string  `json:"created_at"`
 		EditedAt       *string `json:"edited_at"`
+		DeliverAt      *string `json:"deliver_at"`
 	} `json:"message"`
 	Attachments []struct {
 		Size int64 `json:"size"`
@@ -152,6 +153,10 @@ func messageServerViewState(view messageServerView, shown shownMessage) *serverV
 
 	if msg.EditedAt != nil {
 		s.rows = append(s.rows, serverViewRow{label: "Edited", value: serverViewTime(*msg.EditedAt)})
+	}
+
+	if msg.DeliverAt != nil {
+		s.rows = append(s.rows, serverViewRow{label: "Kept from the others until (a surprise)", value: serverViewTime(*msg.DeliverAt)})
 	}
 
 	if msg.Kind == "system" {

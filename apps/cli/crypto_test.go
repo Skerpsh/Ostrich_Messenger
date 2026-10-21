@@ -36,6 +36,13 @@ type cryptoVectors struct {
 		SealedKey         string `json:"sealed_key"`
 		AccountPrivateKey string `json:"account_private_key"`
 	} `json:"device_link"`
+	SealedLetter struct {
+		Round     uint64 `json:"round"`
+		Signature string `json:"signature"`
+		Inner     string `json:"inner"`
+		BoxGo     string `json:"box_go"`
+		BoxJS     string `json:"box_js"`
+	} `json:"sealed_letter"`
 }
 
 func loadVectors(t *testing.T) (cryptoVectors, []byte, []byte) {

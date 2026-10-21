@@ -21,6 +21,8 @@ type outgoing struct {
 	attachments []string
 	// Groups: members it mentions.
 	mentions []string
+	// A sealed letter sent as a surprise: when the server delivers it.
+	deliverAt string
 	// "sending" (in flight or waiting for the network) or "failed".
 	state    string
 	err      string
@@ -36,7 +38,11 @@ const reencryptTries = 3
 // queueMessage adds an encrypted message to the outbox and sends it.
 // mentions: in a group, the members it mentions.
 func (m *model) queueMessage(chatID, id, content string, replyTo *ReplyPreview, attachments []string, mentions ...string) tea.Cmd {
-	m.outgoing = append(m.outgoing, outgoing{
+	return m.queueOutgoing(m.newOutgoing(chatID, id, content, replyTo, attachments, mentions))
+}
+
+func (m *model) newOutgoing(chatID, id, content string, replyTo *ReplyPreview, attachments, mentions []string) outgoing {
+	return outgoing{
 		attachments: attachments,
 		mentions:    mentions,
 		message: Message{
@@ -49,9 +55,13 @@ func (m *model) queueMessage(chatID, id, content string, replyTo *ReplyPreview, 
 			ReplyTo:        replyTo,
 		},
 		state: "sending",
-	})
+	}
+}
 
-	return m.attemptSend(id)
+func (m *model) queueOutgoing(o outgoing) tea.Cmd {
+	m.outgoing = append(m.outgoing, o)
+
+	return m.attemptSend(o.message.ID)
 }
 
 func (m *model) findOutgoing(id string) int {
@@ -83,6 +93,7 @@ func (m *model) attemptSend(id string) tea.Cmd {
 	o := m.outgoing[i].message
 	files := m.outgoing[i].attachments
 	mentions := m.outgoing[i].mentions
+	deliverAt := m.outgoing[i].deliverAt
 	token := m.user.Token
 
 	replyID := ""
@@ -92,7 +103,7 @@ func (m *model) attemptSend(id string) tea.Cmd {
 	}
 
 	return task(func() func(*model) tea.Cmd {
-		sent, err := sendMessage(token, o.ChatID, o.ID, o.Content, replyID, files, mentions)
+		sent, err := sendMessage(token, o.ChatID, o.ID, o.Content, replyID, files, mentions, deliverAt)
 
 		return func(m *model) tea.Cmd {
 			i := m.findOutgoing(id)
@@ -273,6 +284,10 @@ type shownMessage struct {
 	attachments   []attachment
 	link          *linkPreview
 	call          *callEntry
+	// A sealed letter: shown as an envelope, or as what it carries once
+	// opened.
+	sealed *sealedLetter
+	opened bool
 }
 
 // show decrypts a message and reads its payload (text, forward); text
@@ -285,6 +300,20 @@ func (m model) show(chat Chat, messageID, senderID, content string) shownMessage
 	}
 
 	p := decodePayload(text)
+
+	if s := p.sealed; s != nil {
+		// Opened when its time comes (openDueLetters).
+		m.sealedSeen[messageID] = *s
+
+		if state := m.letters[messageID]; state != nil && state.opened {
+			p = state.inner
+			p.sealed = s
+
+			return shownMessage{text: p.text, status: status, forwardedFrom: p.forwardedFrom, attachments: p.attachments, link: p.link, call: p.call, sealed: s, opened: true}
+		}
+
+		return shownMessage{text: p.text, status: status, sealed: s}
+	}
 
 	return shownMessage{text: p.text, status: status, forwardedFrom: p.forwardedFrom, attachments: p.attachments, link: p.link, call: p.call}
 }

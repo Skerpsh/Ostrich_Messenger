@@ -8,6 +8,7 @@ import LinkCard from "./link-card";
 import DevBadge from "@/ui/dev-badge";
 import IconButton from "@/ui/icon-button";
 import MarkupText from "./markup-text";
+import { OpenedNote, SealedEnvelope, type LetterState } from "./sealed-letter";
 import { useAppTheme } from "@/ui/theme";
 import type { Reaction } from "@/api/api";
 import { formatDuration } from "./attachments";
@@ -50,6 +51,7 @@ export default function MessageBubble({
   animateIn = false,
   selected,
   onToggle,
+  letter,
 }: {
   row: MessageRow;
   read: boolean;
@@ -83,6 +85,8 @@ export default function MessageBubble({
   // choosing); a tap chooses it or not.
   selected?: boolean;
   onToggle?: () => void;
+  // A sealed letter's opening (sealed-letter.tsx).
+  letter?: LetterState;
 }) {
   const selecting = selected !== undefined;
   const { colors, textScale } = useAppTheme();
@@ -214,6 +218,7 @@ export default function MessageBubble({
             </Pressable>
           ) : null}
 
+          {text.status === "ok" && text.sealed?.opened ? <OpenedNote letter={text.sealed} own={own} /> : null}
           {text.forwardedFrom ? (
             <Text style={[styles.forwarded, { color: own ? colors.onAccent : colors.accent }]}>
               Forwarded from @{text.forwardedFrom}
@@ -222,7 +227,9 @@ export default function MessageBubble({
           {text.attachments?.length ? (
             <AttachmentView attachments={text.attachments} own={own} onError={onError} onOpenPhoto={onOpenPhoto} />
           ) : null}
-          {text.status === "ok" && text.call ? (
+          {text.status === "ok" && text.sealed && !text.sealed.opened ? (
+            <SealedEnvelope letter={text.sealed} state={letter} own={own} deliverAt={message.deliver_at} />
+          ) : text.status === "ok" && text.call ? (
             <CallEntryView entry={text.call} own={own} onCall={selecting ? undefined : onCall} />
           ) : text.status === "ok" && text.look ? (
             <LookEntryView entry={text.look} label={text.text} own={own} onPress={selecting ? undefined : onLook} />

@@ -23,6 +23,10 @@ type Message struct {
 
 	// Groups: the members it mentions.
 	Mentions []string `json:"mentions"`
+
+	// A sealed letter sent as a surprise, not delivered yet: only its
+	// sender gets it.
+	DeliverAt *string `json:"deliver_at"`
 }
 
 // ReplyPreview is the message a reply refers to.

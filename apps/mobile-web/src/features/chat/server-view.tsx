@@ -44,6 +44,7 @@ function messageRows(view: MessageServerView, full: boolean): Row[] {
     { label: "Sender", value: `@${message.sender_username}` },
     { label: "Sent", value: when(message.created_at) },
     ...(message.edited_at ? [{ label: "Edited", value: when(message.edited_at) }] : []),
+    ...(message.deliver_at ? [{ label: "Kept from the others until (a surprise)", value: when(message.deliver_at) }] : []),
     {
       label: message.kind === "system" ? "Content (written by the server)" : `Content, encrypted (${message.content_length} characters)`,
       value: content,

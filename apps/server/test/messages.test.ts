@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  deliveryTime,
   groupEpochOf,
   isReactionEmoji,
   isEncryptedMessage,
@@ -8,6 +9,7 @@ import {
   needsClientId,
   withReply,
 } from "../src/messages.js";
+import { currentRound, QUICKNET } from "../src/routes/drand.js";
 
 test("only encrypted messages are accepted", () => {
   assert.ok(isEncryptedMessage("e2:AAAA"));
@@ -74,4 +76,22 @@ test("a reaction is one emoji", () => {
   for (const text of ["", "a", "👍👍", "ok", "👍 ", "<script>"]) {
     assert.ok(!isReactionEmoji(text), text);
   }
+});
+
+test("surprises are delivered from a minute to ten years ahead", () => {
+  const now = Date.parse("2026-10-21T12:00:00Z");
+
+  assert.equal(deliveryTime("2026-10-21T12:00:30Z", now), null);
+  assert.equal(deliveryTime("2026-10-21T12:01:00Z", now)?.toISOString(), "2026-10-21T12:01:00.000Z");
+  assert.equal(deliveryTime("2036-10-21T12:00:00Z", now)?.toISOString(), "2036-10-21T12:00:00.000Z");
+  assert.equal(deliveryTime("2036-10-24T12:00:00Z", now), null);
+  assert.equal(deliveryTime("tomorrow", now), null);
+});
+
+test("drand rounds: one every 3 seconds from quicknet's genesis", () => {
+  const genesis = QUICKNET.genesisTime * 1000;
+
+  assert.equal(currentRound(genesis), 1);
+  assert.equal(currentRound(genesis + 2_999), 1);
+  assert.equal(currentRound(genesis + 3_000), 2);
 });

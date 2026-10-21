@@ -44,6 +44,9 @@ type payload struct {
 	// The chat's entry for a call, sent by the caller's app; text says the
 	// same for clients that do not know it.
 	call *callEntry
+	// A sealed letter (sealed.go): the real payload, time-locked; text
+	// says so for clients that do not know it.
+	sealed *sealedLetter
 }
 
 // callEntry: "answered" (with how long, in milliseconds), "missed" or
@@ -95,6 +98,7 @@ type payloadWire struct {
 	A []wireAttachment `json:"a,omitempty"`
 	L *wireLink        `json:"l,omitempty"`
 	C *wireCall        `json:"c,omitempty"`
+	Z *wireSealed      `json:"z,omitempty"`
 }
 
 func toWire(a attachment) wireAttachment {
@@ -130,7 +134,7 @@ func fromWire(a wireAttachment) (attachment, bool) {
 }
 
 func encodePayload(p payload) string {
-	if p.forwardedFrom == "" && len(p.attachments) == 0 && p.link == nil && p.call == nil {
+	if p.forwardedFrom == "" && len(p.attachments) == 0 && p.link == nil && p.call == nil && p.sealed == nil {
 		return p.text
 	}
 
@@ -158,6 +162,10 @@ func encodePayload(p payload) string {
 		}
 	}
 
+	if s := p.sealed; s != nil {
+		wire.Z = &wireSealed{R: s.Round, B: s.Box, S: s.Surprise}
+	}
+
 	data, _ := json.Marshal(wire)
 
 	return payloadMarker + string(data)
@@ -179,6 +187,7 @@ func decodePayload(plain string) payload {
 		A []json.RawMessage `json:"a"`
 		L json.RawMessage   `json:"l"`
 		C json.RawMessage   `json:"c"`
+		Z json.RawMessage   `json:"z"`
 	}
 
 	if json.Unmarshal([]byte(rest), &wire) != nil || wire.T == nil {
@@ -218,6 +227,14 @@ func decodePayload(plain string) payload {
 			if c.D != nil && *c.D >= 0 {
 				p.call.Duration = *c.D
 			}
+		}
+	}
+
+	if len(wire.Z) > 0 {
+		var z wireSealed
+
+		if json.Unmarshal(wire.Z, &z) == nil {
+			p.sealed = readSealed(z)
 		}
 	}
 

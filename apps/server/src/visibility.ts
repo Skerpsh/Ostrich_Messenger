@@ -24,6 +24,7 @@ export function presenceVisible(target: string, viewer: string, chatId: string) 
       WHERE presence_message.chat_id = ${chatId}
         AND presence_message.sender_id = ${target}.id
         AND presence_message.kind = 'text'
+        AND presence_message.deliver_at IS NULL
     )
   )`;
 }

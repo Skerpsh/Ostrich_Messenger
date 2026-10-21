@@ -35,6 +35,9 @@ import PhotoViewer from "@/features/chat/photo-viewer";
 import Reveal, { Collapse, Swap } from "@/ui/reveal";
 import SafetyCode from "@/features/chat/safety-code";
 import ServerView, { type ServerViewTarget } from "@/features/chat/server-view";
+import SealSheet, { type Sealing } from "@/features/chat/seal-sheet";
+import { formatOpening, useSealedLetters } from "@/features/chat/sealed-letter";
+import { SEALED_FALLBACK, openingTime, sealLetter, type SealedLetter } from "@/features/chat/sealed";
 import TypingDots from "@/ui/typing-dots";
 import ScreenEnter, { useLeaveScreen } from "@/ui/screen-enter";
 import { RecordButton, RecordingBar, useVoiceRecorder } from "@/features/chat/voice-recorder";
@@ -216,6 +219,9 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   const [chatMenu, setChatMenu] = useState(false);
   const [showSafetyCode, setShowSafetyCode] = useState(false);
   const [serverView, setServerView] = useState<ServerViewTarget | null>(null);
+  // The next message is sent as a sealed letter (features/chat/sealed.ts).
+  const [sealing, setSealing] = useState<Sealing | null>(null);
+  const [showSeal, setShowSeal] = useState(false);
   // Groups: the members (for names, presence and the group's screen).
   const [members, setMembers] = useState<GroupMember[] | null>(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
@@ -514,10 +520,36 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
     (message as Message & { outgoing?: Outgoing }).outgoing;
 
   // Decrypted once per message.
-  const texts = useMemo(
+  const decrypted = useMemo(
     () => new Map(shownMessages.map((m) => [m.id, crypto.decrypt(m)])),
     [shownMessages, crypto],
   );
+
+  // Sealed letters open by themselves when their time comes; an opened
+  // one is shown as what it carries.
+  const sealedLetters = useMemo(
+    () =>
+      new Map(
+        [...decrypted].flatMap(([id, shown]): [string, SealedLetter][] =>
+          shown.status === "ok" && shown.sealed ? [[id, shown.sealed]] : [],
+        ),
+      ),
+    [decrypted],
+  );
+  const letters = useSealedLetters(sealedLetters);
+  const texts = useMemo(() => {
+    const shown = new Map(decrypted);
+
+    for (const [id, letter] of sealedLetters) {
+      const state = letters.get(id);
+
+      if (state?.status === "opened") {
+        shown.set(id, { ...shown.get(id)!, ...state.payload, sealed: { ...letter, opened: true } });
+      }
+    }
+
+    return shown;
+  }, [decrypted, sealedLetters, letters]);
   const textOf = (message: MessageRef & { content: string }): Shown =>
     texts.get(message.id) ?? crypto.decrypt(message);
 
@@ -776,9 +808,30 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
 
     const id = newMessageId();
     let encrypted: string;
+    // Sealed: the payload is time-locked inside the message, which says so
+    // to clients that do not know sealed letters.
+    const seal = sealing;
+    let deliverAt: string | undefined;
 
     try {
-      encrypted = crypto.encrypt(encodePayload({ text: content, attachments, link }), id);
+      const inner = encodePayload({ text: content, attachments, link });
+
+      if (seal) {
+        const letter = await sealLetter(inner, seal.opensAt, seal.surprise);
+        const opens = new Date(openingTime(letter.round));
+        // A surprise: the server keeps it from the others until it opens.
+        deliverAt = seal.surprise ? opens.toISOString() : undefined;
+        encrypted = crypto.encrypt(
+          encodePayload({
+            text: `${SEALED_FALLBACK}: it opens on ${opens.toUTCString()}`,
+            sealed: letter,
+          }),
+          id,
+        );
+        setSealing(null);
+      } else {
+        encrypted = crypto.encrypt(inner, id);
+      }
     } catch (e) {
       showError(e, "Failed to send message");
       return;
@@ -801,6 +854,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
       replyTo: replyTo ? replyPreview(replyTo) : null,
       attachments: [...attachments, ...(link?.image ? [link.image] : [])].map((a) => a.id),
       ...(mentions.length ? { mentions } : {}),
+      ...(deliverAt ? { deliverAt } : {}),
     });
 
     if (!voiceNote) {
@@ -992,6 +1046,12 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
     }
 
     const shown = textOf(message);
+
+    if (shown.sealed && !shown.sealed.opened) {
+      showError(null, "A sealed letter can be forwarded once it opens");
+      return false;
+    }
+
     const from =
       shown.forwardedFrom ??
       (message.sender_id === user.id ? user.username : (chat?.username ?? message.sender_username));
@@ -1344,7 +1404,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           }]
         : []),
       copy,
-      ...(shown.status === "ok"
+      ...(shown.status === "ok" && (!shown.sealed || shown.sealed.opened)
         ? [{
             icon: "arrow-redo-outline" as const,
             label: "Forward",
@@ -1369,7 +1429,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           setServerView({ kind: "message", chatId, messageId: message.id, shown });
         },
       },
-      ...(own && !shown.forwardedFrom && shown.status === "ok" && !shown.attachments?.some(isVoice)
+      ...(own && !shown.forwardedFrom && shown.status === "ok" && !shown.sealed && !shown.attachments?.some(isVoice)
         ? [{ icon: "create-outline" as const, label: "Edit", onPress: () => startEdit(message) }]
         : []),
       ...(own || groupAdmin
@@ -1452,7 +1512,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         .find((m) => m.sender_id === user?.id && !outgoingOf(m));
       const shown = last && textOf(last);
 
-      if (last && shown && !shown.forwardedFrom && shown.status === "ok" && !shown.attachments?.some(isVoice)) {
+      if (last && shown && !shown.forwardedFrom && shown.status === "ok" && !shown.sealed && !shown.attachments?.some(isVoice)) {
         event.preventDefault();
         startEdit(last);
       }
@@ -1878,6 +1938,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                       }
                       selected={selected && !outgoingOf(item.message) ? selected.has(item.message.id) : undefined}
                       onToggle={() => toggleChosen(item.message)}
+                      letter={letters.get(item.message.id)}
                     />
                   </Collapse>
                 );
@@ -2040,6 +2101,34 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                       size={18}
                       color={colors.muted}
                       onPress={cancelEdit}
+                    />
+                  </View>
+                ) : null}
+              </Reveal>
+
+              <Reveal>
+                {sealing && !editing ? (
+                  <View style={styles.replyBar}>
+                    <Ionicons name={sealing.surprise ? "gift" : "lock-closed"} size={18} color={colors.accent} />
+                    <Pressable
+                      onPress={() => setShowSeal(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Change when the letter opens"
+                      style={[styles.replyBarText, { borderLeftColor: colors.accent }]}
+                    >
+                      <Text numberOfLines={1} style={[styles.replyBarName, { color: colors.accent }]}>
+                        {sealing.surprise ? "Surprise letter" : "Sealed letter"}
+                      </Text>
+                      <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
+                        Opens {formatOpening(sealing.opensAt)}
+                      </Text>
+                    </Pressable>
+                    <IconButton
+                      icon="close"
+                      label="Send without sealing"
+                      size={18}
+                      color={colors.muted}
+                      onPress={() => setSealing(null)}
                     />
                   </View>
                 ) : null}
@@ -2313,6 +2402,14 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           items={[
             { icon: "image-outline", label: "Photo", onPress: () => attach("photo") },
             { icon: "document-outline", label: "File (up to 25 MB)", onPress: () => attach("file") },
+            {
+              icon: "mail-outline",
+              label: "Seal as a letter to the future",
+              onPress: () => {
+                setAttachMenu(false);
+                setShowSeal(true);
+              },
+            },
           ]}
         />
       ) : null}
@@ -2493,6 +2590,18 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
       ) : null}
 
       {serverView ? <ServerView target={serverView} onClose={() => setServerView(null)} /> : null}
+
+      {showSeal ? (
+        <SealSheet
+          initial={sealing}
+          onSeal={(chosen) => {
+            setSealing(chosen);
+            setShowSeal(false);
+            inputRef.current?.focus();
+          }}
+          onClose={() => setShowSeal(false)}
+        />
+      ) : null}
 
       {showSafetyCode && chat && crypto.safetyCode ? (
         <SafetyCode

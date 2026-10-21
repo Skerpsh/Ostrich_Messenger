@@ -289,6 +289,9 @@ func (m *model) savedMenu(chat Chat, inChat bool) *menuState {
 		items = append(items, menuItem{icon: "🗄", label: "What the server sees", action: func(m *model) tea.Cmd {
 			return m.openChatServerView(chat)
 		}})
+		items = append(items, menuItem{icon: "✉", label: "Seal the next message until…", action: func(m *model) tea.Cmd {
+			return m.askSealing()
+		}})
 	}
 
 	pinLabel := "Pin to top"
@@ -320,6 +323,9 @@ func (m *model) groupMenu(chat Chat, inChat bool) *menuState {
 		}})
 		items = append(items, menuItem{icon: "🗄", label: "What the server sees", action: func(m *model) tea.Cmd {
 			return m.openChatServerView(chat)
+		}})
+		items = append(items, menuItem{icon: "✉", label: "Seal the next message until…", action: func(m *model) tea.Cmd {
+			return m.askSealing()
 		}})
 
 		if chat.PinnedMessage != nil && chat.isAdmin() {

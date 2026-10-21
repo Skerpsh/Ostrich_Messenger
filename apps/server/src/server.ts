@@ -12,6 +12,8 @@ import usersRoutes from "./routes/users.js";
 import chatsRoutes from "./routes/chats.js";
 import messagesRoutes from "./routes/messages.js";
 import serverViewRoutes from "./routes/server-view.js";
+import drandRoutes from "./routes/drand.js";
+import { deliverDue, DELIVERY_INTERVAL_MS } from "./deliveries.js";
 import avatarsRoutes from "./routes/avatars.js";
 import pushRoutes from "./routes/push.js";
 import attachmentsRoutes from "./routes/attachments.js";
@@ -155,6 +157,25 @@ async function deleteExpired() {
   }
 }
 
+// Sealed letters whose time has come (deliveries.ts); one round at a time.
+let delivering = false;
+
+async function deliverSurprises() {
+  if (delivering) {
+    return;
+  }
+
+  delivering = true;
+
+  try {
+    await deliverDue();
+  } catch (error) {
+    server.log.error(error, "failed to deliver surprises");
+  } finally {
+    delivering = false;
+  }
+}
+
 const start = async () => {
   try {
     if (!CORS_ORIGINS && process.env.NODE_ENV === "production") {
@@ -198,6 +219,7 @@ const start = async () => {
     await server.register(chatsRoutes);
     await server.register(messagesRoutes);
     await server.register(serverViewRoutes);
+    await server.register(drandRoutes);
     await server.register(avatarsRoutes);
     await server.register(pushRoutes);
     await server.register(attachmentsRoutes);
@@ -215,6 +237,7 @@ const start = async () => {
 
     deleteExpired();
     setInterval(deleteExpired, CLEANUP_INTERVAL_MS).unref();
+    setInterval(deliverSurprises, DELIVERY_INTERVAL_MS).unref();
   } catch (error) {
     server.log.error(error);
     process.exit(1);

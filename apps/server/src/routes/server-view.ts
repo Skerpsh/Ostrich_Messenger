@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { db } from "../database.js";
+import { deliveredTo } from "../messages.js";
 import { authenticate } from "../middleware/auth.js";
 
 // "What the server sees": the rows the database keeps about a message or
@@ -60,13 +61,14 @@ export default async function serverViewRoutes(server: FastifyInstance) {
         `
         SELECT m.id, m.chat_id, m.sender_id, sender.username AS sender_username,
                m.kind, m.content, LENGTH(m.content) AS content_length,
-               m.reply_to_id, m.created_at, m.edited_at
+               m.reply_to_id, m.created_at, m.edited_at, m.deliver_at
         FROM messages m
         JOIN users sender ON sender.id = m.sender_id
         WHERE m.id = $1 AND m.chat_id = $2
           AND ($3::text <> 'group' OR m.created_at >= $4)
+          AND ${deliveredTo("m", "$5")}
         `,
-        [messageId, chatId, member.type, member.joined_at],
+        [messageId, chatId, member.type, member.joined_at, request.user.id],
       );
 
       if (message.rows.length === 0) {
@@ -135,7 +137,7 @@ export default async function serverViewRoutes(server: FastifyInstance) {
         db.query(
           `
           SELECT
-            (SELECT COUNT(*)::int FROM messages WHERE chat_id = $1) AS messages,
+            (SELECT COUNT(*)::int FROM messages m WHERE m.chat_id = $1 AND ${deliveredTo("m", "$2")}) AS messages,
             files.count AS files,
             files.bytes AS file_bytes,
             (SELECT COUNT(*)::int FROM group_keys WHERE chat_id = $1) AS group_keys,
@@ -146,10 +148,10 @@ export default async function serverViewRoutes(server: FastifyInstance) {
             SELECT COUNT(*)::int AS count, COALESCE(SUM(a.size), 0)::bigint AS bytes
             FROM attachments a
             LEFT JOIN messages m ON m.id = a.message_id
-            WHERE a.chat_id = $1 OR m.chat_id = $1
+            WHERE a.chat_id = $1 OR (m.chat_id = $1 AND ${deliveredTo("m", "$2")})
           ) files
           `,
-          [chatId],
+          [chatId, request.user.id],
         ),
       ]);
 

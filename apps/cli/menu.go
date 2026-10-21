@@ -111,7 +111,7 @@ func (m *model) messageMenu(chat Chat, message Message) *menuState {
 
 	items = append(items, copyItem)
 
-	if shown.status == decryptOK {
+	if shown.status == decryptOK && (shown.sealed == nil || shown.opened) {
 		items = append(items, menuItem{icon: "↷", label: "Forward", action: func(m *model) tea.Cmd {
 			m.openMenu(m.forwardMenu(chat, message))
 			return nil
@@ -141,7 +141,7 @@ func (m *model) messageMenu(chat Chat, message Message) *menuState {
 		return m.openMessageServerView(chat, message)
 	}})
 
-	if own && shown.status == decryptOK && shown.forwardedFrom == "" {
+	if own && shown.status == decryptOK && shown.forwardedFrom == "" && shown.sealed == nil {
 		items = append(items, menuItem{icon: "✎", label: "Edit", action: func(m *model) tea.Cmd { return m.startEdit(chat, message) }})
 	}
 
@@ -290,6 +290,9 @@ func (m *model) chatMenu(chat Chat, inChat bool) *menuState {
 		}})
 		items = append(items, menuItem{icon: "🗄", label: "What the server sees", action: func(m *model) tea.Cmd {
 			return m.openChatServerView(chat)
+		}})
+		items = append(items, menuItem{icon: "✉", label: "Seal the next message until…", action: func(m *model) tea.Cmd {
+			return m.askSealing()
 		}})
 
 		if chat.PinnedMessage != nil {
