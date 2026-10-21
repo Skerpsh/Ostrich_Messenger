@@ -14,5 +14,5 @@ dist/
 .expo/
 
 
-# Encrypted message attachments (backend/src/attachments.ts)
-backend/data/
+# Encrypted message attachments (apps/server/src/attachments.ts)
+apps/server/data/

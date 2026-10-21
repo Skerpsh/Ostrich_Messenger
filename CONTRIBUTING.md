@@ -23,9 +23,9 @@ Node.js 22, PostgreSQL and, for the CLI, Go.
 4. Run the checks for every part you touched:
 
    ```bash
-   (cd backend && npm run typecheck && npm test)
-   (cd frontend && npm run typecheck && npm run lint && npm test)
-   (cd cli && gofmt -l . && go vet ./... && go test ./...)
+   (cd apps/server && npm run typecheck && npm test)
+   (cd apps/mobile-web && npm run typecheck && npm run lint && npm test)
+   (cd apps/cli && gofmt -l . && go vet ./... && go test ./...)
    ```
 
 5. Open a pull request describing what changed and why. CI runs the same
@@ -34,12 +34,12 @@ Node.js 22, PostgreSQL and, for the CLI, Go.
 ## Things to keep in mind
 
 - **Encryption** is implemented twice: in TypeScript
-  (`frontend/src/lib/crypto.ts`) and in Go (`cli/crypto.go`). A change to one
+  (`apps/mobile-web/src/crypto/crypto.ts`) and in Go (`apps/cli/crypto.go`). A change to one
   needs the same change in the other, and both must pass
-  `testdata/crypto-vectors.json`.
+  `shared/test-vectors/crypto-vectors.json`.
 - **Clients stay in step.** A feature in the app usually belongs in the CLI
   too, and the other way round.
-- **Database changes** go into a new numbered file in `backend/migrations/`.
+- **Database changes** go into a new numbered file in `apps/server/migrations/`.
   Never edit a migration that has already been applied.
 - **The server must not learn more.** Anything that sends new plaintext or
   metadata to the server needs a good reason in the pull request.

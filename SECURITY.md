@@ -28,10 +28,10 @@ Especially interesting:
 - anything that lets the **server** or a network attacker read, change,
   reorder, replay or forge messages, files or group data, or listen in on a
   call without the Ostrich handshake noticing
-  ([`frontend/src/lib/handshake.ts`](frontend/src/lib/handshake.ts));
+  ([`apps/mobile-web/src/features/calls/handshake.ts`](apps/mobile-web/src/features/calls/handshake.ts));
 - weaknesses in the encryption scheme
-  ([`frontend/src/lib/crypto.ts`](frontend/src/lib/crypto.ts),
-  [`cli/crypto.go`](cli/crypto.go)) or differences between the two
+  ([`apps/mobile-web/src/crypto/crypto.ts`](apps/mobile-web/src/crypto/crypto.ts),
+  [`apps/cli/crypto.go`](apps/cli/crypto.go)) or differences between the two
   implementations;
 - ways to get the OstrichID or a private key off a device;
 - authentication, session and access-control bugs in the API.

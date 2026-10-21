@@ -79,7 +79,7 @@
 | Client | Built with | Where to get it |
 |---|---|---|
 | **Web** | Expo + React Native Web | [ostrich-messenger.online](https://ostrich-messenger.online), installable as an app from the browser |
-| **iOS / Android** | Expo (React Native) | Build from [`frontend/`](frontend) with Expo / EAS, see [Mobile apps](#mobile-apps) |
+| **iOS / Android** | Expo (React Native) | Build from [`apps/mobile-web/`](apps/mobile-web) with Expo / EAS, see [Mobile apps](#mobile-apps) |
 | **Terminal** | Go + Bubble Tea | [One-line install](#terminal-client-cli) or the [latest release](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) |
 
 All clients use the same account, the same chats and the same encryption.
@@ -139,7 +139,7 @@ SmartScreen asks once: *More info* → *Run anyway*.
 **From source** (Go 1.27+)
 
 ```bash
-cd cli && go build -o ostrich . && ./ostrich
+cd apps/cli && go build -o ostrich . && ./ostrich
 ```
 
 </td></tr></table>
@@ -162,7 +162,7 @@ call entries.
 Link previews are shown as text.
 
 The full key reference, the "Remember me" option, where sessions and the cache are stored and
-other details are in [`cli/README.md`](cli/README.md).
+other details are in [`apps/cli/README.md`](apps/cli/README.md).
 
 | Environment variable | Purpose |
 |---|---|
@@ -172,9 +172,9 @@ other details are in [`cli/README.md`](cli/README.md).
 
 ## How the encryption works
 
-The full specification is at the top of [`frontend/src/lib/crypto.ts`](frontend/src/lib/crypto.ts).
-The Go client implements the same scheme in [`cli/crypto.go`](cli/crypto.go), and both are
-tested against shared vectors in [`testdata/crypto-vectors.json`](testdata/crypto-vectors.json).
+The full specification is at the top of [`apps/mobile-web/src/crypto/crypto.ts`](apps/mobile-web/src/crypto/crypto.ts).
+The Go client implements the same scheme in [`apps/cli/crypto.go`](apps/cli/crypto.go), and both are
+tested against shared vectors in [`shared/test-vectors/crypto-vectors.json`](shared/test-vectors/crypto-vectors.json).
 
 ```mermaid
 flowchart LR
@@ -207,7 +207,7 @@ flowchart LR
   **Ostrich handshake** checks even that: both devices turn the two fingerprints into two sentences,
   each person reads theirs aloud and picks the other's among four. The caller commits to its part of
   the input before seeing the callee's, so someone in the middle gets a single 1-in-a-million try.
-  Details in [`frontend/src/lib/handshake.ts`](frontend/src/lib/handshake.ts).
+  Details in [`apps/mobile-web/src/features/calls/handshake.ts`](apps/mobile-web/src/features/calls/handshake.ts).
 - **Safety codes.** 40 digits computed from both public keys. If the codes match on both devices,
   the server has not substituted a key.
 - **Logging in with a QR code.** The new device shows a one-time X25519 public key in its QR
@@ -250,10 +250,10 @@ flowchart TB
 
 | Part | Stack | Directory |
 |---|---|---|
-| Backend | Node.js 22, TypeScript, Fastify 5, PostgreSQL (`pg`), WebSockets, Argon2, optional Redis | [`backend/`](backend) |
-| Web and mobile apps | Expo SDK 57, React Native 0.86, expo-router, `@noble/*` cryptography | [`frontend/`](frontend) |
-| Terminal client | Go, Bubble Tea | [`cli/`](cli) |
-| Server operations | Bash, systemd, Caddy | [`ops/`](ops) |
+| Backend | Node.js 22, TypeScript, Fastify 5, PostgreSQL (`pg`), WebSockets, Argon2, optional Redis | [`apps/server/`](apps/server) |
+| Web and mobile apps | Expo SDK 57, React Native 0.86, expo-router, `@noble/*` cryptography | [`apps/mobile-web/`](apps/mobile-web) |
+| Terminal client | Go, Bubble Tea | [`apps/cli/`](apps/cli) |
+| Server operations | Bash, systemd, Caddy | [`deploy/`](deploy) |
 
 ## Local development
 
@@ -274,7 +274,7 @@ sudo -u postgres psql -c "CREATE DATABASE ostrich_db OWNER ostrich;"
 ### 2. Backend
 
 ```bash
-cd backend
+cd apps/server
 npm install
 cat > .env <<'EOF'
 DB_HOST=localhost
@@ -291,7 +291,7 @@ Check it: `curl http://localhost:3000/api/health` should answer `{"status":"ok",
 ### 3. Web and mobile app
 
 ```bash
-cd frontend
+cd apps/mobile-web
 npm install
 echo 'EXPO_PUBLIC_API_URL=http://localhost:3000' > .env.local
 npm start            # then press w for web, i for iOS, a for Android
@@ -303,7 +303,7 @@ When testing on a phone, use your computer's LAN IP instead of `localhost`
 ### 4. Terminal client
 
 ```bash
-cd cli
+cd apps/cli
 go build -o ostrich .
 OSTRICH_SERVER=http://localhost:3000 ./ostrich
 ```
@@ -311,10 +311,10 @@ OSTRICH_SERVER=http://localhost:3000 ./ostrich
 ### Mobile apps
 
 The apps are built with [EAS Build](https://docs.expo.dev/build/introduction/)
-(profiles are in [`frontend/eas.json`](frontend/eas.json)):
+(profiles are in [`apps/mobile-web/eas.json`](apps/mobile-web/eas.json)):
 
 ```bash
-cd frontend
+cd apps/mobile-web
 npx eas-cli build --platform android --profile preview   # installable APK
 npx eas-cli build --platform ios --profile production
 npx eas-cli build --platform android --profile quest     # APK for Meta Quest
@@ -334,25 +334,25 @@ messages and calls). Calls need a development or store build: `react-native-webr
 
 | Where | Command | What it does |
 |---|---|---|
-| `backend/` | `npm run dev` | Development server with reload |
-| `backend/` | `npm test` | Tests |
-| `backend/` | `npm run typecheck` | Type check, including tests |
-| `backend/` | `npm run db:migrate` | Apply new migrations |
-| `backend/` | `npm run dev-badge -- add @username` | Give a user the DEV badge |
-| `frontend/` | `npm start` | Expo development server |
-| `frontend/` | `npm test` · `npm run lint` · `npm run typecheck` | Checks |
-| `frontend/` | `npm run build:web` | Static web build in `dist/` |
-| `cli/` | `go test ./...` · `go vet ./...` | Checks |
+| `apps/server/` | `npm run dev` | Development server with reload |
+| `apps/server/` | `npm test` | Tests |
+| `apps/server/` | `npm run typecheck` | Type check, including tests |
+| `apps/server/` | `npm run db:migrate` | Apply new migrations |
+| `apps/server/` | `npm run dev-badge -- add @username` | Give a user the DEV badge |
+| `apps/mobile-web/` | `npm start` | Expo development server |
+| `apps/mobile-web/` | `npm test` · `npm run lint` · `npm run typecheck` | Checks |
+| `apps/mobile-web/` | `npm run build:web` | Static web build in `dist/` |
+| `apps/cli/` | `go test ./...` · `go vet ./...` | Checks |
 
 ## Self-hosting on a server
 
 This walks through one Ubuntu/Debian VPS running everything: the backend, PostgreSQL and Caddy,
-which provides HTTPS and serves the web app. The [`ops/`](ops) scripts assume this layout:
+which provides HTTPS and serves the web app. The [`deploy/`](deploy) scripts assume this layout:
 
 | What | Where |
 |---|---|
 | Repository | `/opt/ostrich` |
-| Backend settings | `/opt/ostrich/backend/.env` |
+| Backend settings | `/opt/ostrich/apps/server/.env` |
 | Backend service | systemd unit `ostrich` |
 | Web app files | `/var/www/ostrich-web` |
 | Backups | `/var/backups/ostrich` |
@@ -379,7 +379,7 @@ sudo -u postgres psql -c "CREATE DATABASE ostrich_db OWNER ostrich;"
 ### 3. Configure the backend
 
 ```bash
-cat > /opt/ostrich/backend/.env <<'EOF'
+cat > /opt/ostrich/apps/server/.env <<'EOF'
 DB_HOST=localhost
 DB_NAME=ostrich_db
 DB_USER=ostrich
@@ -387,7 +387,7 @@ DB_PASSWORD=CHANGE_ME
 HOST=127.0.0.1
 CORS_ORIGINS=https://chat.example.com
 EOF
-chmod 600 /opt/ostrich/backend/.env
+chmod 600 /opt/ostrich/apps/server/.env
 ```
 
 ### 4. Create the systemd service
@@ -399,8 +399,8 @@ Description=Ostrich backend
 After=network.target postgresql.service
 
 [Service]
-WorkingDirectory=/opt/ostrich/backend
-EnvironmentFile=/opt/ostrich/backend/.env
+WorkingDirectory=/opt/ostrich/apps/server
+EnvironmentFile=/opt/ostrich/apps/server/.env
 Environment=NODE_ENV=production
 ExecStart=/bin/bash -c '[ -s /root/.nvm/nvm.sh ] && . /root/.nvm/nvm.sh; exec node dist/server.js'
 Restart=always
@@ -449,8 +449,8 @@ Build the web app for your domain and run the deploy script. It builds the backe
 migrations, restarts the service, checks that it answers, then builds and publishes the web app:
 
 ```bash
-echo 'EXPO_PUBLIC_API_URL=https://chat.example.com' > /opt/ostrich/frontend/.env.local
-cd /opt/ostrich && ops/deploy.sh --no-backup && systemctl reload caddy
+echo 'EXPO_PUBLIC_API_URL=https://chat.example.com' > /opt/ostrich/apps/mobile-web/.env.local
+cd /opt/ostrich && deploy/deploy.sh --no-backup && systemctl reload caddy
 ```
 
 Open `https://chat.example.com`. For the CLI, run it with
@@ -460,11 +460,11 @@ here, so links need no extra setting. If you serve the web app from another doma
 `CORS_ORIGINS`.
 
 Next steps: [daily backups](#backups), [monitoring](#monitoring) and a
-[TURN server for calls](ops/README.md#calls-the-turn-server).
+[TURN server for calls](deploy/README.md#calls-the-turn-server).
 
 ## Configuration
 
-The backend reads its settings from environment variables, usually in `backend/.env`.
+The backend reads its settings from environment variables, usually in `apps/server/.env`.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -478,21 +478,21 @@ The backend reads its settings from environment variables, usually in `backend/.
 | `CORS_ORIGINS` | any | Comma-separated browser origins allowed to call the API |
 | `TRUST_PROXY` | `loopback` | Proxies trusted for `X-Forwarded-For`: `true`, `false` or an address list |
 | `REDIS_URL` | none | Shared state for several backend processes, e.g. `redis://127.0.0.1:6379` |
-| `ATTACHMENTS_DIR` | `backend/data/attachments` | Where encrypted files are stored |
+| `ATTACHMENTS_DIR` | `apps/server/data/attachments` | Where encrypted files are stored |
 | `EXPO_ACCESS_TOKEN` | none | Expo token for push notifications, if your Expo project requires one |
 | `MONITOR_SECRET` | none | Shared secret for the monitoring bot's stats endpoint |
 | `TURN_URLS` | none | TURN servers for calls, comma separated, e.g. `turn:203.0.113.7:3478?transport=udp,turn:203.0.113.7:3478?transport=tcp` |
 | `STUN_URLS` | none | STUN servers for calls, e.g. `stun:203.0.113.7:3478` |
-| `TURN_SECRET` | none | coturn's `static-auth-secret`: the backend makes TURN logins with it ([setup](ops/README.md#calls-the-turn-server)) |
+| `TURN_SECRET` | none | coturn's `static-auth-secret`: the backend makes TURN logins with it ([setup](deploy/README.md#calls-the-turn-server)) |
 
 The monitoring bot's own settings (`MONITOR_*`) are listed in
-[`ops/README.md`](ops/README.md#monitoring-bot).
+[`deploy/README.md`](deploy/README.md#monitoring-bot).
 
 Client settings:
 
 | Client | Variable | Default |
 |---|---|---|
-| Web / mobile | `EXPO_PUBLIC_API_URL` (in `frontend/.env.local`, at build time): the API | `https://62.238.111.55.nip.io` |
+| Web / mobile | `EXPO_PUBLIC_API_URL` (in `apps/mobile-web/.env.local`, at build time): the API | `https://62.238.111.55.nip.io` |
 | Mobile | `EXPO_PUBLIC_WEB_URL` (at build time): the web app, for links | `https://ostrich-messenger.online`, or the API's address when `EXPO_PUBLIC_API_URL` is set |
 | CLI | `OSTRICH_SERVER`: the API | `https://62.238.111.55.nip.io` |
 | CLI | `OSTRICH_WEB`: the web app, for links | `https://ostrich-messenger.online`, or `OSTRICH_SERVER` when that is set |
@@ -502,36 +502,36 @@ The official setup serves the API at `62.238.111.55.nip.io` and the web app at
 
 ## Operations: deploys, backups and monitoring
 
-The complete guide is [`ops/README.md`](ops/README.md). In short:
+The complete guide is [`deploy/README.md`](deploy/README.md). In short:
 
 ### Deploys
 
 ```bash
-cd /opt/ostrich && ops/deploy.sh                 # backend + web, with a backup first
-ops/deploy.sh --backend-only                     # or --web-only, --no-backup
+cd /opt/ostrich && deploy/deploy.sh                 # backend + web, with a backup first
+deploy/deploy.sh --backend-only                     # or --web-only, --no-backup
 ```
 
 ### Database migrations
 
-Schema changes live in [`backend/migrations/`](backend/migrations) as numbered SQL files. Each
+Schema changes live in [`apps/server/migrations/`](apps/server/migrations) as numbered SQL files. Each
 file is applied once, in its own transaction, and recorded in `schema_migrations`. To change the
 schema, add the next numbered file. Never edit an applied one.
 
 ### Backups
 
-[`ops/backup.sh`](ops/backup.sh) writes a compressed `pg_dump` and keeps the 7 newest copies. It
+[`deploy/backup.sh`](deploy/backup.sh) writes a compressed `pg_dump` and keeps the 7 newest copies. It
 skips the backup when the disk is nearly full and can ping
 [Healthchecks.io](https://healthchecks.io). Daily runs come from a systemd timer:
 
 ```bash
-cp /opt/ostrich/ops/ostrich-backup.{service,timer} /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now ostrich-backup.timer
+cp /opt/ostrich/deploy/ostrich-backup.{service,timer} /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now ostrich-backup.timer
 ```
 
 Restore: `pg_restore --clean --if-exists -d ostrich_db <file>`.
 
 ### Monitoring
 
-- **Monitoring bot** ([`backend/src/monitor/`](backend/src/monitor)): reports to Telegram every
+- **Monitoring bot** ([`apps/server/src/monitor/`](apps/server/src/monitor)): reports to Telegram every
   15 minutes and sends a daily summary. It alerts when the backend is down or slow, the database
   fails, a service crashes, a disk or memory runs low, a backup is missing, errors or failed logins
   spike, or an SSL certificate is about to expire. Commands: `/stats`, `/today`, `/health`.
@@ -541,15 +541,15 @@ Restore: `pg_restore --clean --if-exists -d ostrich_db <file>`.
 ### Scaling
 
 One backend process handles a lot. To use several CPU cores or restart without downtime, run
-several processes (`ops/ostrich@.service`) behind Caddy and set `REDIS_URL`. They then share
+several processes (`deploy/ostrich@.service`) behind Caddy and set `REDIS_URL`. They then share
 WebSocket events, presence, rate limits and failed login counts through Redis.
 
 ## Testing and CI
 
 ```bash
-(cd backend && npm test && npm run typecheck)
-(cd frontend && npm test && npm run lint && npm run typecheck)
-(cd cli && go vet ./... && go test ./...)
+(cd apps/server && npm test && npm run typecheck)
+(cd apps/mobile-web && npm test && npm run lint && npm run typecheck)
+(cd apps/cli && go vet ./... && go test ./...)
 ```
 
 [GitHub Actions](.github/workflows/ci.yml) runs all of these on every push and pull request,
@@ -568,23 +568,30 @@ binaries, `install.sh` and `SHA256SUMS`, plus notes generated from the commits.
 
 ## Project structure
 
+One repository for every system Ostrich runs on. Each app is in `apps/`, with its own README;
+what they share (the protocol, the encryption) is checked against the same test vectors.
+
 ```
 .
-├── backend/                Fastify API, WebSockets, database
-│   ├── migrations/         numbered SQL migrations
-│   ├── src/
-│   │   ├── routes/         HTTP and WebSocket endpoints
-│   │   ├── monitor/        Telegram monitoring bot
-│   │   └── server.ts       entry point
-│   └── test/
-├── frontend/               Expo app: web (PWA), iOS and Android
-│   ├── src/app/            screens (expo-router)
-│   ├── src/components/     UI components
-│   ├── src/context/        auth, chats, calls, realtime, theme
-│   └── src/lib/            API client, crypto, cache, helpers
-├── cli/                    Go terminal client
-├── ops/                    deploy and backup scripts, systemd units, coturn config
-├── testdata/               test vectors shared by the TypeScript and Go code
+├── apps/
+│   ├── mobile-web/         Expo app: Android, iOS and the web (PWA)
+│   │   └── src/
+│   │       ├── app/        screens (expo-router routes)
+│   │       ├── features/   auth, chats, chat, groups, calls, settings, devices
+│   │       ├── crypto/     end-to-end encryption (no UI)
+│   │       ├── api/        the server: requests, the live connection, links
+│   │       ├── ui/         buttons, headers, animations, theme
+│   │       └── platform/   what differs between the phones and the web
+│   │                       (*.web.ts / *.native.ts next to each other)
+│   ├── desktop/            Windows and Linux app (planned: Electron)
+│   ├── server/             Fastify API, WebSockets, PostgreSQL
+│   │   ├── migrations/     numbered SQL migrations
+│   │   ├── src/routes/     HTTP and WebSocket endpoints
+│   │   └── src/monitor/    Telegram monitoring bot
+│   └── cli/                Go terminal client
+├── shared/test-vectors/    test vectors for the TypeScript and Go code
+├── deploy/                 deploy and backup scripts, systemd units, coturn
+├── docs/                   which app runs where and how each is built
 └── .github/workflows/      CI and CLI releases
 ```
 

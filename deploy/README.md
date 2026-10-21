@@ -1,0 +1,362 @@
+# Ostrich server operations
+
+Scripts for the VPS. They assume the layout used so far:
+
+| What | Where |
+|---|---|
+| Repository | `/opt/ostrich` |
+| Backend service | `systemd` unit `ostrich` (`/opt/ostrich/apps/server`) |
+| Database settings | `/opt/ostrich/apps/server/.env` |
+| Web app (served by Caddy) | `/var/www/ostrich-web` |
+
+Each script lists its variables at the top if anything is different.
+
+## Deploy
+
+```bash
+cd /opt/ostrich
+git pull                     # once, to get the scripts themselves
+deploy/deploy.sh                # backend + web
+deploy/deploy.sh --web-only     # only the website
+deploy/deploy.sh --backend-only
+deploy/deploy.sh --no-backup    # skip the database backup before migrating
+```
+
+The script stops at the first error. Before the migration it backs up the
+database; after restarting the backend it checks `/api/health` and prints the
+service log if the backend does not come up.
+
+## Database migrations
+
+`deploy/deploy.sh` runs `npm run db:migrate:prod`, which applies the files in
+`apps/server/migrations/` (`001_*.sql`, `002_*.sql`, ...) that the database has
+not had yet, each in a transaction, and records them in `schema_migrations`.
+The first run on an existing database applies `001_baseline.sql`, which
+matches the old `schema.sql` and changes nothing that is already there.
+
+A schema change is a new file with the next number; files already applied
+are never edited.
+
+## Web server headers
+
+The web app sets its Content-Security-Policy itself, but a page cannot
+forbid other sites to show it in a frame; the web server has to. In the
+Caddyfile, inside the block of the web app's site:
+
+```
+header {
+	Content-Security-Policy "frame-ancestors 'none'"
+	X-Frame-Options "DENY"
+	X-Content-Type-Options "nosniff"
+	Referrer-Policy "no-referrer"
+	Strict-Transport-Security "max-age=31536000"
+}
+```
+
+Then `systemctl reload caddy`.
+
+## Several backend processes
+
+One backend process is enough for a long time. For more (several CPU
+cores, or restarts without anyone noticing) run several processes behind
+Caddy; they share websocket events, who is online, websocket tickets,
+failed logins and rate limits through Redis. Without `REDIS_URL` the backend
+keeps all of that in memory and must run as one process.
+
+All processes must see the same files of messages (`ATTACHMENTS_DIR`):
+on one server they do; on several, put the directory on shared storage.
+
+On the server, one command per step:
+
+1. Redis, only for this machine (Debian/Ubuntu listens on localhost by default):
+
+```bash
+apt-get install -y redis-server && systemctl enable --now redis-server && redis-cli ping
+```
+
+2. Tell the backend about it:
+
+```bash
+grep -q '^REDIS_URL=' /opt/ostrich/apps/server/.env || echo 'REDIS_URL=redis://127.0.0.1:6379' >> /opt/ostrich/apps/server/.env
+```
+
+3. Two processes on ports 3001 and 3002 instead of the single service (check
+first with `systemctl cat ostrich` that it runs as the same user as
+`deploy/ostrich@.service`, which has none, i.e. root; add `User=` there if not):
+
+```bash
+cp /opt/ostrich/deploy/ostrich@.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now ostrich@3001 ostrich@3002 && curl -fsS http://127.0.0.1:3001/api/health && curl -fsS http://127.0.0.1:3002/api/health
+```
+
+Both should answer with `"redis":"connected"`.
+
+4. In the Caddyfile, the API site's `reverse_proxy 127.0.0.1:3000` becomes
+(websockets need nothing more):
+
+```
+reverse_proxy 127.0.0.1:3001 127.0.0.1:3002 {
+	lb_policy least_conn
+	health_uri /api/health
+}
+```
+
+```bash
+systemctl reload caddy && systemctl disable --now ostrich
+```
+
+5. Deploys then restart the processes one by one:
+
+```bash
+SERVICES="ostrich@3001 ostrich@3002" deploy/deploy.sh
+```
+
+More processes: another port in steps 3–5. Back to one: the reverse in the
+opposite order (`reverse_proxy 127.0.0.1:3000`, `systemctl enable --now
+ostrich`, `systemctl disable --now ostrich@3001 ostrich@3002`).
+
+## Monitoring
+
+Two free services watch the server from outside and write to Telegram:
+
+- **UptimeRobot** checks every 5 minutes that the backend answers and sees
+  its database.
+- **Healthchecks.io** expects a ping from every daily backup and raises the
+  alarm when one fails or none comes.
+
+And our own bot on the server reports every 15 minutes (see *Monitoring
+bot* below).
+
+### Server down: UptimeRobot
+
+1. Sign up at <https://uptimerobot.com>.
+2. *Integrations* → *Telegram* → follow the link to their bot and press
+   *Start*: Telegram becomes an alert contact.
+3. *New monitor* → type **Keyword**, URL `https://<api address>/api/health`,
+   keyword `connected` (*Alert when keyword does not exist*), interval
+   5 minutes, alert contact Telegram.
+
+The health check answers `{"status":"ok","database":"connected"}` only when
+the backend runs and reaches PostgreSQL, so a stopped database alerts too.
+
+### Monitoring bot
+
+A Telegram bot of our own, running on the server next to the backend
+(`apps/server/src/monitor/`, unit `ostrich-monitor`).
+
+- **Every 15 minutes** (at :00, :15, :30, :45), silently: a few lines of
+  summary (users, online, messages, disk/RAM/CPU), and details that open
+  with a tap: users and peak online, requests, 5xx, failed logins and log
+  errors, database and files, CPU, RAM, swap, disks (with a forecast of
+  when they are full), network, backend response time and memory,
+  Postgres connections, services, the last backup, SSL certificates,
+  pending updates. ▲/▼ show the change since the previous report.
+- **At midnight**, a summary of the day compared with the day before: new
+  users, messages, peak online, requests, errors, crashes, how much the
+  database, the files and the disks grew.
+- **Alerts** with sound, checked every minute, when a problem has lasted two
+  checks, and again when it is fixed: the backend does not answer or is
+  slow, the database fails, a service failed or crashed (restarted by
+  systemd), a disk or the memory is nearly full or a disk will be full
+  within two weeks, the last backup is more than 26 hours old, many
+  errors in the backend's log or many failed logins, an SSL certificate
+  expires within two weeks.
+- **Commands**: `/stats` (the report now), `/today` (the day so far),
+  `/health`, `/id`.
+
+The day's figures and the disk history are kept in
+`/var/lib/ostrich-monitor/state.json`, so a restart (each deploy) does not
+lose them. SSL certificates are checked for the sites in
+`/etc/caddy/Caddyfile`.
+
+It does not replace UptimeRobot above: if the whole server is down, the
+bot is down too.
+
+On the server, one command per step:
+
+1. In Telegram, [@BotFather](https://t.me/BotFather) → `/newbot`; copy the
+   token it gives. Then put it (instead of `TOKEN`) and a random secret,
+   with which the bot asks the backend who is online, into `.env`:
+
+```bash
+printf 'MONITOR_BOT_TOKEN=TOKEN\nMONITOR_SECRET=%s\n' "$(openssl rand -hex 32)" >> /opt/ostrich/apps/server/.env
+```
+
+2. Build it and restart the backend, which now knows the secret:
+
+```bash
+cd /opt/ostrich && deploy/deploy.sh --backend-only --no-backup
+```
+
+3. Start the bot:
+
+```bash
+cp /opt/ostrich/deploy/ostrich-monitor.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now ostrich-monitor
+```
+
+4. Write `/start` to the bot: it answers with your chat id. For a group,
+   add the bot to it and send `/id` there. Put the id (instead of `ID`;
+   several separated by commas) into `.env`:
+
+```bash
+echo 'MONITOR_CHAT_IDS=ID' >> /opt/ostrich/apps/server/.env && systemctl restart ostrich-monitor
+```
+
+The bot says "Мониторинг запущен" with a first report. Only these chats
+get reports and answers. Deploys restart the bot with the backend.
+
+With several backend processes (above), give it all of their addresses:
+
+```bash
+echo 'MONITOR_BACKEND_URLS=http://127.0.0.1:3001,http://127.0.0.1:3002' >> /opt/ostrich/apps/server/.env && systemctl restart ostrich-monitor
+```
+
+Other settings, in `.env` as well (the defaults are shown):
+
+| Variable | Default | |
+|---|---|---|
+| `MONITOR_REPORT_MINUTES` | `15` | how often to report |
+| `MONITOR_CHECK_SECONDS` | `60` | how often to check |
+| `MONITOR_ALERT_AFTER` | `2` | checks in a row before an alert |
+| `MONITOR_DISK_MIN_FREE_PERCENT` | `10` | a disk is low below this ... |
+| `MONITOR_DISK_MIN_FREE_GB` | `2` | ... or this (uploads stop at 1 GB) |
+| `MONITOR_MEMORY_MIN_FREE_PERCENT` | `5` | |
+| `MONITOR_BACKUP_MAX_AGE_HOURS` | `26` | |
+| `MONITOR_DISK_FULL_ALERT_DAYS` | `14` | alert when a disk will be full sooner |
+| `MONITOR_SLOW_MS` | `3000` | the backend is slow above this |
+| `MONITOR_LOG_ERRORS_ALERT` | `20` | errors in the log within 5 minutes |
+| `MONITOR_FAILED_LOGINS_ALERT` | `50` | failed logins within 15 minutes |
+| `MONITOR_CERT_MIN_DAYS` | `14` | Caddy renews 30 days ahead |
+| `MONITOR_TLS_HOSTS` | sites in the Caddyfile | e.g. `api.example.com,example.com` |
+| `MONITOR_SERVICES` | `ostrich* postgresql* redis* caddy* coturn*` | systemd services to watch |
+| `BACKUP_DIR` | `/var/backups/ostrich` | where `backup.sh` writes |
+
+Times are the server's: `timedatectl set-timezone Europe/Moscow` (your
+city), then `systemctl restart ostrich-monitor`.
+
+Another person: they press *Start* in the bot and send you the chat id it
+answers; add it to the list (instead of `ID`):
+
+```bash
+sed -i 's/^MONITOR_CHAT_IDS=.*/&,ID/' /opt/ostrich/apps/server/.env && grep '^MONITOR_CHAT_IDS=' /opt/ostrich/apps/server/.env && systemctl restart ostrich-monitor
+```
+
+What it does: `journalctl -u ostrich-monitor -n 30`.
+
+### Files of messages
+
+Photos and files sent in chats are stored encrypted (the server never has
+their keys) in `ATTACHMENTS_DIR`, by default `/opt/ostrich/apps/server/data/attachments`.
+Set it in the backend's `.env` to put them on a bigger disk. Uploads are
+refused when less than 1 GB would stay free. Files of deleted messages, and
+uploads never sent, are removed by the backend within a few hours.
+
+The database backups below do not contain these files. To keep them too,
+copy the folder to another machine now and then, e.g. from your computer:
+
+```bash
+rsync -a root@SERVER:/opt/ostrich/apps/server/data/attachments/ ostrich-attachments/
+```
+
+## Calls: the TURN server
+
+Calls go straight between the two devices when they can reach each other.
+Behind strict NATs and firewalls (some mobile networks, offices) they
+cannot, and the audio and video have to go through a TURN server: without
+one such calls connect but stay silent. They stay encrypted end to end on
+the way; the TURN server only passes packets it cannot read.
+
+[`turnserver.conf`](turnserver.conf) sets up coturn on the same server. The
+backend gives each app a TURN login for 6 hours, made with a secret that
+coturn shares (nothing is stored). Each command is one line:
+
+```bash
+apt-get install -y coturn
+```
+
+```bash
+SECRET=$(openssl rand -hex 32) && IP=$(curl -4 -s ifconfig.me) && sed "s/^static-auth-secret=CHANGE_ME/static-auth-secret=$SECRET/" /opt/ostrich/deploy/turnserver.conf > /etc/turnserver.conf && printf 'TURN_SECRET=%s\nTURN_URLS=turn:%s:3478?transport=udp,turn:%s:3478?transport=tcp\nSTUN_URLS=stun:%s:3478\n' "$SECRET" "$IP" "$IP" "$IP" >> /opt/ostrich/apps/server/.env && tail -2 /opt/ostrich/apps/server/.env
+```
+
+```bash
+sed -i 's/^#\?TURNSERVER_ENABLED=.*/TURNSERVER_ENABLED=1/' /etc/default/coturn 2>/dev/null; systemctl enable --now coturn && systemctl restart coturn ostrich && systemctl is-active coturn ostrich
+```
+
+With a firewall (ufw), open the TURN port and the relay ports:
+
+```bash
+ufw allow 3478 && ufw allow 49152:49352/udp
+```
+
+The monitoring bot watches the `coturn` service, and its reports count
+calls (started and answered). Relayed calls show in the server's network
+traffic, each way for every call that needs the relay: about 50 kbit/s for
+audio, 1–2 Mbit/s with video.
+
+To check it: open
+[Trickle ICE](https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/),
+add `turn:<server's IP>:3478` with a login from
+`curl -s -H "Authorization: Bearer <a session token>" https://<api>/api/calls/ice-servers`,
+and press *Gather candidates*: a `relay` line means it works.
+
+## Backups: Healthchecks.io
+
+1. Sign up at <https://healthchecks.io>, *Integrations* → *Telegram* →
+   follow the link to their bot.
+2. *Add check*: name "Ostrich backup", period **1 day**, grace **2 hours**.
+   Copy its ping URL (`https://hc-ping.com/…`).
+3. On the server (put your URL in):
+
+```bash
+mkdir -p /etc/systemd/system/ostrich-backup.service.d && printf '[Service]\nEnvironment=HEALTHCHECK_URL=https://hc-ping.com/YOUR-UUID\n' > /etc/systemd/system/ostrich-backup.service.d/healthcheck.conf && systemctl daemon-reload && systemctl start ostrich-backup.service
+```
+
+The last command runs a backup now: the check turns green. From then on a
+failed backup (disk full, database down, …) alerts right away, and a backup
+that does not run at all alerts after a day and two hours.
+
+## Backups
+
+`deploy/backup.sh` writes a compressed `pg_dump` to `/var/backups/ostrich` and
+keeps the newest 7. It skips the backup (and fails) when the disk would have
+less than 500 MB left. Run it by hand any time:
+
+```bash
+deploy/backup.sh
+KEEP=3 deploy/backup.sh
+```
+
+### Daily backups
+
+```bash
+cp /opt/ostrich/deploy/ostrich-backup.service /opt/ostrich/deploy/ostrich-backup.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now ostrich-backup.timer
+
+systemctl list-timers ostrich-backup.timer   # next run
+systemctl start ostrich-backup.service       # run one now
+journalctl -u ostrich-backup -n 20           # what happened
+ls -lh /var/backups/ostrich
+```
+
+How many backups to keep and how much space to leave are set in
+`ostrich-backup.service` (`KEEP`, `MIN_FREE_MB`). Check the space first:
+
+```bash
+df -h /var/backups
+sudo -u postgres psql -d ostrich_db -c "SELECT pg_size_pretty(pg_database_size('ostrich_db'));"
+```
+
+Each backup is smaller than the database size shown (it is compressed).
+Messages are end-to-end encrypted, so backups contain only ciphertext.
+
+### Restore
+
+```bash
+systemctl stop ostrich
+sudo -u postgres pg_restore --clean --if-exists -d ostrich_db /var/backups/ostrich/ostrich-YYYYMMDD-HHMMSS.dump
+systemctl start ostrich
+```
+
+These backups are on the same disk as the database: they protect against
+mistakes, not against losing the server. Copy them elsewhere from time to time
+(e.g. `scp` to your computer) for that.
