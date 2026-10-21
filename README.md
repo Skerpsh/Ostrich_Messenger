@@ -38,6 +38,7 @@
 - [Contributing](#contributing)
 - [Contact](#contact)
 - [Security](#security)
+- [Code signing policy](#code-signing-policy)
 - [License](#license)
 
 ## Features
@@ -637,6 +638,31 @@ Want to join? Write to [hello@ostrich-messenger.com](mailto:hello@ostrich-messen
 Please **do not** open public issues for vulnerabilities. Report them privately as described in
 [SECURITY.md](SECURITY.md) or by email to
 [security@ostrich-messenger.com](mailto:security@ostrich-messenger.com).
+
+## Code signing policy
+
+Free code signing on Windows provided by [SignPath.io](https://signpath.io), certificate by
+[SignPath Foundation](https://signpath.org).
+
+- Committers and reviewers: [@Skerpsh](https://github.com/Skerpsh)
+- Approvers: [@Skerpsh](https://github.com/Skerpsh)
+
+Only builds made by the [Release](.github/workflows/release.yml) workflow on GitHub, from the
+code in this repository at a version tag, are signed, and each signing is approved by hand. Team
+members use two-factor authentication on GitHub.
+
+**Privacy.** Ostrich does not transfer any information to other networked systems unless the
+person using it asks for it, except what a messenger needs to work:
+
+- the Ostrich server the app is set up with (by default Ostrich's own): the account, contacts and
+  messages, which are end-to-end encrypted, so the server cannot read them
+- calls: directly between the two devices, or through the server's own relay (TURN), encrypted
+- push notifications on Android and iOS: through Expo and Google's or Apple's push service; they
+  only say "New message", never its text or sender
+- link previews: made by the sender's device, which loads the linked page
+- the desktop app checks GitHub releases for updates
+
+Questions: [privacy@ostrich-messenger.com](mailto:privacy@ostrich-messenger.com).
 
 ## License
 
