@@ -85,6 +85,10 @@ export function notifyNewMessage(chatId: string, senderId: string, mentions: str
         body: "New message",
         sound: "default",
         priority: "high",
+        // Android: the app's "Messages" channel (notifications.native.ts),
+        // important enough to pop up on the screen; the default one only
+        // goes quietly into the shade.
+        channelId: "messages",
         data: { chatId },
       }));
 

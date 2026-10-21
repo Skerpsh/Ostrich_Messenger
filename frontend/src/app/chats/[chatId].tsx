@@ -81,6 +81,7 @@ import {
 import { saveFile } from "@/lib/files";
 import { formatPresence, previewText } from "@/lib/format";
 import { chatTitle, isGroupDistrusted } from "@/lib/groups";
+import { KEYBOARD_BEHAVIOR, useKeyboardShown } from "@/lib/keyboard";
 import { loadCachedMessages, saveCachedMessages } from "@/lib/local-cache";
 import { mentionedUsernames, plainText } from "@/lib/markup";
 import { useInvertedWheel } from "@/lib/inverted-wheel";
@@ -183,6 +184,8 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
 
   const [messages, setMessages] = useState<Message[] | null>(null);
   const motion = useMotion();
+  // The composer sits on the keyboard: no room for the bar below then.
+  const keyboardShown = useKeyboardShown();
   // Messages newer than this come in animated (not the history).
   const [openedAt] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
@@ -1720,7 +1723,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
 
       <KeyboardAvoidingView
         style={styles.screen}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_BEHAVIOR}
       >
         {messages === null ? (
           <ActivityIndicator color={colors.muted} style={styles.screen} />
@@ -1956,7 +1959,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                 styles.composer,
                 styles.blockedBar,
                 {
-                  paddingBottom: insets.bottom + 10,
+                  paddingBottom: (keyboardShown ? 0 : insets.bottom) + 10,
                   backgroundColor: colors.surface,
                   borderTopColor: colors.line,
                 },
@@ -1976,7 +1979,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
               style={[
                 styles.composer,
                 {
-                  paddingBottom: insets.bottom + 10,
+                  paddingBottom: (keyboardShown ? 0 : insets.bottom) + 10,
                   backgroundColor: colors.surface,
                   borderTopColor: colors.line,
                 },
@@ -2511,8 +2514,10 @@ const styles = StyleSheet.create({
   },
 
   // The empty component of an inverted list is drawn upside down.
+  // Upright again inside the inverted list, which Android turns over both
+  // ways (scale -1) and the others upside down only (scaleY -1).
   flipped: {
-    transform: [{ scaleY: -1 }],
+    transform: Platform.OS === "android" ? [{ scale: -1 }] : [{ scaleY: -1 }],
   },
 
   emptyWrap: {

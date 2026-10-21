@@ -593,6 +593,16 @@ binaries, `install.sh` and `SHA256SUMS`, plus notes generated from the commits.
 Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how
 to set up the project and what a good pull request looks like.
 
+### Beta testers
+
+Thanks to the people who try Ostrich before everyone else and tell us what breaks:
+
+| | Who | What they found |
+|---|---|---|
+| 🐛 | [@slawti](https://github.com/slawti) | The first Android build on a Pixel: the keyboard covering the message field, notifications that did not pop up, no microphone or camera, panels that would not open |
+
+Want to join? Write to [hello@ostrich-messenger.com](mailto:hello@ostrich-messenger.com).
+
 ## Contact
 
 - Help with the app: [support@ostrich-messenger.com](mailto:support@ostrich-messenger.com)

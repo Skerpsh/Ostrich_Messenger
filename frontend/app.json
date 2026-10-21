@@ -51,8 +51,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Ostrich uses your photos to set your profile picture and chat wallpapers.",
-          "cameraPermission": false,
-          "microphonePermission": false
+          "cameraPermission": "Ostrich uses the camera to scan QR codes: invites, contacts and safety codes.",
+          "microphonePermission": "Ostrich uses the microphone for voice messages and calls."
         }
       ],
       [

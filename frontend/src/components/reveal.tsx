@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { StyleSheet, type StyleProp, type View, type ViewStyle } from "react-native";
+import { Platform, StyleSheet, type StyleProp, type View, type ViewStyle } from "react-native";
 import Animated, { type CSSAnimationProperties, type CSSTransitionProperties } from "react-native-reanimated";
 import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, SPRING, useMotion, type Motion } from "@/lib/motion";
 
@@ -16,7 +16,33 @@ const HIDDEN = {
 
 export type RevealKind = keyof typeof HIDDEN;
 
+// The same, shown (for keyframes, which need the same transforms).
+const SHOWN = {
+  rise: [{ translateY: 0 }],
+  drop: [{ translateY: 0 }],
+  pop: [{ scale: 1 }],
+  fade: [],
+} satisfies Record<RevealKind, ViewStyle["transform"]>;
+
 const ENTER_MS = { full: 300, reduced: 150, off: 0 } satisfies Record<Motion, number>;
+
+// Coming in from the hidden look, or going back to it (the phones).
+function keyframes(kind: RevealKind, motion: Motion, coming: boolean): CSSAnimationProperties<ViewStyle> | null {
+  if (motion === "off") {
+    return null;
+  }
+
+  const moving = motion === "full";
+  const hidden = { opacity: 0, transform: moving ? HIDDEN[kind] : [] };
+  const visible = { opacity: 1, transform: moving ? SHOWN[kind] : [] };
+
+  return {
+    animationName: coming ? { from: hidden, to: visible } : { from: visible, to: hidden },
+    animationDuration: coming ? ENTER_MS[motion] : LEAVE_MS[motion],
+    animationTimingFunction: coming ? EASE_OUT : EASE_IN,
+    animationFillMode: coming ? "none" : "forwards",
+  };
+}
 
 function transition(
   motion: Motion,
@@ -62,11 +88,17 @@ export default function Reveal({
   const [open, setOpen] = useState(shown && (!appear || motion === "off"));
   const [height, setHeight] = useState<number | null>(null);
   const measured = height !== null;
+  // There from the start (and not to appear): no animation until it goes.
+  const [quiet, setQuiet] = useState(shown && !appear);
 
   // Following the child as it is rendered (React's way to adjust state to
   // new props; only this component renders again).
   if (shown && kept !== children) {
     setKept(children);
+  }
+
+  if (!shown && quiet) {
+    setQuiet(false);
   }
 
   if (shown && !mounted) {
@@ -106,14 +138,28 @@ export default function Reveal({
     return null;
   }
 
+  // On its way out it takes no presses.
+  const pointerEvents = shown ? "box-none" : "none";
+
+  // The phones: animations of their own (keyframes), no growing height. A
+  // view hidden at no height is not measured reliably on Android, and the
+  // panels stayed shut there.
+  if (Platform.OS !== "web") {
+    return (
+      <Animated.View
+        pointerEvents={pointerEvents}
+        style={[style, shown ? (quiet ? null : keyframes(kind, motion, true)) : keyframes(kind, motion, false)]}
+      >
+        {shown ? children : kept}
+      </Animated.View>
+    );
+  }
+
   const content = {
     opacity: open ? 1 : 0,
     transform: open ? [] : HIDDEN[kind],
     ...transition(motion, open, ["opacity", "transform"]),
   };
-
-  // On its way out it takes no presses.
-  const pointerEvents = shown ? "box-none" : "none";
 
   if (!collapse) {
     return (
@@ -176,6 +222,13 @@ export function Collapse({
       return;
     }
 
+    // The phones: it fades and shrinks (keyframes, below), the list then
+    // closes up at once.
+    if (Platform.OS !== "web") {
+      const timer = setTimeout(() => closed.current(), LEAVE_MS[motion]);
+      return () => clearTimeout(timer);
+    }
+
     let cancel = () => {};
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -200,7 +253,9 @@ export function Collapse({
       ref={ref}
       pointerEvents={closing ? "none" : "auto"}
       style={
-        closing && height !== null
+        closing && Platform.OS !== "web"
+          ? keyframes("pop", motion, false)
+          : closing && height !== null
           ? {
               overflow: "hidden",
               height: shut ? 0 : height,
@@ -223,18 +278,21 @@ export function useSlider(selected: number) {
   const motion = useMotion();
   const [places, setPlaces] = useState<Record<number, { x: number; y: number; width: number; height: number }>>({});
   const place = places[selected];
+  // Moved with a transform (what animates on the phones too), sized at once.
   const style:
-    | (CSSTransitionProperties<ViewStyle> & Pick<ViewStyle, "position" | "left" | "top" | "width" | "height">)
+    | (CSSTransitionProperties<ViewStyle> &
+        Pick<ViewStyle, "position" | "left" | "top" | "width" | "height" | "transform">)
     | null = place
     ? {
         position: "absolute",
-        left: place.x,
-        top: place.y,
+        left: 0,
+        top: 0,
         width: place.width,
         height: place.height,
+        transform: [{ translateX: place.x }, { translateY: place.y }],
         ...(motion === "full"
           ? {
-              transitionProperty: ["left", "top", "width"],
+              transitionProperty: "transform",
               transitionDuration: 380,
               transitionTimingFunction: SPRING,
             }
@@ -326,7 +384,7 @@ export function Swap({
       style={[
         fill && styles.fill,
         style,
-        previous && resize && !fill && height !== null
+        previous && resize && !fill && Platform.OS === "web" && height !== null
           ? {
               height,
               overflow: "hidden",

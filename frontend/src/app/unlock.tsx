@@ -2,7 +2,6 @@ import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +17,7 @@ import Reveal from "@/components/reveal";
 import TextField from "@/components/text-field";
 import { useAuth, useCurrentUser } from "@/context/auth";
 import { useAppTheme } from "@/context/theme";
+import { KEYBOARD_BEHAVIOR } from "@/lib/keyboard";
 import { useShake } from "@/lib/motion";
 import { TOUCH_UI } from "@/lib/touch";
 import { radius } from "@/theme/colors";
@@ -55,7 +55,7 @@ export default function UnlockScreen() {
 
       <KeyboardAvoidingView
         style={styles.screen}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_BEHAVIOR}
       >
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}

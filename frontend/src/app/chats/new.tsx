@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import Animated from "react-native-reanimated";
 import {
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,6 +22,7 @@ import { useChats } from "@/context/chats";
 import { useAppTheme } from "@/context/theme";
 import { findUser, type FoundUser } from "@/lib/api";
 import { createGroup, MAX_GROUP_MEMBERS } from "@/lib/groups";
+import { KEYBOARD_BEHAVIOR } from "@/lib/keyboard";
 import { useEscape } from "@/lib/keys";
 import { useIsWide } from "@/lib/layout";
 import { linkPath, parseLink } from "@/lib/links";
@@ -98,7 +98,7 @@ function NewChat() {
 
       <KeyboardAvoidingView
         style={styles.screen}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_BEHAVIOR}
       >
         <ScrollView
           contentContainerStyle={styles.body}

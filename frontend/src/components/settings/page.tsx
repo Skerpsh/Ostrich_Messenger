@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { useIsFocused, useRouter } from "expo-router";
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppHeader from "@/components/app-header";
 import ScreenEnter, { useLeaveScreen } from "@/components/screen-enter";
 import { useAppTheme } from "@/context/theme";
+import { KEYBOARD_BEHAVIOR } from "@/lib/keyboard";
 import { useEscape } from "@/lib/keys";
 import { styles } from "./ui";
 
@@ -35,7 +36,7 @@ function Page({ title, children }: { title: string; children: ReactNode }) {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <AppHeader onBack={back} title={title} />
 
-      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={styles.screen} behavior={KEYBOARD_BEHAVIOR}>
         <ScrollView
           contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 32 }]}
           keyboardShouldPersistTaps="handled"

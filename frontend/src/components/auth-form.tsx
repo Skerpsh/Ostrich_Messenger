@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import {
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,6 +24,7 @@ import {
   USERNAME_RE,
   USERNAME_RULES,
 } from "@/lib/validation";
+import { KEYBOARD_BEHAVIOR } from "@/lib/keyboard";
 import { useShake } from "@/lib/motion";
 import { TOUCH_UI } from "@/lib/touch";
 import { radius } from "@/theme/colors";
@@ -116,7 +116,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
       <KeyboardAvoidingView
         style={styles.screen}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_BEHAVIOR}
       >
         <ScrollView
           contentContainerStyle={[
