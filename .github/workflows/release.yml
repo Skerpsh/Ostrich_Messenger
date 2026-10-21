@@ -1,0 +1,137 @@
+# Publishes a release of every app when a version tag is pushed
+# (git tag v1.3.0 && git push origin v1.3.0): the CLI for Linux, macOS and
+# Windows, and the Android app (an APK built with EAS), all under the same
+# version, with SHA-256 checksums and a table of what to download.
+#
+# The Android build needs EXPO_TOKEN in the repository's secrets (Settings →
+# Secrets and variables → Actions); without it the release has the CLI only.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  cli:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/cli/go.mod
+      - run: go vet ./... && go test ./...
+      - name: Build
+        run: |
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            os="${target%/*}"
+            arch="${target#*/}"
+            name="ostrich-$os-$arch"
+            [ "$os" = windows ] && name="$name.exe"
+            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath \
+              -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" -o "dist/$name" .
+          done
+          cp install.sh dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli
+          path: apps/cli/dist/*
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile-web
+    steps:
+      - name: Check for the Expo token
+        id: token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::warning::EXPO_TOKEN is not set: the release will have no Android app"
+            echo "set=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "set=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.set == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.set == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile-web/package-lock.json
+      - uses: expo/expo-github-action@v8
+        if: steps.token.outputs.set == 'true'
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Build the APK with EAS
+        if: steps.token.outputs.set == 'true'
+        run: |
+          npm ci
+          # The app's version is the tag's (v1.3.0 → 1.3.0); EAS counts the
+          # build number up by itself (eas.json, "github" profile).
+          version="${GITHUB_REF_NAME#v}"
+          jq --arg v "$version" '.expo.version = $v' app.json > app.json.new && mv app.json.new app.json
+          eas build --platform android --profile github --non-interactive --wait --json > build.json
+          url=$(jq -r '.[0].artifacts.buildUrl' build.json)
+          mkdir -p dist
+          curl -fsSL "$url" -o dist/Ostrich-Android.apk
+      - uses: actions/upload-artifact@v4
+        if: steps.token.outputs.set == 'true'
+        with:
+          name: android
+          path: apps/mobile-web/dist/Ostrich-Android.apk
+
+  publish:
+    needs: [cli, android]
+    # The CLI is enough to publish; the Android app joins when it was built.
+    if: ${{ !cancelled() && needs.cli.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Notes
+        run: |
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
+          android="[Ostrich-Android.apk]($base/Ostrich-Android.apk)"
+          [ -f release/Ostrich-Android.apk ] || android="not in this release"
+          cat > notes.md <<EOF
+          ## Download
+
+          | System | File |
+          |---|---|
+          | **Android** | $android |
+          | **Windows** | the app: coming soon · terminal: [ostrich-windows-amd64.exe]($base/ostrich-windows-amd64.exe) |
+          | **Linux** | the app: coming soon · terminal: [x86-64]($base/ostrich-linux-amd64), [ARM64]($base/ostrich-linux-arm64) or \`curl -fsSL $base/install.sh \| sh\` |
+          | **macOS** | terminal: [Apple silicon]($base/ostrich-darwin-arm64), [Intel]($base/ostrich-darwin-amd64) |
+          | **iOS** | coming to the App Store |
+          | **Web** | [ostrich-messenger.online](https://ostrich-messenger.online), nothing to install |
+
+          On Android, open the APK on the phone and allow installing from that app when asked.
+          Check a download with \`sha256sum -c SHA256SUMS\`.
+
+          EOF
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # A release made by hand on GitHub (which also makes the tag) gets
+        # the files added to it instead.
+        run: |
+          (cd release && sha256sum * > SHA256SUMS)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* --title "Ostrich $GITHUB_REF_NAME" --notes-file notes.md --generate-notes
+          fi

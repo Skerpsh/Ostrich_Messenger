@@ -30,10 +30,10 @@ From the source: `cd apps/cli && go build -o ostrich . && ./ostrich`.
 git tag v1.2.0 && git push origin v1.2.0
 ```
 
-The *Release CLI* workflow tests and builds the CLI for Linux, macOS and
-Windows (x86 and ARM) and publishes the files, `install.sh` and
-`SHA256SUMS` as the release, with notes from the commits since the last
-tag.
+The *Release* workflow (`.github/workflows/release.yml`) tests and builds the
+CLI for Linux, macOS and Windows (x86 and ARM) and publishes the files,
+`install.sh` and `SHA256SUMS` in the release, next to the Android app, with
+notes from the commits since the last tag.
 
 `OSTRICH_SERVER=http://localhost:3000 ./ostrich` uses another backend. Invite and profile links point
 to the web app: Ostrich's site for the default server, the server's own address for another

@@ -3,13 +3,14 @@
 <img src=".github/social-preview.png" alt="Ostrich: a private messenger where the server only ever sees ciphertext. Web, iOS, Android and Terminal.">
 
 [![CI](https://github.com/Skerpsh/Ostrich_Messenger/actions/workflows/ci.yml/badge.svg)](https://github.com/Skerpsh/Ostrich_Messenger/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/Skerpsh/Ostrich_Messenger?label=CLI&sort=semver)](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/Skerpsh/Ostrich_Messenger?label=release&sort=semver)](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)
 ![Expo](https://img.shields.io/badge/Expo-000020?logo=expo&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
 
+[**Download**](#download) ·
 [**Open the web app**](https://ostrich-messenger.online) ·
 [Install the CLI](#terminal-client-cli) ·
 [Self-host](#self-hosting-on-a-server) ·
@@ -22,7 +23,7 @@
 ## Contents
 
 - [Features](#features)
-- [Clients](#clients)
+- [Download](#download)
 - [Quick start for users](#quick-start-for-users)
 - [Terminal client (CLI)](#terminal-client-cli)
 - [How the encryption works](#how-the-encryption-works)
@@ -32,7 +33,7 @@
 - [Configuration](#configuration)
 - [Operations: deploys, backups and monitoring](#operations-deploys-backups-and-monitoring)
 - [Testing and CI](#testing-and-ci)
-- [Releasing the CLI](#releasing-the-cli)
+- [Releasing](#releasing)
 - [Project structure](#project-structure)
 - [Contributing](#contributing)
 - [Contact](#contact)
@@ -74,13 +75,18 @@
 - 🌗 Light and dark themes with an accent color
 - ⌨️ Keyboard shortcuts in the web app (Ctrl/⌘ K, Alt ↑/↓, ↑ to edit, Esc)
 
-## Clients
+## Download
 
-| Client | Built with | Where to get it |
-|---|---|---|
-| **Web** | Expo + React Native Web | [ostrich-messenger.online](https://ostrich-messenger.online), installable as an app from the browser |
-| **iOS / Android** | Expo (React Native) | Build from [`apps/mobile-web/`](apps/mobile-web) with Expo / EAS, see [Mobile apps](#mobile-apps) |
-| **Terminal** | Go + Bubble Tea | [One-line install](#terminal-client-cli) or the [latest release](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) |
+| System | Get Ostrich |
+|---|---|
+| 🤖 **Android** | [**Download the APK**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Android.apk) — open it on the phone and allow installing when asked |
+| 🪟 **Windows** | The app: coming soon · Terminal: [ostrich-windows-amd64.exe](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-windows-amd64.exe) |
+| 🐧 **Linux** | The app: coming soon · Terminal: [x86-64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-amd64), [ARM64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-arm64) or the [one-line install](#terminal-client-cli) |
+| 🍎 **macOS** | Terminal: [Apple silicon](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-arm64), [Intel](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-amd64) |
+| 📱 **iOS** | Coming to the App Store |
+| 🌐 **Web** | [ostrich-messenger.online](https://ostrich-messenger.online): nothing to install, and installable as an app from the browser |
+
+Every file of every version: [releases](https://github.com/Skerpsh/Ostrich_Messenger/releases).
 
 All clients use the same account, the same chats and the same encryption.
 
@@ -556,15 +562,23 @@ WebSocket events, presence, rate limits and failed login counts through Redis.
 plus a `gofmt` check. The TypeScript and Go cryptography is checked against the same test vectors,
 so the clients cannot drift apart.
 
-## Releasing the CLI
+## Releasing
 
 ```bash
-git tag v1.2.0 && git push origin v1.2.0   # the next version after the latest release
+git tag v1.3.0 && git push origin v1.3.0   # the next version after the latest release
 ```
 
-The [Release CLI](.github/workflows/release-cli.yml) workflow tests the CLI and builds it for
-Linux, macOS and Windows on x86-64 and ARM64. It then publishes a GitHub release with the
-binaries, `install.sh` and `SHA256SUMS`, plus notes generated from the commits.
+The [Release](.github/workflows/release.yml) workflow publishes every app under that version:
+the CLI for Linux, macOS and Windows on x86-64 and ARM64 (tested first), and the Android app,
+an APK built with EAS (the app's version is the tag's; the build number counts up by itself).
+The release gets the files, `install.sh` and `SHA256SUMS`, a table of what to download for
+which system, and notes generated from the commits. The [Download](#download) links always
+point at the latest release.
+
+The Android build needs an Expo access token once: create one at
+[expo.dev → Account settings → Access tokens](https://expo.dev/settings/access-tokens), then add
+it on GitHub under the repository's **Settings → Secrets and variables → Actions → New repository
+secret** as `EXPO_TOKEN`. Without it the release has the CLI only.
 
 ## Project structure
 
