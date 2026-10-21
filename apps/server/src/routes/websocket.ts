@@ -493,6 +493,9 @@ export default async function websocketRoutes(server: FastifyInstance) {
       send({
         type: "connected",
         username: user.username,
+        // The server's clock: clients time calls by it, not by their own
+        // (which may be hours off).
+        time: Date.now(),
       });
     },
   );

@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import type { LastMessage, Message, Reaction } from "./api";
 import { WS_URL } from "./config";
+import { setServerTime } from "./server-clock";
 
 const RECONNECT_DELAY_MS = 3_000;
 
@@ -221,6 +222,7 @@ export class RealtimeConnection {
         avatarId?: string | null;
         isDeveloper?: boolean;
         error?: string;
+        time?: number;
       };
 
       try {
@@ -231,6 +233,10 @@ export class RealtimeConnection {
 
       switch (data.type) {
         case "connected":
+          if (typeof data.time === "number") {
+            setServerTime(data.time);
+          }
+
           this.ready = true;
           this.handlers.onStatus("online");
 

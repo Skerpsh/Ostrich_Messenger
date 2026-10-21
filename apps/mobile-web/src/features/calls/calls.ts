@@ -1,4 +1,5 @@
 import type { Chat } from "@/api/api";
+import { serverNow } from "@/api/server-clock";
 import {
   CallConnection,
   type Candidate,
@@ -110,7 +111,8 @@ const RESTART_MS = 3_000;
 const LOST_MS = 30_000;
 // Network candidates are sent in batches, at most this often.
 const CANDIDATES_MS = 150;
-// Offers older than this (or this far ahead: clocks differ) are ignored.
+// Offers older than this (or this far ahead) are ignored. Both sides time
+// them by the server's clock (api/server-clock.ts), not their own.
 const OFFER_MAX_AGE_MS = 2 * 60_000;
 
 // Calls this device has seen, so an offer sent again cannot ring again.
@@ -243,7 +245,7 @@ export class CallSession {
       decryptCallSignal(event.data, { chatId: chat.id, callId: id, senderId: callerId }, deps.privateKey, chat.public_key),
     );
 
-    if (signal?.k !== "offer" || Math.abs(Date.now() - signal.t) > OFFER_MAX_AGE_MS) {
+    if (signal?.k !== "offer" || Math.abs(serverNow() - signal.t) > OFFER_MAX_AGE_MS) {
       return null;
     }
 
@@ -425,7 +427,7 @@ export class CallSession {
       return;
     }
 
-    const data = this.seal({ k: "offer", sdp, commit: commitment(this.nonce), t: Date.now(), v: this.view.video });
+    const data = this.seal({ k: "offer", sdp, commit: commitment(this.nonce), t: serverNow(), v: this.view.video });
 
     if (!this.deps.send({ type: "call_start", chatId: this.view.chat.id, callId: this.id, data })) {
       this.finish("You're offline");
