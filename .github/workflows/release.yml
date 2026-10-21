@@ -49,6 +49,9 @@ jobs:
       run:
         working-directory: apps/mobile-web
     steps:
+      # First: the steps run in apps/mobile-web, which only exists once
+      # the code is checked out.
+      - uses: actions/checkout@v4
       - name: Check for the Expo token
         id: token
         env:
@@ -60,8 +63,6 @@ jobs:
           else
             echo "set=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
-        if: steps.token.outputs.set == 'true'
       - uses: actions/setup-node@v4
         if: steps.token.outputs.set == 'true'
         with:
