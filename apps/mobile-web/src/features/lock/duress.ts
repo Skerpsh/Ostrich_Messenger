@@ -33,6 +33,8 @@ type FakeData = {
   devices: { id: string; client: string; daysAgo: number; minutesAgo: number }[];
   // App lock as it looks then: no wipe PIN, nothing about this.
   lock: { wipe: boolean; wipeAfterTries: boolean };
+  // Account: when the username "can be changed again" (ISO).
+  usernameChangeAt?: string;
 };
 
 type DuressState = { config: DuressConfig | null; fake: FakeData | null };
@@ -129,7 +131,13 @@ export async function makeFakeData(safeChats: Chat[]) {
     minutesAgo: 30 + random(10 * 24 * 60),
   }));
 
-  await saveFake({ recovery, disappear, devices, lock: { wipe: false, wipeAfterTries: false } });
+  await saveFake({
+    recovery,
+    disappear,
+    devices,
+    lock: { wipe: false, wipeAfterTries: false },
+    usernameChangeAt: new Date(Date.now() + (3 + random(24)) * DAY).toISOString(),
+  });
 }
 
 export async function forgetDuress() {
@@ -187,6 +195,19 @@ export function fakeDisappear(): DisappearStatus {
       stale: false,
     })),
   };
+}
+
+// Settings → Account: the username was changed lately, so it cannot be
+// now (as the server says once in 28 days); a date that has passed moves
+// on by 28 days.
+export function fakeUsernameChangeAt() {
+  let at = new Date(state.fake?.usernameChangeAt ?? Date.now() + 9 * DAY).getTime();
+
+  while (at <= Date.now()) {
+    at += 28 * DAY;
+  }
+
+  return new Date(at).toISOString();
 }
 
 // Settings → Devices: this one as it is, the others made up.

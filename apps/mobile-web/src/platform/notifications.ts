@@ -81,3 +81,7 @@ export async function showMessageNotification(
 export async function syncPushToken(_withToken: WithToken) {}
 
 export function useNotificationTaps(_openChat: (chatId: string) => void) {}
+
+// The phones only (notifications.native.ts): the web's come from the open
+// app, which filters them itself.
+export async function pausePushNotifications(_withToken: WithToken) {}

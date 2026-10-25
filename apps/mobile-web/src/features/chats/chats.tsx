@@ -675,11 +675,16 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
   );
 
   // Mobile: register for push notifications; tapping one opens its chat.
+  // With an app lock, only once the real PIN opens it (LockWatch): not
+  // while it is locked, nor opened with the duress PIN.
+  const lock = useLock();
+  const lockOn = !lock.loaded || lock.config !== null;
+
   useEffect(() => {
-    if (userId && privateKey) {
+    if (userId && privateKey && !lockOn) {
       syncPushToken(withToken);
     }
-  }, [userId, privateKey, withToken]);
+  }, [userId, privateKey, withToken, lockOn]);
 
   useNotificationTaps(openChat);
 
@@ -727,7 +732,7 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
 
   // The silent alert, once each time the duress PIN opens the app: sent
   // like any message, to a chat that is not shown.
-  const { opened, duress } = useLock();
+  const { opened, duress } = lock;
   const duressConfig = useDuressConfig();
   const alertSent = useRef(0);
 

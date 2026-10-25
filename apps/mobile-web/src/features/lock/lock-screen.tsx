@@ -10,6 +10,7 @@ import { useAppTheme } from "@/ui/theme";
 import { useAuth } from "@/features/auth/auth";
 import { enterPin, lockNow, useLock, WIPE_AFTER } from "./lock";
 import { lockSeemsOff, setLockSeemsOff } from "./duress";
+import { pausePushNotifications, syncPushToken } from "@/platform/notifications";
 import PinPad from "./pin-pad";
 
 // In front of everything while the app is locked (app/_layout.tsx).
@@ -130,8 +131,19 @@ function formatWait(ms: number) {
 // Locks the app after it was in the background for the time chosen, and
 // on Ctrl/⌘ L (web). Mounted once while signed in.
 export function LockWatch() {
-  const { config, locked } = useLock();
+  const { config, locked, duress, opened } = useLock();
+  const { withToken } = useAuth();
   const background = config?.background ?? null;
+
+  // Push notifications paused while opened with the duress PIN, back with
+  // the real one.
+  useEffect(() => {
+    if (opened === 0) {
+      return;
+    }
+
+    (duress ? pausePushNotifications : syncPushToken)(withToken).catch(() => {});
+  }, [opened, duress, withToken]);
 
   useEffect(() => {
     if (!config) {

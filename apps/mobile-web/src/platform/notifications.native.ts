@@ -129,3 +129,15 @@ export function useNotificationTaps(openChat: (chatId: string) => void) {
     return () => subscription.remove();
   }, [openChat]);
 }
+
+// Opened with the duress PIN (features/lock): no push notifications on
+// this device until the real PIN opens it (syncPushToken then), and the
+// ones shown are cleared. The server sees only that this device's push
+// token went, as when notifications are turned off.
+export async function pausePushNotifications(withToken: WithToken) {
+  await Notifications.dismissAllNotificationsAsync().catch(() => {});
+
+  if (notificationsSupported()) {
+    await withToken(removePushToken).catch(() => {});
+  }
+}

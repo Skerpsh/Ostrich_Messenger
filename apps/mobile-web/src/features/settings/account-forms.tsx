@@ -7,6 +7,8 @@ import TextField from "@/ui/text-field";
 import { useAuth, useCurrentUser } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
 import { changePassword, changeUsername, deleteAccount } from "@/api/api";
+import { fakeUsernameChangeAt } from "@/features/lock/duress";
+import { inDuress } from "@/features/lock/lock";
 import { deriveFromOstrichId, normalizeOstrichId } from "@/crypto/crypto";
 import { formatDate } from "@/ui/format";
 import { useShake } from "@/ui/motion";
@@ -39,10 +41,12 @@ export function UsernameForm() {
   const [done, setDone] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Once per 28 days (the first time right after registration).
-  const next =
-    user?.next_username_change_at &&
-    new Date(user.next_username_change_at) > new Date()
+  // Once per 28 days (the first time right after registration). Opened
+  // with the duress PIN: never now (features/lock/duress.ts).
+  const next = inDuress()
+    ? fakeUsernameChangeAt()
+    : user?.next_username_change_at &&
+        new Date(user.next_username_change_at) > new Date()
       ? user.next_username_change_at
       : null;
 
@@ -175,9 +179,12 @@ export function PasswordForm() {
     setSaving(true);
 
     try {
-      await withToken((token) =>
-        changePassword(token, currentPassword, newPassword),
-      );
+      // Opened with the duress PIN: it only looks changed.
+      await (inDuress()
+        ? new Promise((resolve) => setTimeout(resolve, 900))
+        : withToken((token) =>
+            changePassword(token, currentPassword, newPassword),
+          ));
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -243,7 +250,7 @@ export function PasswordForm() {
 // Needs the password and the OstrichID: deleting is final.
 export function DeleteAccountForm() {
   const { colors } = useAppTheme();
-  const { state, withToken, signOut } = useAuth();
+  const { state, withToken, signOut, wipeDevice } = useAuth();
   const [password, setPassword] = useState("");
   const [ostrichId, setOstrichId] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -274,6 +281,13 @@ export function DeleteAccountForm() {
     setDeleting(true);
 
     try {
+      // Opened with the duress PIN: the account stays, this device is
+      // wiped, so it looks deleted.
+      if (inDuress()) {
+        await wipeDevice();
+        return;
+      }
+
       await withToken((token) =>
         deleteAccount(token, password, deriveFromOstrichId(id).authKey),
       );
