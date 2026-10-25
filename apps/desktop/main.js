@@ -36,6 +36,9 @@ const UPDATE_RETRY_MAX_MS = 15 * 60 * 1000;
 let window = null;
 let tray = null;
 let quitting = false;
+// Installing a downloaded version (restarting to update): a failure says
+// how to install it by hand.
+let installing = false;
 // A new version downloaded and waiting: "Restart to update" in the tray.
 let updateReady = null;
 // What the updater does, for Settings: "unsupported" (Flatpak, the AUR,
@@ -140,6 +143,10 @@ function startUpdates() {
   autoUpdater.autoInstallOnAppQuit = silent;
   autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} };
 
+  if (["deb", "rpm", "pacman"].includes(type) && noNewPrivileges()) {
+    installOutsideApp(autoUpdater);
+  }
+
   autoUpdater.on("checking-for-update", () => setUpdateState({ state: "checking" }));
   autoUpdater.on("update-not-available", () => {
     retries = 0;
@@ -153,7 +160,14 @@ function startUpdates() {
   // A failed check or download (offline, the network changing) is tried
   // again soon, not in UPDATE_CHECK_MS.
   autoUpdater.on("error", (error) => {
-    setUpdateState({ state: "error", message: String(error?.message ?? error).split("\n")[0] });
+    let message = String(error?.message ?? error).split("\n")[0];
+
+    if (installing) {
+      installing = quitting = false;
+      message = `Could not install it (${message}). In a terminal: ${INSTALL_BY_HAND[type]} ${autoUpdater.installerPath}`;
+    }
+
+    setUpdateState({ state: "error", message });
     clearTimeout(retryTimer);
     retryTimer = setTimeout(checkForUpdates, Math.min(UPDATE_RETRY_MS * 2 ** retries, UPDATE_RETRY_MAX_MS));
     retries++;
@@ -182,6 +196,48 @@ function startUpdates() {
 
   setTimeout(checkForUpdates, UPDATE_FIRST_MS);
   setInterval(checkForUpdates, UPDATE_CHECK_MS);
+}
+
+const INSTALL_BY_HAND = {
+  deb: "sudo apt install",
+  rpm: "sudo dnf install",
+  pacman: "sudo pacman -U",
+};
+
+// Whether the app was started with "no new privileges" (some launchers and
+// other apps' sandboxes start programs so): then pkexec cannot ask for the
+// password ("pkexec must be setuid root").
+function noNewPrivileges() {
+  try {
+    return /^NoNewPrivs:\s*1$/m.test(readFileSync("/proc/self/status", "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+// Runs the package's installer (pkexec, then pacman, apt or dnf) from the
+// user's systemd instead, which was not started so: it does not inherit it.
+function installOutsideApp(autoUpdater) {
+  const runAsIs = autoUpdater.runCommandWithSudoIfNeeded;
+
+  autoUpdater.runCommandWithSudoIfNeeded = function (commandWithArgs) {
+    if (this.isRunningAsRoot()) {
+      return runAsIs.call(this, commandWithArgs);
+    }
+
+    return this.spawnSyncLog("systemd-run", [
+      "--user",
+      "--wait",
+      "--pipe",
+      "--collect",
+      "--quiet",
+      "pkexec",
+      "--disable-internal-agent",
+      "/bin/bash",
+      "-c",
+      `'${commandWithArgs.join(" ")}'`,
+    ]);
+  };
 }
 
 // Downloads with Node's HTTP, not Chromium's: Chromium drops every request
@@ -244,7 +300,7 @@ function log(message) {
 }
 
 function installUpdate() {
-  quitting = true;
+  quitting = installing = true;
   // Not silent: the installer of Windows shows its progress; the app is
   // started again after it.
   updater.autoUpdater.quitAndInstall(false, true);
