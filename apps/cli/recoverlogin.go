@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -495,11 +494,11 @@ func (m model) recoverLoginView() string {
 	r := m.auth.recover
 	w := authCardWidth(m.width)
 	inner := w - 4
-	lines := []string{bold("Recover with friends", p.text, p.panel), ""}
+	lines := []string{""}
 
 	text := func(s string) {
 		for _, line := range wrap(s, inner) {
-			lines = append(lines, seg(line, p.textSoft, p.panel))
+			lines = append(lines, seg(line, p.textSoft, p.bg))
 		}
 
 		lines = append(lines, "")
@@ -507,7 +506,7 @@ func (m model) recoverLoginView() string {
 
 	field := func(i int, label string) {
 		lines = append(lines,
-			seg(label, p.textSoft, p.panel),
+			seg(label, p.textSoft, p.bg),
 			zone.Mark(fmt.Sprintf("recover:field:%d", i), m.inputBox(r.inputs[i].View(), r.focus == i, inner)),
 			"",
 		)
@@ -528,9 +527,9 @@ func (m model) recoverLoginView() string {
 		text("Call or meet your guardians and read each of them this code. They type it in Settings → Recovery through friends to approve. Do not send it in a message.")
 		code, _ := recoveryCode(r.saved.PublicKey)
 		lines = append(lines,
-			blank(inner, p.accentSoft),
-			center(bold(code, p.text, p.accentSoft), inner, p.accentSoft),
-			blank(inner, p.accentSoft),
+			"",
+			center(bold(code, p.accent, p.bg), inner, p.bg),
+			"",
 			"",
 		)
 
@@ -554,12 +553,12 @@ func (m model) recoverLoginView() string {
 		}
 
 		lines = append(lines,
-			seg(fmt.Sprintf("%s of %d guardians have approved", approved, threshold), p.text, p.panel),
-			seg(clip(when, inner), p.text, p.panel),
+			seg(fmt.Sprintf("%s of %d guardians have approved", approved, threshold), p.text, p.bg),
+			seg(clip(when, inner), p.text, p.bg),
 			"",
 		)
 		text("You can close Ostrich meanwhile: this request is kept on this computer until " + formatDateTime(r.saved.ExpiresAt) + ".")
-		lines = append(lines, zone.Mark("recover:forget", m.button("Stop recovering (Ctrl+X)", inner, false, true)))
+		lines = append(lines, m.link("recover:forget", "Ctrl+X", "Stop recovering", inner, true))
 		hints = "Ctrl+N Check now   Ctrl+X Stop recovering   Esc Back"
 	case "ready":
 		text("Your guardians have given back your OstrichID. Enter your password to log in as @" + sanitize(r.saved.Username) + ": you get a new OstrichID, and your other devices are logged out.")
@@ -576,47 +575,31 @@ func (m model) recoverLoginView() string {
 			text("This request has expired.")
 		}
 
-		lines = append(lines, zone.Mark("recover:forget", m.button("Start again (Enter)", inner, false, true)))
+		lines = append(lines, m.link("recover:forget", "Enter", "Start again", inner, true))
 		hints = "Enter Start again   Esc Back"
 	}
 
 	if r.err != "" {
 		for _, line := range wrap(sanitize(r.err), inner) {
-			lines = append(lines, seg(line, p.danger, p.panel))
+			lines = append(lines, seg(line, p.danger, p.bg))
 		}
 
 		lines = append(lines, "")
 	}
 
 	if submit != "" {
-		box := "☐"
-
-		if m.auth.remember {
-			box = "☑"
-		}
-
 		if r.loading {
 			submit = "…"
 		}
 
 		lines = append(lines,
-			zone.Mark("recover:remember", seg(box+" ", p.accent, p.panel)+seg("Remember me on this computer", p.text, p.panel)),
+			m.checkbox("recover:remember", m.auth.remember, "Remember me on this computer"),
 			"",
 			zone.Mark("recover:submit", m.button(submit, inner, true, !r.loading)),
 		)
 	}
 
-	lines = append(lines, "", zone.Mark("recover:back", m.button("Back to logging in", inner, false, true)))
+	lines = append(lines, "", m.link("recover:back", "Esc", "Back to logging in", inner, true))
 
-	block := m.card(lines, w)
-
-	if m.height >= len(lines)+8 {
-		block = strings.Join([]string{
-			center(bold(logo[0], p.accent, p.bg), w, p.bg),
-			center(bold(logo[1], p.accent, p.bg), w, p.bg),
-			blank(w, p.bg),
-		}, "\n") + "\n" + block
-	}
-
-	return m.screen(block, hints)
+	return m.screen(m.box("Recover with friends", lines, w), hints)
 }

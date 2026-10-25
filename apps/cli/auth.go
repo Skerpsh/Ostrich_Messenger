@@ -403,12 +403,6 @@ func authCardWidth(screenWidth int) int {
 	return min(56, max(screenWidth-4, 30))
 }
 
-// The wordmark, drawn with block characters.
-var logo = []string{
-	"█▀█ █▀▀ ▀█▀ █▀█ █ █▀▀ █ █",
-	"█▄█ ▄▄█  █  █▀▄ █ █▄▄ █▀█",
-}
-
 // card draws lines (each w-4 cells wide at most) on a panel with
 // padding.
 func (m model) card(lines []string, w int) string {
@@ -480,6 +474,30 @@ func (m model) inputBox(view string, focused bool, w int) string {
 	return bold("> ", fg, p.bg) + fitLine(onBackground(view, p.bg), w-2, p.bg)
 }
 
+// link: "Ctrl+L  Log in with a QR code", clickable.
+func (m model) link(id, key, label string, w int, enabled bool) string {
+	p := m.pal
+	fg := p.text
+
+	if !enabled {
+		fg = p.muted
+	}
+
+	return zone.Mark(id, seg(key, p.accent, p.bg)+blank(max(8-width(key), 1), p.bg)+seg(clip(label, w-8), fg, p.bg))
+}
+
+// checkbox: "[x] label".
+func (m model) checkbox(id string, on bool, label string) string {
+	p := m.pal
+	box := "[ ]"
+
+	if on {
+		box = "[x]"
+	}
+
+	return zone.Mark(id, seg(box+" ", p.accent, p.bg)+seg(label, p.text, p.bg))
+}
+
 func (m model) authView() string {
 	if m.auth.qr != nil {
 		return m.qrLoginView()
@@ -490,47 +508,50 @@ func (m model) authView() string {
 	}
 
 	p := m.pal
+	bg := p.bg
 	a := m.auth
 	w := authCardWidth(m.width)
 	inner := w - 4
 
-	var lines []string
-
-	// Tabs.
-	half := inner / 2
 	tab := func(label string, selected bool, id string) string {
-		fg, bg := p.muted, p.panelAlt
-
 		if selected {
-			fg, bg = p.accent, p.accentSoft
+			return zone.Mark(id, bold(label, p.accent, bg))
 		}
 
-		return zone.Mark(id, center(bold(label, fg, bg), half, bg))
+		return zone.Mark(id, seg(label, p.muted, bg))
 	}
 
-	lines = append(lines,
-		tab("Log in", !a.register, "auth:login")+tab("Create account", a.register, "auth:register")+blank(inner-2*half, p.panel),
+	lines := []string{
+		seg(clip("Private, end-to-end encrypted messages.", inner), p.muted, bg),
 		"",
-	)
+		tab("Log in", !a.register, "auth:login") + seg("   ·   ", p.line, bg) + tab("Create account", a.register, "auth:register"),
+		"",
+	}
 
 	labels := map[int]string{
 		fieldUsername:  "Username",
 		fieldPassword:  "Password",
-		fieldConfirm:   "Repeat password",
+		fieldConfirm:   "Repeat the password",
 		fieldOstrichID: "OstrichID",
 	}
 
 	for i, field := range a.fields() {
+		labelFg := p.muted
+
+		if a.focus == i {
+			labelFg = p.text
+		}
+
 		lines = append(lines,
-			seg(labels[field], p.textSoft, p.panel),
+			seg(labels[field], labelFg, bg),
 			zone.Mark(fmt.Sprintf("auth:field:%d", i), m.inputBox(a.inputs[field].View(), a.focus == i, inner)),
 			"",
 		)
 	}
 
 	if a.register {
-		for _, line := range wrap("You will get an OstrichID: the key to your account and your end-to-end encrypted messages. It is shown only once.", inner) {
-			lines = append(lines, seg(line, p.muted, p.panel))
+		for _, line := range wrap("You get an OstrichID: the key to your account and your messages. It is shown only once.", inner) {
+			lines = append(lines, seg(line, p.muted, bg))
 		}
 
 		lines = append(lines, "")
@@ -539,123 +560,88 @@ func (m model) authView() string {
 	switch {
 	case a.err != "":
 		for _, line := range wrap(sanitize(a.err), inner) {
-			lines = append(lines, seg(line, p.danger, p.panel))
+			lines = append(lines, seg(line, p.danger, bg))
 		}
 
 		lines = append(lines, "")
 	case a.notice != "":
-		lines = append(lines, seg(clip(a.notice, inner), p.muted, p.panel), "")
+		lines = append(lines, seg(clip(a.notice, inner), p.muted, bg), "")
 	}
-
-	box := "☐"
-
-	if a.remember {
-		box = "☑"
-	}
-
-	lines = append(lines,
-		zone.Mark("auth:remember", seg(box+" ", p.accent, p.panel)+seg("Remember me on this computer", p.text, p.panel)),
-		"",
-	)
 
 	label := "Log in"
 
 	switch {
 	case a.loading && a.register:
-		label = "Creating account…"
+		label = "Creating the account…"
 	case a.loading:
 		label = "Logging in…"
 	case a.register:
 		label = "Create account"
 	}
 
-	lines = append(lines, zone.Mark("auth:submit", m.button(label, inner, true, !a.loading)))
+	lines = append(lines,
+		m.checkbox("auth:remember", a.remember, "Remember me on this computer"),
+		"",
+		zone.Mark("auth:submit", m.button(label, inner, true, !a.loading)),
+	)
 
 	if !a.register {
 		lines = append(lines,
-			"", zone.Mark("auth:qr", m.button("Log in with a QR code (Ctrl+L)", inner, false, !a.loading)),
-			"", zone.Mark("auth:recover", m.button("Lost your OstrichID? Recover with friends (Ctrl+F)", inner, false, !a.loading)),
+			"",
+			m.link("auth:qr", "Ctrl+L", "Log in with a QR code", inner, !a.loading),
+			m.link("auth:recover", "Ctrl+F", "Lost your OstrichID? Recover with friends", inner, !a.loading),
 		)
 	}
 
-	header := []string{
-		center(bold(logo[0], p.accent, p.bg), w, p.bg),
-		center(bold(logo[1], p.accent, p.bg), w, p.bg),
-		blank(w, p.bg),
-		center(seg("Private. Fast. End-to-end encrypted.", p.muted, p.bg), w, p.bg),
-		blank(w, p.bg),
-	}
-
-	block := strings.Join(header, "\n") + "\n" + m.card(lines, w)
-
-	return m.screen(block, "Tab Log in / Create account   ↑↓ Field   Ctrl+R Remember me   Ctrl+L QR code   Ctrl+F Recover   Enter Next / Submit   Esc Quit")
+	return m.screen(m.box("Ostrich", lines, w), "Tab log in / create account   ↑↓ field   Enter next / submit   Ctrl+R remember me   Esc quit")
 }
 
 func (m model) ostrichIDView() string {
 	p := m.pal
+	bg := p.bg
 	w := authCardWidth(m.width)
 	inner := w - 4
 	id := m.user.OstrichID
+	text := func(s string, fg string) []string {
+		var out []string
 
-	check := "☐"
+		for _, line := range wrap(s, inner) {
+			if fg == "danger" {
+				out = append(out, bold(line, p.danger, bg))
+			} else {
+				out = append(out, seg(line, p.textSoft, bg))
+			}
+		}
 
-	if m.idSaved {
-		check = "☑"
+		return out
 	}
 
-	var lines []string
-
-	lines = append(lines,
-		seg("YOUR OSTRICHID", p.muted, p.panel),
-		"",
-		blank(inner, p.accentSoft),
-		center(bold(sanitize(id), p.text, p.accentSoft), inner, p.accentSoft),
-		blank(inner, p.accentSoft),
-		"",
-	)
-
-	for _, line := range wrap("You need it to log in, together with your username and password.", inner) {
-		lines = append(lines, seg(line, p.textSoft, p.panel))
-	}
-
+	lines := []string{"", center(bold(sanitize(id), p.accent, bg), inner, bg), ""}
+	lines = append(lines, text("You need it to log in, together with your username and password.", "")...)
 	lines = append(lines, "")
-
-	for _, line := range wrap("It is shown only this once. Ostrich cannot show it again: if you lose it, only friends you choose as guardians (Settings → Recovery through friends) can give it back.", inner) {
-		lines = append(lines, bold(line, p.danger, p.panel))
-	}
-
+	lines = append(lines, text("It is shown only this once. Ostrich cannot show it again: if you lose it, only friends you choose as guardians (Settings → Recovery through friends) can give it back.", "danger")...)
 	lines = append(lines, "")
-
-	for _, line := range wrap("Save it somewhere safe, such as a password manager.", inner) {
-		lines = append(lines, seg(line, p.textSoft, p.panel))
-	}
-
+	lines = append(lines, text("Save it somewhere safe, such as a password manager.", "")...)
 	lines = append(lines,
 		"",
-		zone.Mark("id:saved", seg(check+" ", p.accent, p.panel)+bold("I have saved my OstrichID", p.text, p.panel)),
-		"",
-		zone.Mark("id:copy", m.button("Copy", inner, false, true)),
+		m.checkbox("id:saved", m.idSaved, "I have saved my OstrichID"),
 		"",
 		zone.Mark("id:continue", m.button("Continue", inner, true, m.idSaved)),
+		"",
+		m.link("id:copy", "c", "Copy it", inner, true),
 	)
 
-	hints := "c Copy   Space Saved   Enter Continue"
+	hints := "c copy   Space saved   Enter continue"
 
 	if m.quitArmed {
 		hints = "Press Ctrl+C again to quit. You will not see this OstrichID again."
 	}
 
-	block := strings.Join([]string{
-		center(bold(logo[0], p.accent, p.bg), w, p.bg),
-		center(bold(logo[1], p.accent, p.bg), w, p.bg),
-		blank(w, p.bg),
-	}, "\n") + "\n" + m.card(lines, w)
-
-	view := m.screen(block, hints)
+	view := m.screen(m.box("Your OstrichID", lines, w), hints)
 
 	if m.quitArmed {
 		lines := strings.Split(view, "\n")
-		lines[len(lines)-1] = fitLine(seg(" "+hints, p.danger, p.bg), m.width, p.bg)
+		lines[len(lines)-1] = fitLine(seg(" "+hints, p.danger, bg), m.width, bg)
 		view = strings.Join(lines, "\n")
 	}
 

@@ -7,11 +7,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	zone "github.com/lrstanley/bubblezone"
 )
 
 // Logging in with a QR code, without the password or the OstrichID
@@ -185,29 +183,29 @@ func (m *model) updateQRLoginMouse(msg tea.MouseMsg) tea.Cmd {
 
 func (m model) qrLoginView() string {
 	p := m.pal
+	bg := p.bg
 	qr := m.auth.qr
 	w := authCardWidth(m.width)
 	inner := w - 4
-
-	lines := []string{bold("Log in with a QR code", p.text, p.panel), ""}
+	lines := []string{""}
 
 	switch {
 	case qr.err != "":
 		for _, line := range wrap(sanitize(qr.err), inner) {
-			lines = append(lines, seg(line, p.danger, p.panel))
+			lines = append(lines, seg(line, p.danger, bg))
 		}
 
 		lines = append(lines, "")
 	case qr.text == "":
-		lines = append(lines, center(seg("Making a code…", p.muted, p.panel), inner, p.panel), "")
+		lines = append(lines, center(seg("Making a code…", p.muted, bg), inner, bg), "")
 	default:
 		code, err := qrLines(qr.text)
 		if err != nil {
-			lines = append(lines, seg(clip(err.Error(), inner), p.danger, p.panel))
+			lines = append(lines, seg(clip(err.Error(), inner), p.danger, bg))
 		}
 
 		for _, line := range code {
-			lines = append(lines, center(line, inner, p.panel))
+			lines = append(lines, center(line, inner, bg))
 		}
 
 		lines = append(lines, "")
@@ -218,32 +216,15 @@ func (m model) qrLoginView() string {
 		"Settings → Devices → Link a device",
 		"Point the camera at this code and confirm",
 	} {
-		lines = append(lines, seg(fmt.Sprintf("%d  ", i+1), p.accent, p.panel)+seg(clip(step, inner-3), p.textSoft, p.panel))
-	}
-
-	box := "☐"
-
-	if m.auth.remember {
-		box = "☑"
+		lines = append(lines, seg(fmt.Sprintf("%d  ", i+1), p.accent, bg)+seg(clip(step, inner-3), p.textSoft, bg))
 	}
 
 	lines = append(lines,
 		"",
-		zone.Mark("qrlogin:remember", seg(box+" ", p.accent, p.panel)+seg("Remember me on this computer", p.text, p.panel)),
+		m.checkbox("qrlogin:remember", m.auth.remember, "Remember me on this computer"),
 		"",
-		zone.Mark("qrlogin:back", m.button("Log in with a password", inner, false, true)),
+		m.link("qrlogin:back", "Esc", "Log in with a password instead", inner, true),
 	)
 
-	// The code needs the room: the logo only on tall terminals.
-	block := m.card(lines, w)
-
-	if m.height >= len(lines)+8 {
-		block = strings.Join([]string{
-			center(bold(logo[0], p.accent, p.bg), w, p.bg),
-			center(bold(logo[1], p.accent, p.bg), w, p.bg),
-			blank(w, p.bg),
-		}, "\n") + "\n" + block
-	}
-
-	return m.screen(block, "r New code   Ctrl+R Remember me   Esc Back")
+	return m.screen(m.box("Log in with a QR code", lines, w), "r new code   Ctrl+R remember me   Esc back")
 }
