@@ -976,6 +976,9 @@ func (m model) settingsBody(w int) (lines []string, rowAt []int) {
 	}
 
 	put(blank(cw, bg))
+	// This client's version, small, at the bottom (as in the apps).
+	put(center(seg("Ostrich "+sanitize(version)+" · terminal", p.muted, bg), cw, bg))
+	put(blank(cw, bg))
 
 	return lines, rowAt
 }

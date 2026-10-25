@@ -27,6 +27,7 @@
     "productName": "Ostrich",
     "files": [
       "main.js",
+      "preload.cjs",
       "web/**"
     ],
     "directories": {

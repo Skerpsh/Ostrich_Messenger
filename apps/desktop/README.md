@@ -20,8 +20,12 @@ On top of the web app:
 - **updates** from the GitHub releases, looked for at start and every 4 hours:
   the AppImage and the Windows app install them when they quit; the `.deb`,
   `.rpm` and `.pacman` when you choose "Restart to update" (in the
-  notification or the tray's menu), asking for your password. The Flatpak does
-  not update itself
+  notification, the tray's menu or Settings), asking for your password. The
+  Flatpak and the AUR package do not update themselves (their package manager
+  does). A failed check (offline, the network changing at start) is tried
+  again after 30 s, then less often; Settings shows the version and how the
+  updates go (`preload.cjs` gives the page only that), and `updates.log` in
+  the app's folder keeps it
 - `--hidden` starts it in the tray
 
 ## Building

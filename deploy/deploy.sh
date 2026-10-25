@@ -54,6 +54,31 @@ done
 
 step() { printf '\n==> %s\n' "$*"; }
 
+# The version of what is deployed: the commit's tag; else the next one
+# (v1.5.5 → 1.5.6), which the end of the script tags, or, without a
+# release, the last one and the commit ("1.5.5+c23b2c2").
+release_version() {
+  local commit last major minor patch
+  commit=$(git -C "$REPO" rev-parse HEAD)
+  git -C "$REPO" fetch --tags --quiet origin 2>/dev/null || true
+  last=$(git -C "$REPO" tag --points-at "$commit" -l 'v*' | head -1)
+
+  if [ -n "$last" ]; then
+    echo "${last#v}"
+    return
+  fi
+
+  last=$(git -C "$REPO" tag -l 'v*' --sort=-v:refname | head -1)
+  last="${last:-v0.0.0}"
+
+  if [ "$release" = 1 ] && [ -r "$RELEASE_TOKEN_FILE" ]; then
+    IFS=. read -r major minor patch <<<"${last#v}"
+    echo "$major.$minor.$((patch + 1))"
+  else
+    echo "${last#v}+$(git -C "$REPO" rev-parse --short HEAD)"
+  fi
+}
+
 cd "$REPO"
 
 step "Pulling the code"
@@ -143,7 +168,8 @@ if [ "$web" = 1 ]; then
   step "Building the web app"
   cd "$REPO/apps/mobile-web"
   npm ci
-  npm run build:web
+  # Shown in Settings: the version this deploy releases (see below).
+  EXPO_PUBLIC_APP_VERSION="$(release_version)" npm run build:web
 
   step "Publishing to $WEB_ROOT"
   mkdir -p "$WEB_ROOT"
@@ -165,9 +191,7 @@ if [ "$release" = 1 ] && [ -r "$RELEASE_TOKEN_FILE" ]; then
   if git tag --points-at "$commit" | grep -q '^v'; then
     echo "This commit is released already ($(git tag --points-at "$commit" | grep '^v' | head -1))"
   else
-    last=$(git tag -l 'v*' --sort=-v:refname | head -1)
-    IFS=. read -r major minor patch <<<"${last:-v0.0.0}"
-    next="v${major#v}.$minor.$((patch + 1))"
+    next="v$(release_version)"
 
     if curl -fsS -o /dev/null -X POST \
       -H "Authorization: Bearer $(cat "$RELEASE_TOKEN_FILE")" \

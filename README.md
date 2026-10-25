@@ -25,6 +25,7 @@
 - [Features](#features)
 - [Download](#download)
 - [Quick start for users](#quick-start-for-users)
+- [Updates](#updates)
 - [Terminal client (CLI)](#terminal-client-cli)
 - [How the encryption works](#how-the-encryption-works)
 - [Architecture](#architecture)
@@ -76,8 +77,10 @@
 **Everywhere**
 - 🌐 Installable **web app** (PWA) that works offline
 - 📱 **iOS and Android** apps from the same code, with push notifications
+- 💻 **Desktop app** for Windows and Linux, with an icon in the tray and the unread count
 - 🖥 Full-featured **terminal client** with mouse support, QR codes and offline cache
-- 🌗 Light and dark themes with an accent color
+- 🔄 **Every app updates itself**: the Android app over the air, the desktop apps and the CLI from
+  each release; the version is at the bottom of Settings
 - ⌨️ Keyboard shortcuts in the web app (Ctrl/⌘ K, Alt ↑/↓, ↑ to edit, Esc)
 
 ## Download
@@ -85,7 +88,7 @@
 | System | Get Ostrich |
 |---|---|
 | 🤖 **Android** | [**Download the APK**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Android.apk) — open it on the phone and allow installing when asked; it updates itself |
-| 🪟 **Windows** | [**Download the installer**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Windows-Setup.exe) · Terminal: [ostrich-windows-amd64.exe](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-windows-amd64.exe) |
+| 🪟 **Windows** | [**Download the installer**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Windows-Setup.exe), which updates itself · Terminal: [ostrich-windows-amd64.exe](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-windows-amd64.exe) |
 | 🐧 **Linux** | [**AppImage**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.AppImage) (any distribution) · [.deb](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.deb) (Ubuntu, Debian) · [.rpm](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.rpm) (Fedora, openSUSE) · [.pacman](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.pacman) (Arch, or from the AUR: `yay -S ostrich-desktop-bin`), all updating themselves · [Flatpak](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.flatpak) · Terminal: [x86-64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-amd64), [ARM64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-arm64) or the [one-line install](#terminal-client-cli) (Arch: `yay -S ostrich-cli-bin`) |
 | 🍎 **macOS** | Terminal: [Apple silicon](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-arm64), [Intel](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-amd64) |
 | 📱 **iOS** | Coming to the App Store |
@@ -100,7 +103,8 @@ All clients use the same account, the same chats and the same encryption.
 1. Open the [web app](https://ostrich-messenger.online) or install the [CLI](#terminal-client-cli).
 2. **Create an account** with a `@username` and a password.
 3. **Save your OstrichID.** It is shown **once**. Keep it in a password manager or on paper.
-   You need it to log in on a new device. Nobody, including the server owner, can recover it for you.
+   You need it to log in on a new device. The server owner cannot recover it for you; friends you
+   choose in **Settings → Recovery through friends** can.
 4. Start a chat: **New chat** → type the exact `@username` of your contact.
 5. Optional: open the chat's **safety code** and compare the 40 digits with your contact
    in person or over another channel. If they match, your conversation cannot be read by the server.
@@ -126,8 +130,30 @@ call, open the **Ostrich handshake**: each of you reads a silly sentence aloud (
 juggles cacti") and picks the other's among four. If both find it, nobody is in the middle of the
 call.
 
+**Lost your OstrichID?** If you chose guardians, press **Lost your OstrichID? Recover with friends**
+on the login screen (`Ctrl+F` in the CLI), enter your username and password, and read the 6-digit
+code to each guardian by voice; they type it in their Settings to approve. After a day, in which
+your devices that are still logged in are warned and can cancel it, you log in with a new
+OstrichID and choose your guardians again.
+
 In the web app, **Settings → Keyboard shortcuts** lists the keys: `Ctrl/⌘ K` search chats,
 `Alt ↑/↓` previous / next chat, `↑` edit your last message, `Esc` cancel or close the chat.
+
+## Updates
+
+The version you have is at the bottom of **Settings**.
+
+| Client | How it updates |
+|---|---|
+| Web | With every deploy of the server, when the page is opened again |
+| Android | The new code comes **over the air** and is used from the next start (or tap the banner to restart). A version that changed the native part shows a banner to download the new APK |
+| Windows, AppImage | Looked for at start and every 4 hours, downloaded in the background, installed when you quit Ostrich (or *Restart to update*) |
+| .deb, .rpm, .pacman | The same, installed when you choose *Restart to update* in the notification, the tray's menu or Settings; your password is asked |
+| AUR, Flatpak | By the package manager (`yay -Syu`, `flatpak update`) |
+| CLI | Replaces itself at start with the new release (checked against `SHA256SUMS`), used from the next start; installed by a package manager, it says to update with it |
+
+The desktop app keeps a log of its updates in its folder (`~/.config/Ostrich/updates.log` on
+Linux, `%APPDATA%\Ostrich\updates.log` on Windows).
 
 ## Terminal client (CLI)
 
@@ -163,7 +189,7 @@ in a narrow terminal. The keyboard and the mouse both work.
 
 | Where | Keys |
 |---|---|
-| Login screen | `Tab` log in / create account · `Ctrl+L` log in with a QR code · `Ctrl+R` remember me |
+| Login screen | `Tab` log in / create account · `Ctrl+L` log in with a QR code · `Ctrl+F` recover with friends · `Ctrl+R` remember me |
 | Chats list | `↑↓` move · `Enter` open · `/` search · `n` new chat · `m` chat menu · `s` settings · `t` theme · `q` quit |
 | Chat | `Enter` send · `Alt+Enter` new line · `Ctrl+A` attach a file · `↑` choose a message · `Ctrl+F` search · `Ctrl+K` safety code · `Esc` back |
 | Chosen message | `r` reply · `e` edit · `d` delete · `c` copy · `s` what the server sees · `1`–`8` react · `Enter` more |
@@ -227,12 +253,23 @@ flowchart LR
   code. The device that scans it sends the account's private key encrypted for that key, so the
   server only relays ciphertext. The session goes to the device that holds the link's secret,
   which is not in the code, so seeing the code is not enough to log in.
+- **Letters to the future.** The letter is encrypted like any message, and inside that with
+  [drand](https://drand.love)'s time-lock encryption (tlock, the quicknet network) to a round of
+  the date chosen: the key exists only once drand publishes that round's signature, so before
+  then nobody can open it, the sender and the server neither.
+- **Recovery through friends.** The OstrichID is split on your device with Shamir's secret sharing
+  over GF(256): any chosen number of the shares give it back, fewer tell nothing. Each share is
+  sealed for one guardian's public key. A new device asks with your password and a one-time key
+  pair; each guardian checks the code of that key with you by voice and seals their share again for
+  it, so neither an impostor nor the server can put their own key in. The server only adds the
+  day of waiting and gives the shares to the device that asked.
 - **Settings sync.** If you turn it on, your personalization is stored on the server encrypted
   with a key derived from your account's private key, so only your devices can read it. A chat's
   wallpaper set "for everyone" is an ordinary encrypted message.
 
 **What the server can see:** usernames, who talks to whom and when (calls included), message
-sizes, profile photos, and IP addresses. **What it cannot see:** message text, files, what is
+sizes, profile photos, IP addresses, who your guardians are and when a recovery is asked, and
+when "If I disappear" messages and letters to the future are due (not what they say). **What it cannot see:** message text, files, what is
 said and shown in calls, group names and photos, synced settings and chat wallpapers, your
 OstrichID or your private key.
 
@@ -246,10 +283,13 @@ OstrichID or your private key.
 flowchart TB
     subgraph Clients
         W["Web app (PWA)"]
+        D["Desktop app<br/>(Windows, Linux)"]
         M["iOS / Android"]
         C["Terminal client"]
     end
-    W & M & C -->|"HTTPS /api · WSS /ws"| CADDY["Caddy<br/>TLS + static files"]
+    W & D & M & C -->|"HTTPS /api · WSS /ws"| CADDY["Caddy<br/>TLS + static files"]
+    D & C -.->|updates| GH["GitHub releases"]
+    M -.->|"updates over the air"| EAS["Expo (EAS Update)"]
     CADDY --> B1["Backend<br/>Fastify, Node.js"]
     CADDY -.->|optional| B2["More backend<br/>processes"]
     B1 & B2 --> PG[(PostgreSQL)]
@@ -265,6 +305,7 @@ flowchart TB
 |---|---|---|
 | Backend | Node.js 22, TypeScript, Fastify 5, PostgreSQL (`pg`), WebSockets, Argon2, optional Redis | [`apps/server/`](apps/server) |
 | Web and mobile apps | Expo SDK 57, React Native 0.86, expo-router, `@noble/*` cryptography | [`apps/mobile-web/`](apps/mobile-web) |
+| Desktop app | Electron 44 around the web build, electron-builder, electron-updater | [`apps/desktop/`](apps/desktop) |
 | Terminal client | Go, Bubble Tea | [`apps/cli/`](apps/cli) |
 | Server operations | Bash, systemd, Caddy | [`deploy/`](deploy) |
 
@@ -521,8 +562,12 @@ The complete guide is [`deploy/README.md`](deploy/README.md). In short:
 
 ```bash
 cd /opt/ostrich && deploy/deploy.sh                 # backend + web, with a backup first
-deploy/deploy.sh --backend-only                     # or --web-only, --no-backup
+deploy/deploy.sh --backend-only                     # or --web-only, --no-backup, --no-release
 ```
+
+At the end the script tags the deployed commit with the next version (v1.5.5 → v1.5.6), which
+[releases](#releasing) the apps; they then update themselves. It needs a GitHub token on the
+server once ([how](deploy/README.md#releasing-the-apps-with-each-deploy)).
 
 ### Database migrations
 
@@ -571,22 +616,32 @@ so the clients cannot drift apart.
 
 ## Releasing
 
+Each deploy releases the apps by itself (see [Deploys](#deploys)). By hand:
+
 ```bash
-git tag v1.3.0 && git push origin v1.3.0   # the next version after the latest release
+git tag v1.6.0 && git push origin v1.6.0   # the next version after the latest release
 ```
 
 The [Release](.github/workflows/release.yml) workflow publishes every app under that version:
-the CLI for Linux, macOS and Windows on x86-64 and ARM64 (tested first), the Android app,
-an APK built with EAS (the app's version is the tag's; the build number counts up by itself),
-and the desktop app for Linux (AppImage, .deb, .rpm, Flatpak) and Windows (an installer).
+
+- the **CLI** for Linux, macOS and Windows on x86-64 and ARM64 (tested first)
+- the **Android app**: the code over the air to the installed apps (EAS Update), and an APK built
+  with EAS, only when the native part changed (its fingerprint, `android-runtime.txt`, differs
+  from the last release's); otherwise the last APK is kept, which gets the new code over the air
+- the **desktop app** for Linux (AppImage, .deb, .rpm, .pacman, Flatpak) and Windows (an
+  installer), with `latest-linux.yml` and `latest.yml`, which the installed apps update from
+- the **AUR** packages `ostrich-desktop-bin` and `ostrich-cli-bin` ([`packaging/aur/`](packaging/aur))
+
 The release gets the files, `install.sh` and `SHA256SUMS`, a table of what to download for
 which system, and notes generated from the commits. The [Download](#download) links always
 point at the latest release.
 
-The Android build needs an Expo access token once: create one at
-[expo.dev → Account settings → Access tokens](https://expo.dev/settings/access-tokens), then add
-it on GitHub under the repository's **Settings → Secrets and variables → Actions → New repository
-secret** as `EXPO_TOKEN`. Without it the release has the CLI only.
+Secrets, on GitHub under the repository's **Settings → Secrets and variables → Actions**:
+
+| Secret | For | Without it |
+|---|---|---|
+| `EXPO_TOKEN` | The Android app: [expo.dev → Account settings → Access tokens](https://expo.dev/settings/access-tokens) | No Android app in the release |
+| `AUR_SSH_KEY` | The AUR packages: the private half of an SSH key whose public half is in the AUR account | The AUR is not updated |
 
 ## Project structure
 
@@ -613,8 +668,9 @@ what they share (the protocol, the encryption) is checked against the same test 
 │   └── cli/                Go terminal client
 ├── shared/test-vectors/    test vectors for the TypeScript and Go code
 ├── deploy/                 deploy and backup scripts, systemd units, coturn
+├── packaging/aur/          the AUR packages (PKGBUILDs, set to each release)
 ├── docs/                   which app runs where and how each is built
-└── .github/workflows/      CI and CLI releases
+└── .github/workflows/      CI and the releases of every app
 ```
 
 ## Contributing

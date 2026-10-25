@@ -3,8 +3,8 @@
 // messenger needs on top: an icon in the tray with the unread count, a
 // window that hides there instead of quitting, ostrich:// links, and
 // updates from the GitHub releases.
-import { app, BrowserWindow, Menu, nativeImage, net, Notification, protocol, session, shell, Tray } from "electron";
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, net, Notification, protocol, session, shell, Tray } from "electron";
+import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import updater from "electron-updater";
@@ -15,6 +15,7 @@ const WEB = path.join(HERE, "web");
 const ORIGIN = "app://ostrich";
 const ICON = path.join(HERE, "web", "icon-512.png");
 const BOUNDS_FILE = path.join(app.getPath("userData"), "window.json");
+const LOG_FILE = path.join(app.getPath("userData"), "updates.log");
 
 // --hidden: start in the tray (when started with the system).
 const startHidden = process.argv.includes("--hidden");
@@ -22,12 +23,23 @@ const startHidden = process.argv.includes("--hidden");
 // It stays open in the tray for days: new versions are looked for this
 // often, not only at start.
 const UPDATE_CHECK_MS = 4 * 60 * 60 * 1000;
+// The first check, a moment after start: right away, Chromium often still
+// sees the network changing (VPNs, containers) and fails the download.
+const UPDATE_FIRST_MS = 10 * 1000;
+// After a failed check: 30 s, then twice as long each time, up to 15 min.
+const UPDATE_RETRY_MS = 30 * 1000;
+const UPDATE_RETRY_MAX_MS = 15 * 60 * 1000;
 
 let window = null;
 let tray = null;
 let quitting = false;
 // A new version downloaded and waiting: "Restart to update" in the tray.
 let updateReady = null;
+// What the updater does, for Settings: "unsupported" (Flatpak, the AUR,
+// not packaged), "checking", "latest", "downloading", "ready", "error".
+let updateState = { state: "idle" };
+let retryTimer = null;
+let retries = 0;
 
 // app://ostrich behaves like an https site: its own origin for storage,
 // fetch and the API's CORS.
@@ -70,11 +82,11 @@ function start() {
   session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => callback(allowed.has(permission)));
   session.defaultSession.setPermissionCheckHandler((_contents, permission) => allowed.has(permission));
 
+  // First: Settings may ask how the updates go as soon as it opens.
+  startUpdates();
   createWindow();
   createTray();
   openLink(process.argv.find((arg) => arg.startsWith("ostrich://")));
-
-  startUpdates();
 }
 
 // The package this is: "appimage", "deb", "rpm", "pacman", "windows", or
@@ -105,27 +117,52 @@ function packageType() {
 // New versions from the GitHub releases (latest.yml, latest-linux.yml),
 // downloaded in the background. The AppImage and Windows install them when
 // the app quits; the .deb, .rpm and .pacman ask for the password
-// (pkexec), so only when the user restarts to update.
+// (pkexec), so only when the user restarts to update. Settings shows how it
+// goes (preload.cjs), and updates.log in the app's folder keeps it.
 function startUpdates() {
   const type = packageType();
 
+  ipcMain.handle("ostrich:update-state", () => updateState);
+  ipcMain.handle("ostrich:check-for-updates", () => checkForUpdates());
+  ipcMain.handle("ostrich:install-update", () => updateState.state === "ready" && installUpdate());
+
   if (!type) {
+    setUpdateState({ state: "unsupported" });
     return;
   }
 
   const { autoUpdater } = updater;
   const silent = type === "appimage" || type === "windows";
   autoUpdater.autoInstallOnAppQuit = silent;
+  autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} };
+
+  autoUpdater.on("checking-for-update", () => setUpdateState({ state: "checking" }));
+  autoUpdater.on("update-not-available", () => {
+    retries = 0;
+    setUpdateState({ state: "latest" });
+  });
+  autoUpdater.on("update-available", (info) => setUpdateState({ state: "downloading", version: info.version, percent: 0 }));
+  autoUpdater.on("download-progress", (progress) =>
+    setUpdateState({ ...updateState, state: "downloading", percent: Math.floor(progress.percent) }),
+  );
+
+  // A failed check or download (offline, the network changing) is tried
+  // again soon, not in UPDATE_CHECK_MS.
+  autoUpdater.on("error", (error) => {
+    setUpdateState({ state: "error", message: String(error?.message ?? error).split("\n")[0] });
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(checkForUpdates, Math.min(UPDATE_RETRY_MS * 2 ** retries, UPDATE_RETRY_MAX_MS));
+    retries++;
+  });
 
   autoUpdater.on("update-downloaded", (info) => {
-    if (updateReady === info.version) {
-      return;
-    }
-
+    retries = 0;
+    const first = updateReady !== info.version;
     updateReady = info.version;
+    setUpdateState({ state: "ready", version: info.version, silent });
     updateTrayMenu();
 
-    if (Notification.isSupported()) {
+    if (first && Notification.isSupported()) {
       const notice = new Notification({
         title: `Ostrich ${info.version} is ready`,
         body: silent
@@ -139,10 +176,38 @@ function startUpdates() {
     }
   });
 
-  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  setTimeout(checkForUpdates, UPDATE_FIRST_MS);
+  setInterval(checkForUpdates, UPDATE_CHECK_MS);
+}
 
-  check();
-  setInterval(check, UPDATE_CHECK_MS);
+function checkForUpdates() {
+  // Downloaded already: nothing to look for until it is installed.
+  if (updateState.state === "unsupported" || updateState.state === "ready") {
+    return updateState;
+  }
+
+  // Asked again by hand: the next failure is retried soon again.
+  clearTimeout(retryTimer);
+  updater.autoUpdater.checkForUpdates().catch(() => {});
+
+  return updateState;
+}
+
+function setUpdateState(next) {
+  updateState = { ...next, current: app.getVersion() };
+  log(`update: ${JSON.stringify(updateState)}`);
+  window?.webContents.send("ostrich:update-state", updateState);
+}
+
+// updates.log, up to about 100 kB (then started again).
+function log(message) {
+  try {
+    if (statSync(LOG_FILE, { throwIfNoEntry: false })?.size > 100_000) {
+      writeFileSync(LOG_FILE, "");
+    }
+
+    appendFileSync(LOG_FILE, `${new Date().toISOString()} ${message}\n`);
+  } catch {}
 }
 
 function installUpdate() {
@@ -173,6 +238,8 @@ function createWindow() {
     backgroundColor: "#111111",
     autoHideMenuBar: true,
     webPreferences: {
+      // window.ostrichDesktop: the version and the updates, for Settings.
+      preload: path.join(HERE, "preload.cjs"),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,

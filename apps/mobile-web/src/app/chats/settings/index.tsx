@@ -10,6 +10,7 @@ import DevBadge from "@/ui/dev-badge";
 import QrCode from "@/ui/qr-code";
 import type { IconName } from "@/ui/icon-button";
 import { ProfilePhoto } from "@/features/settings/profile-photo";
+import { AppVersion } from "@/features/settings/app-version";
 import { Divider, Row, Section, styles } from "@/features/settings/ui";
 import { useAuth, useCurrentUser } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
@@ -171,6 +172,8 @@ function Settings() {
         <Section>
           <Row icon="log-out-outline" label="Log out" onPress={signOut} />
         </Section>
+
+        <AppVersion />
       </ScrollView>
     </View>
   );
