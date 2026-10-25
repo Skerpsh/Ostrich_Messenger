@@ -23,13 +23,17 @@ import {
 import { chatTitle, useAllGroupKeys } from "@/features/groups/groups";
 import { messagePreview } from "./preview";
 import { getItem, removeItem, setItem } from "@/platform/storage";
-import { showMessage } from "@/features/chat/use-chat-crypto";
+import { encryptForChat, showMessage } from "@/features/chat/use-chat-crypto";
 import {
   showMessageNotification,
   syncPushToken,
   useNotificationTaps,
 } from "@/platform/notifications";
 import { useLatest } from "@/ui/use-latest";
+import { useLock } from "@/features/lock/lock";
+import { showChatInDuress, useDuress, useDuressConfig } from "@/features/lock/duress";
+import { encodePayload } from "@/features/chat/payload";
+import { newMessageId } from "@/crypto/crypto";
 
 // How long "typing…" shows after the last typing event.
 const TYPING_MS = 6000;
@@ -157,6 +161,9 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
   }
 
   const chatsRef = useLatest(chats);
+  // Opened with the duress PIN: the safe chats (features/lock/duress.ts).
+  const safe = useDuress();
+  const safeRef = useLatest(safe);
   const viewingRef = useLatest(visible ? activeChatId : null);
 
   const reload = useCallback(async () => {
@@ -418,7 +425,13 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
 
             // Web: a browser notification unless the chat is on screen or
             // muted (a mention comes through anyway; none for group events).
-            if (chat && (!chat.muted || mentionsMe) && !viewing && message.kind !== "system") {
+            if (
+              chat &&
+              (!safeRef.current || safeRef.current.has(chat.id)) &&
+              (!chat.muted || mentionsMe) &&
+              !viewing &&
+              message.kind !== "system"
+            ) {
               const preview = messagePreview(
                 showMessage(message, privateKeyRef.current, chat, userId),
               );
@@ -568,6 +581,7 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
       chatsRef,
       viewingRef,
       privateKeyRef,
+      safeRef,
     ],
   );
 
@@ -670,12 +684,18 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
   useNotificationTaps(openChat);
 
   const addChat = useCallback((chat: Chat) => {
+    // A new chat shows with the duress PIN; an old hidden one (the server
+    // returns it when a chat with that person is started again) stays so.
+    if (!chatsRef.current?.some((c) => c.id === chat.id)) {
+      showChatInDuress(chat.id).catch(() => {});
+    }
+
     setChats((current) =>
       current && !current.some((c) => c.id === chat.id)
         ? [chat, ...current]
         : current,
     );
-  }, []);
+  }, [chatsRef]);
 
   const setPeerReadAt = useCallback(
     (chatId: string, lastReadAt: string | null) => {
@@ -693,10 +713,51 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const totalUnread = useMemo(
-    () => (chats ?? []).reduce((sum, chat) => sum + chat.unread_count, 0),
-    [chats],
+  // What the app shows: all the chats, or opened with the duress PIN only
+  // the safe ones (search, calls, forwarding and counts take them from here).
+  const shownChats = useMemo(
+    () => (safe && chats ? chats.filter((chat) => safe.has(chat.id)) : chats),
+    [chats, safe],
   );
+
+  const totalUnread = useMemo(
+    () => (shownChats ?? []).reduce((sum, chat) => sum + chat.unread_count, 0),
+    [shownChats],
+  );
+
+  // The silent alert, once each time the duress PIN opens the app: sent
+  // like any message, to a chat that is not shown.
+  const { opened, duress } = useLock();
+  const duressConfig = useDuressConfig();
+  const alertSent = useRef(0);
+
+  useEffect(() => {
+    const alert = duressConfig?.alert;
+
+    if (!duress || !alert || !userId || alertSent.current === opened) {
+      return;
+    }
+
+    const chat = chats?.find((c) => c.id === alert.chatId);
+    const key = privateKeyRef.current;
+
+    if (!chat || !key) {
+      return;
+    }
+
+    alertSent.current = opened;
+    const id = newMessageId();
+
+    try {
+      const content = encryptForChat(chat, encodePayload({ text: alert.text }), { id, sender_id: userId }, key);
+      withToken((token) => api.sendMessage(token, chat.id, { id, content, replyTo: null })).catch(() => {
+        // Tried again with the next change of the list (back online).
+        alertSent.current = 0;
+      });
+    } catch {
+      alertSent.current = 0;
+    }
+  }, [opened, duress, duressConfig, chats, userId, withToken, privateKeyRef]);
 
   // Web: unread count in the tab title.
   const baseTitle = useRef<string | null>(null);
@@ -713,7 +774,7 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
   return (
     <ChatsContext
       value={{
-        chats,
+        chats: shownChats,
         synced,
         error,
         reload,

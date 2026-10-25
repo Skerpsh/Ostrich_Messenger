@@ -3,7 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text } from "react-native";
 import Animated from "react-native-reanimated";
-import { approveRecovery, getGuarding, getRecovery, setRecovery, type Guarding, type RecoveryStatus } from "@/api/api";
+import { approveRecovery, getGuarding, getRecovery, setRecovery, type Guarding, type RecoveryPerson, type RecoveryStatus } from "@/api/api";
 import { useRealtime } from "@/api/realtime-context";
 import { useAuth } from "@/features/auth/auth";
 import {
@@ -24,6 +24,8 @@ import { useAppTheme } from "@/ui/theme";
 import { enterStyle, useMotion } from "@/ui/motion";
 import { withAlpha } from "@/ui/colors";
 import { RECOVERED_KEY } from "./saved";
+import { changeFake, fakeRecovery } from "@/features/lock/duress";
+import { inDuress, useLock } from "@/features/lock/lock";
 
 // Recovery through friends (backend recovery.ts): the user's OstrichID
 // split on this device among friends ("guardians"), any `threshold` of
@@ -71,6 +73,14 @@ export const useGuarding = () => useSyncExternalStore(subscribe, () => guarding)
 const useRecovered = () => useSyncExternalStore(subscribe, () => recovered);
 
 export function loadRecovery(withToken: ReturnType<typeof useAuth>["withToken"]) {
+  // Opened with the duress PIN: made-up guardians, no requests, no friends
+  // to help (features/lock/duress.ts).
+  if (inDuress()) {
+    setRecoveryStatus(fakeRecovery());
+    setGuarding([]);
+    return;
+  }
+
   withToken(getRecovery).then(setRecoveryStatus, () => {});
   withToken(getGuarding).then(setGuarding, () => {});
 }
@@ -79,6 +89,8 @@ export function loadRecovery(withToken: ReturnType<typeof useAuth>["withToken"])
 export function RecoveryWatch() {
   const { withToken } = useAuth();
   const { subscribeEvents } = useRealtime();
+  // Loaded again when opened the other way (duress PIN or real PIN).
+  const { opened } = useLock();
 
   useEffect(() => {
     loadRecovery(withToken);
@@ -86,7 +98,7 @@ export function RecoveryWatch() {
       recovered = value !== null && !owner?.setup;
       changed();
     });
-  }, [withToken]);
+  }, [withToken, opened]);
 
   useEffect(
     () =>
@@ -108,16 +120,33 @@ export const defaultThreshold = (total: number) => Math.max(MIN_GUARDIANS, Math.
 
 // Splits the OstrichID (typed by the user: it is not kept on the device)
 // among the guardians, each share sealed for their public key.
-export function chooseGuardians(
+export async function chooseGuardians(
   token: string,
   ostrichIdInput: string,
-  guardians: { id: string; public_key: string }[],
+  guardians: (RecoveryPerson & { public_key: string })[],
   threshold: number,
-) {
+): Promise<RecoveryStatus> {
   const ostrichId = normalizeOstrichId(ostrichIdInput);
 
   if (!ostrichId) {
     throw new Error("An OstrichID has 20 letters and digits, like XXXX-XXXX-XXXX-XXXX-XXXX");
+  }
+
+  if (inDuress()) {
+    await changeFake((fake) => ({
+      ...fake,
+      recovery: {
+        threshold,
+        guardians: guardians.map(({ id, username, avatar_id, is_developer }) => ({
+          id,
+          username,
+          avatar_id,
+          is_developer,
+        })),
+        daysAgo: 0,
+      },
+    }));
+    return fakeRecovery();
   }
 
   const id = newMessageId();

@@ -1,6 +1,7 @@
 import { loadCachedChats } from "@/api/local-cache";
 import { cacheClear } from "@/platform/cache";
 import { getItem, removeItems } from "@/platform/storage";
+import { DURESS_KEYS } from "./duress";
 import { LOCK_KEYS } from "./lock";
 
 // Wiping the device (the wipe PIN, 10 wrong PINs, "Forgot your PIN?"):
@@ -26,6 +27,7 @@ const KEYS = [
   "ostrich-recovery-request",
   "ostrich-recovered",
   ...LOCK_KEYS,
+  ...DURESS_KEYS,
 ];
 
 export async function wipeLocalData(userId: string | null) {

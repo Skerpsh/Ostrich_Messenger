@@ -22,7 +22,8 @@ import {
   wrapAccountKey,
 } from "@/crypto/crypto";
 import { RECOVERED_KEY } from "@/features/recovery/saved";
-import { forgetLock, LOCK_KEYS } from "@/features/lock/lock";
+import { forgetLock, inDuress, LOCK_KEYS } from "@/features/lock/lock";
+import { forgetDuress } from "@/features/lock/duress";
 import { wipeLocalData } from "@/features/lock/wipe";
 import { reloadApp } from "@/platform/reload";
 import { getItem, removeItem, setItem } from "@/platform/storage";
@@ -120,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removeItem(PRIVATE_KEY_KEY),
       removeItem(RECOVERED_KEY),
       ...LOCK_KEYS.map(removeItem),
+      forgetDuress(),
     ]);
     forgetLock();
     clearChatKeys();
@@ -346,6 +348,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOutEverywhere = async () => {
+    // Opened with the duress PIN: only this device logs out, as if it were
+    // all of them (features/lock/duress.ts).
+    if (inDuress()) {
+      await signOut();
+      return;
+    }
+
     if (state.status === "signedIn") {
       // Unlike signOut, this must reach the server: other devices stay
       // signed in otherwise.

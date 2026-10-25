@@ -11,7 +11,7 @@ import {
 import AnimatedPressable from "@/ui/animated-pressable";
 import Button from "@/ui/button";
 import TextField from "@/ui/text-field";
-import { getKeys, saveDisappearMessage, type Chat } from "@/api/api";
+import { getKeys, type Chat } from "@/api/api";
 import { useAuth, useCurrentUser, usePrivateKey } from "@/features/auth/auth";
 import {
   formatSize,
@@ -35,7 +35,7 @@ import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
 import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
 import { radius } from "@/ui/colors";
-import { setDisappearStatus } from "./disappear";
+import { disappearApi, setDisappearStatus } from "./disappear";
 
 // Writing a message of "If I disappear" (or changing one): to a chat or a
 // group, with files, and the user's OstrichID if they choose. Encrypted
@@ -174,7 +174,7 @@ export default function DisappearEditor({
         privateKey,
       );
       const status = await withToken((token) =>
-        saveDisappearMessage(token, {
+        disappearApi.saveMessage(token, {
           id: draft.id,
           chatId: chat.id,
           content,

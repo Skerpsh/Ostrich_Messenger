@@ -7,6 +7,9 @@ import { getItem, removeItem, setItem } from "@/platform/storage";
 // it was in the background. Only on this device: the PIN is kept as a
 // slow hash (scrypt), never sent nor synced. A wipe PIN, and optionally 10
 // wrong PINs in a row, wipe the device instead (features/lock/wipe.ts).
+// "Head in the sand": a duress PIN opens the app showing only the chats
+// chosen (features/lock/duress.ts), until it is locked and opened with the
+// real PIN.
 //
 // The PIN locks the screens, it does not encrypt anything: 10 000 PINs are
 // tried in minutes on a computer. What protects is the waiting between
@@ -26,6 +29,8 @@ export type LockConfig = {
   salt: string;
   pin: string;
   wipe: string | null;
+  // "Head in the sand" (duress.ts); null: off.
+  duress?: string | null;
   wipeAfterTries: boolean;
   // Minutes in the background before it locks; null: only at start.
   background: number | null;
@@ -46,10 +51,21 @@ type LockState = {
   loaded: boolean;
   config: LockConfig | null;
   locked: boolean;
+  // How it was last opened: with the duress PIN, only the safe chats show.
+  duress: boolean;
+  // Counts the times it was opened (the silent alert goes once each).
+  opened: number;
   failures: Failures;
 };
 
-let state: LockState = { loaded: false, config: null, locked: false, failures: { count: 0, until: 0 } };
+let state: LockState = {
+  loaded: false,
+  config: null,
+  locked: false,
+  duress: false,
+  opened: 0,
+  failures: { count: 0, until: 0 },
+};
 const listeners = new Set<() => void>();
 
 function set(next: Partial<LockState>) {
@@ -63,6 +79,9 @@ const subscribe = (listener: () => void) => {
 };
 
 export const useLock = () => useSyncExternalStore(subscribe, () => state);
+
+// Outside React (the settings' data, duress.ts).
+export const inDuress = () => state.duress;
 
 function parse<T>(value: string | null): T | null {
   try {
@@ -124,6 +143,7 @@ export const validPin = (pin: string) => new RegExp(`^\\d{${PIN_LENGTH}}$`).test
 // What a PIN typed at the lock screen is.
 export type PinResult =
   | { kind: "unlock" }
+  | { kind: "duress" }
   | { kind: "wipe" }
   | { kind: "wrong"; failures: number; waitUntil: number }
   | { kind: "wait"; waitUntil: number };
@@ -144,8 +164,14 @@ export async function enterPin(pin: string): Promise<PinResult> {
 
   if (same(hash, config.pin)) {
     await saveFailures({ count: 0, until: 0 });
-    set({ locked: false });
+    set({ locked: false, duress: false, opened: state.opened + 1 });
     return { kind: "unlock" };
+  }
+
+  if (same(hash, config.duress ?? null)) {
+    await saveFailures({ count: 0, until: 0 });
+    set({ locked: false, duress: true, opened: state.opened + 1 });
+    return { kind: "duress" };
   }
 
   if (same(hash, config.wipe)) {
@@ -164,51 +190,68 @@ export async function enterPin(pin: string): Promise<PinResult> {
   return { kind: "wrong", failures: count, waitUntil };
 }
 
-// Whether a PIN is the app lock's own one (for the settings).
+// Whether a PIN is the app lock's own one (for the settings). Opened with
+// the duress PIN, that one is "the PIN".
 export async function isPin(pin: string) {
-  return state.config !== null && same(await hashPin(pin, state.config.salt), state.config.pin);
+  const config = state.config;
+  return config !== null && same(await hashPin(pin, config.salt), state.duress ? (config.duress ?? null) : config.pin);
+}
+
+// The PINs must all differ; the error does not say which one it met.
+async function freshHash(pin: string, except: (string | null | undefined)[]) {
+  const hash = await hashPin(pin, state.config!.salt);
+
+  if (except.some((other) => same(hash, other ?? null))) {
+    throw new Error("Choose another PIN");
+  }
+
+  return hash;
 }
 
 export async function turnOnLock(pin: string) {
   const salt = toBase64(randomBytes(16));
 
   await saveFailures({ count: 0, until: 0 });
-  await saveConfig({ salt, pin: await hashPin(pin, salt), wipe: null, wipeAfterTries: false, background: 1 });
+  await saveConfig({
+    salt,
+    pin: await hashPin(pin, salt),
+    wipe: null,
+    wipeAfterTries: false,
+    background: 1,
+    duress: null,
+  });
 }
 
 export const turnOffLock = async () => {
   await Promise.all([saveConfig(null), removeItem(FAILURES_KEY)]);
-  set({ locked: false, failures: { count: 0, until: 0 } });
+  set({ locked: false, duress: false, failures: { count: 0, until: 0 } });
 };
 
-// A new PIN; the wipe PIN cannot be the same.
+// A new PIN, unlike the others. Opened with the duress PIN, it is that
+// one that changes: the real PIN stays.
 export async function changePin(pin: string) {
   const config = state.config!;
-  const hash = await hashPin(pin, config.salt);
 
-  if (same(hash, config.wipe)) {
-    throw new Error("This is your wipe PIN: choose another one");
+  if (state.duress) {
+    await saveConfig({ ...config, duress: await freshHash(pin, [config.pin, config.wipe]) });
+    return;
   }
 
-  await saveConfig({ ...config, pin: hash });
+  await saveConfig({ ...config, pin: await freshHash(pin, [config.wipe, config.duress]) });
 }
 
 // null: no wipe PIN.
 export async function setWipePin(pin: string | null) {
   const config = state.config!;
 
-  if (pin === null) {
-    await saveConfig({ ...config, wipe: null });
-    return;
-  }
+  await saveConfig({ ...config, wipe: pin === null ? null : await freshHash(pin, [config.pin, config.duress]) });
+}
 
-  const hash = await hashPin(pin, config.salt);
+// null: "Head in the sand" off.
+export async function setDuressPin(pin: string | null) {
+  const config = state.config!;
 
-  if (same(hash, config.pin)) {
-    throw new Error("The wipe PIN must be different from your PIN");
-  }
-
-  await saveConfig({ ...config, wipe: hash });
+  await saveConfig({ ...config, duress: pin === null ? null : await freshHash(pin, [config.pin, config.wipe]) });
 }
 
 export const setWipeAfterTries = (on: boolean) => saveConfig({ ...state.config!, wipeAfterTries: on });
@@ -226,5 +269,5 @@ export const LOCK_KEYS = [CONFIG_KEY, FAILURES_KEY];
 
 // Logged out or wiped: no lock any more.
 export function forgetLock() {
-  set({ config: null, locked: false, failures: { count: 0, until: 0 } });
+  set({ config: null, locked: false, duress: false, failures: { count: 0, until: 0 } });
 }

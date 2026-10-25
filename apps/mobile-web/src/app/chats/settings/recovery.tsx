@@ -25,6 +25,8 @@ import {
   useRecoveryStatus,
 } from "@/features/recovery/recovery";
 import { useAppTheme } from "@/ui/theme";
+import { changeFake, fakeRecovery } from "@/features/lock/duress";
+import { inDuress } from "@/features/lock/lock";
 
 // Settings → Recovery through friends: the user's guardians and any
 // request to recover the account, and the friends the user guards.
@@ -204,7 +206,13 @@ function GuardiansList({
     setBusy(true);
 
     try {
-      setRecoveryStatus(await withToken(removeRecovery));
+      if (inDuress()) {
+        // Opened with the duress PIN: only the made-up guardians go.
+        await changeFake((fake) => ({ ...fake, recovery: null }));
+        setRecoveryStatus(fakeRecovery());
+      } else {
+        setRecoveryStatus(await withToken(removeRecovery));
+      }
     } finally {
       setBusy(false);
       setConfirmRemove(false);

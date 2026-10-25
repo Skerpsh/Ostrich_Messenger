@@ -9,7 +9,17 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { AppState, Platform, Pressable, StyleSheet, Text } from "react-native";
 import Animated from "react-native-reanimated";
-import { disappearAlive, getDisappear, type DisappearStatus } from "@/api/api";
+import {
+  deleteDisappearMessage,
+  disappearAlive,
+  getDisappear,
+  saveDisappearMessage,
+  setDisappear,
+  turnOffDisappear,
+  type DisappearStatus,
+} from "@/api/api";
+import { changeFake, fakeDisappear } from "@/features/lock/duress";
+import { inDuress, useLock } from "@/features/lock/lock";
 import { useRealtime } from "@/api/realtime-context";
 import { useAuth } from "@/features/auth/auth";
 import { formatDate } from "@/ui/format";
@@ -45,6 +55,60 @@ function useCameBack() {
   return useSyncExternalStore(subscribe, () => cameBack);
 }
 
+// The requests of the settings: opened with the duress PIN, they read and
+// change the made-up switch (features/lock/duress.ts) instead.
+export const disappearApi = {
+  get: (token: string) => (inDuress() ? Promise.resolve(fakeDisappear()) : getDisappear(token)),
+
+  set: async (token: string, days: number) => {
+    if (!inDuress()) {
+      return setDisappear(token, days);
+    }
+
+    await changeFake((fake) => ({ ...fake, disappear: { days, messages: fake.disappear?.messages ?? [] } }));
+    return fakeDisappear();
+  },
+
+  turnOff: async (token: string) => {
+    if (!inDuress()) {
+      return turnOffDisappear(token);
+    }
+
+    await changeFake((fake) => ({ ...fake, disappear: null }));
+    return fakeDisappear();
+  },
+
+  saveMessage: async (token: string, message: Parameters<typeof saveDisappearMessage>[1]) => {
+    if (!inDuress()) {
+      return saveDisappearMessage(token, message);
+    }
+
+    await changeFake((fake) => ({
+      ...fake,
+      disappear: fake.disappear && {
+        ...fake.disappear,
+        messages: [
+          ...fake.disappear.messages.filter((m) => m.id !== message.id),
+          { id: message.id, chatId: message.chatId, content: message.content, minutesAgo: 0 },
+        ],
+      },
+    }));
+    return fakeDisappear();
+  },
+
+  deleteMessage: async (token: string, id: string) => {
+    if (!inDuress()) {
+      return deleteDisappearMessage(token, id);
+    }
+
+    await changeFake((fake) => ({
+      ...fake,
+      disappear: fake.disappear && { ...fake.disappear, messages: fake.disappear.messages.filter((m) => m.id !== id) },
+    }));
+    return fakeDisappear();
+  },
+};
+
 // Once in this long at most, while the app is open.
 const ALIVE_EVERY_MS = 10 * 60 * 1000;
 
@@ -55,6 +119,14 @@ export function DisappearWatch() {
   const { subscribeEvents } = useRealtime();
   const signedIn = state.status === "signedIn";
   const last = useRef(0);
+  const { opened } = useLock();
+
+  // Opened the other way (duress PIN or real PIN): shown again.
+  useEffect(() => {
+    if (signedIn && opened > 0) {
+      withToken(disappearApi.get).then(setDisappearStatus, () => {});
+    }
+  }, [signedIn, opened, withToken]);
 
   const alive = useCallback(() => {
     if (Date.now() - last.current < ALIVE_EVERY_MS) {
@@ -64,6 +136,12 @@ export function DisappearWatch() {
     last.current = Date.now();
     withToken(disappearAlive).then(
       (result) => {
+        // The user is here either way; what shows is made up then.
+        if (inDuress()) {
+          setDisappearStatus(fakeDisappear());
+          return;
+        }
+
         if (result.was_warned > 0) {
           cameBack = result.was_warned;
         }
@@ -103,7 +181,7 @@ export function DisappearWatch() {
       subscribeEvents({
         onEvent: (event) => {
           if (event.type === "disappear") {
-            withToken(getDisappear).then(setDisappearStatus, () => {});
+            withToken(disappearApi.get).then(setDisappearStatus, () => {});
           }
         },
       }),

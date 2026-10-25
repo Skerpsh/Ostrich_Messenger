@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import AppHeader from "@/ui/app-header";
 import Button from "@/ui/button";
 import { Swap } from "@/ui/reveal";
@@ -8,6 +9,7 @@ import { hasMod, useKeydown } from "@/ui/keys";
 import { useAppTheme } from "@/ui/theme";
 import { useAuth } from "@/features/auth/auth";
 import { enterPin, lockNow, useLock, WIPE_AFTER } from "./lock";
+import { lockSeemsOff, setLockSeemsOff } from "./duress";
 import PinPad from "./pin-pad";
 
 // In front of everything while the app is locked (app/_layout.tsx).
@@ -15,6 +17,7 @@ export function LockScreen() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { wipeDevice } = useAuth();
+  const router = useRouter();
   const { config, failures } = useLock();
   const [error, setError] = useState<string | null>(null);
   const [forgot, setForgot] = useState(false);
@@ -42,9 +45,22 @@ export function LockScreen() {
     const result = await enterPin(pin);
     setNow(Date.now());
 
+    // Each opening starts with the lock as it really is.
+    if (result.kind === "unlock" || result.kind === "duress") {
+      setLockSeemsOff(false);
+    }
+
     switch (result.kind) {
       case "unlock":
         setError(null);
+        return true;
+      case "duress":
+        // Nothing of what was open before (it may be a hidden chat).
+        setError(null);
+        if (router.canDismiss()) {
+          router.dismissAll();
+        }
+        router.replace("/chats");
         return true;
       case "wipe":
         await wipe();
@@ -125,6 +141,11 @@ export function LockWatch() {
     let hiddenAt: number | null = null;
 
     const hide = () => {
+      // "Turned off" with the duress PIN: it must not lock now.
+      if (lockSeemsOff()) {
+        return;
+      }
+
       hiddenAt = Date.now();
 
       // "Immediately": locked already, so the app switcher shows no chats.
@@ -154,7 +175,7 @@ export function LockWatch() {
   }, [config, background]);
 
   useKeydown((event) => {
-    if (config && !locked && hasMod(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "l") {
+    if (config && !locked && !lockSeemsOff() && hasMod(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "l") {
       lockNow();
       return true;
     }

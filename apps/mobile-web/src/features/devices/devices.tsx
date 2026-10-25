@@ -7,6 +7,8 @@ import Reveal, { Swap } from "@/ui/reveal";
 import { useAuth } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
 import { endSession, getSessions, type Session } from "@/api/api";
+import { changeFake, fakeSessions } from "@/features/lock/duress";
+import { inDuress } from "@/features/lock/lock";
 import { formatChatDate, formatDate } from "@/ui/format";
 import { LinkDeviceRow } from "./link-device";
 import { Divider, Section, styles } from "@/features/settings/ui";
@@ -35,7 +37,8 @@ export function DevicesSection() {
     let current = true;
 
     withToken(getSessions).then(
-      (loaded) => current && setSessions(loaded),
+      // Opened with the duress PIN: this device, and made-up others.
+      (loaded) => current && setSessions(inDuress() ? fakeSessions(loaded) : loaded),
       (e) =>
         current && setError(e instanceof Error ? e.message : "Failed to load devices"),
     );
@@ -47,7 +50,12 @@ export function DevicesSection() {
 
   const end = async (session: Session) => {
     try {
-      await withToken((token) => endSession(token, session.id));
+      if (inDuress()) {
+        await changeFake((fake) => ({ ...fake, devices: fake.devices.filter((device) => device.id !== session.id) }));
+      } else {
+        await withToken((token) => endSession(token, session.id));
+      }
+
       setVersion((v) => v + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to log out the device");

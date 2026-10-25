@@ -3,13 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Button from "@/ui/button";
 import TextField from "@/ui/text-field";
-import {
-  deleteDisappearMessage,
-  getDisappear,
-  setDisappear,
-  turnOffDisappear,
-  type DisappearStatus,
-} from "@/api/api";
+import { type DisappearStatus } from "@/api/api";
 import { useAuth, useCurrentUser, usePrivateKey } from "@/features/auth/auth";
 import { useChats } from "@/features/chats/chats";
 import { messagePreview } from "@/features/chats/preview";
@@ -27,6 +21,7 @@ import DisappearEditor, {
   type DisappearDraft,
 } from "@/features/disappear/disappear-editor";
 import {
+  disappearApi,
   setDisappearStatus,
   useDisappearStatus,
 } from "@/features/disappear/disappear";
@@ -56,7 +51,7 @@ export default function DisappearSettings() {
   const [editing, setEditing] = useState<DisappearDraft | null>(null);
 
   useEffect(() => {
-    withToken(getDisappear).then(setDisappearStatus, () => {});
+    withToken(disappearApi.get).then(setDisappearStatus, () => {});
   }, [withToken]);
 
   const run = async (change: (token: string) => Promise<DisappearStatus>) => {
@@ -199,7 +194,7 @@ export default function DisappearSettings() {
                 daysProblem !== null ||
                 (on && chosenDays === status?.switch?.days)
               }
-              onPress={() => run((token) => setDisappear(token, chosenDays))}
+              onPress={() => run((token) => disappearApi.set(token, chosenDays))}
             />
             {on || status?.switch?.triggered_at ? (
               <Button
@@ -216,7 +211,7 @@ export default function DisappearSettings() {
                   }
 
                   setConfirmOff(false);
-                  run(turnOffDisappear);
+                  run(disappearApi.turnOff);
                 }}
               />
             ) : null}
@@ -293,7 +288,7 @@ export default function DisappearSettings() {
                     <Pressable
                       onPress={() =>
                         run((token) =>
-                          deleteDisappearMessage(token, message.id),
+                          disappearApi.deleteMessage(token, message.id),
                         )
                       }
                       accessibilityRole="button"

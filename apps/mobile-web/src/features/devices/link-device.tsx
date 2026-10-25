@@ -7,6 +7,7 @@ import Reveal, { Swap } from "@/ui/reveal";
 import { useAuth, usePrivateKey } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
 import { approveDeviceLink, getDeviceLink } from "@/api/api";
+import { inDuress } from "@/features/lock/lock";
 import { sealForLink } from "@/crypto/crypto";
 import { parseLink } from "@/api/links";
 import { radius } from "@/ui/colors";
@@ -70,6 +71,16 @@ export function LinkDeviceRow({
 
     setBusy(true);
     setError(null);
+
+    // Opened with the duress PIN: the account's key never goes to a new
+    // device (it would give the whole account away); it looks as if the
+    // code had expired.
+    if (inDuress()) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      setError("This code has expired: show a new one on the other device and scan it again");
+      setBusy(false);
+      return;
+    }
 
     try {
       const sealed = sealForLink(privateKey, scanned.publicKey, scanned.id);

@@ -26,6 +26,7 @@ import { registerServiceWorker } from "@/platform/pwa";
 import SettingsSync from "@/features/settings/settings-sync";
 import { nearestAccent } from "@/ui/colors";
 import { loadLock, useLock } from "@/features/lock/lock";
+import { loadDuress } from "@/features/lock/duress";
 import { LockScreen, LockWatch } from "@/features/lock/lock-screen";
 
 // Keep the splash screen until the saved session has been checked.
@@ -63,7 +64,7 @@ function RootNavigator() {
 
   // Whether the app is locked, before anything of the account is shown.
   useEffect(() => {
-    loadLock();
+    loadDuress().then(loadLock, loadLock);
   }, []);
 
   useEffect(() => {

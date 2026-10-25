@@ -3,6 +3,7 @@ import { DisappearBanner } from "@/features/disappear/disappear";
 import { RecoveryBanner } from "@/features/recovery/recovery";
 import { UpdateBanner } from "@/features/updates/update-banner";
 import { lockNow, useLock } from "@/features/lock/lock";
+import { useDuress, useLockSeemsOff } from "@/features/lock/duress";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { usePathname, useRouter } from "expo-router";
@@ -64,6 +65,9 @@ export default function ChatList() {
   const wide = useIsWide();
   const user = useCurrentUser();
   const lockConfig = useLock().config;
+  const lockSeemsOff = useLockSeemsOff();
+  // Opened with the duress PIN: Saved messages only if it is a safe chat.
+  const safe = useDuress();
   const { withToken } = useAuth();
   const privateKey = usePrivateKey();
   const { chats, error, reload, typing, updateChatSettings, removeChat, leaveGroup, drafts } =
@@ -276,9 +280,12 @@ export default function ChatList() {
   const settingsButton = (
     <IconButton icon="settings-outline" label="Settings" onPress={() => go("/chats/settings")} />
   );
-  const savedButton = <IconButton icon="bookmark-outline" label="Saved messages" onPress={openSaved} />;
+  const savedButton =
+    safe && !chats?.some((chat) => chat.type === "saved") ? null : (
+      <IconButton icon="bookmark-outline" label="Saved messages" onPress={openSaved} />
+    );
   // With an app lock: locks it now (also Ctrl/⌘ L).
-  const lockButton = lockConfig ? <IconButton icon="lock-closed-outline" label="Lock Ostrich" onPress={lockNow} /> : null;
+  const lockButton = lockConfig && !lockSeemsOff ? <IconButton icon="lock-closed-outline" label="Lock Ostrich" onPress={lockNow} /> : null;
   const newChatButton = (
     <IconButton icon="create-outline" label="New chat or group" onPress={() => go("/chats/new")} />
   );
