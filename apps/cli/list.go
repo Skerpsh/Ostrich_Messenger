@@ -378,10 +378,7 @@ func (m *model) toggleTheme() tea.Cmd {
 		m.cfg.Theme = "dark"
 	}
 
-	m.cfg.save()
-	m.applyTheme()
-
-	return nil
+	return m.lookChanged()
 }
 
 // --- view ---

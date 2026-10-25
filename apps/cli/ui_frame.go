@@ -114,6 +114,8 @@ func (m model) mainView() string {
 	switch {
 	case m.helpOpen:
 		view = overlay(view, m.helpView(), w, h)
+	case m.settings != nil && m.settings.form != "" && (m.wide() || m.focus == paneSettings):
+		view = overlay(view, m.settingsFormView(), w, h)
 	case m.prompt != nil:
 		view = overlay(view, m.promptView(), w, h)
 	case m.qr != nil:
@@ -202,8 +204,10 @@ func (m model) hints() string {
 		return "Type to filter  ↑↓ choose  Enter do it  Esc close"
 	case m.settings != nil && m.settings.form != "" && (m.wide() || m.focus == paneSettings):
 		return "↑↓ Tab field  Enter next / save  Esc cancel"
+	case m.settings != nil && m.settings.inContent && (m.wide() || m.focus == paneSettings):
+		return "↑↓ move  Enter choose  ←→ change  Esc the parts"
 	case m.settings != nil && (m.wide() || m.focus == paneSettings):
-		return "↑↓ move  Enter choose  ←→ change  Esc close"
+		return "↑↓ part  Enter open it  Esc close  Ctrl+P commands"
 	case m.focus == paneChat && c != nil:
 		switch {
 		case c.attaching:

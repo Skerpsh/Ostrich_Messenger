@@ -109,10 +109,13 @@ func (m *model) toList(cmd tea.Cmd) tea.Cmd {
 // openSettingsForm opens Settings with a form open.
 func (m *model) openSettingsForm(form string) tea.Cmd {
 	cmd := m.openSettings()
+	rows := m.settingsRows()
 
-	for i, r := range m.settingsRows() {
-		if r.form == form {
-			m.settings.cursor = i
+	for i, part := range m.settingsParts() {
+		for j := part.start; j < part.end; j++ {
+			if rows[j].form == form {
+				m.settings.part, m.settings.cursor, m.settings.inContent = i, j, true
+			}
 		}
 	}
 
@@ -122,16 +125,11 @@ func (m *model) openSettingsForm(form string) tea.Cmd {
 // openSettingsAt opens Settings on a section's first row.
 func (m *model) openSettingsAt(section string) tea.Cmd {
 	cmd := m.openSettings()
-	rows := m.settingsRows()
 
-	for i, r := range rows {
-		if r.kind == rowSection && r.label == section {
-			for j := i + 1; j < len(rows); j++ {
-				if rows[j].selectable() {
-					m.settings.cursor = j
-					break
-				}
-			}
+	for i, part := range m.settingsParts() {
+		if part.title == section {
+			m.choosePart(i)
+			m.settings.inContent = true
 		}
 	}
 

@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -12,16 +10,19 @@ import (
 	zone "github.com/lrstanley/bubblezone"
 )
 
-// Settings, with the same sections as the web: profile, appearance,
-// account, privacy, notifications, devices, security, danger zone.
-
-const maxAvatarBytes = 8 << 20
+// Settings: its parts on the left (Profile, Appearance, Account...), the
+// chosen part's rows on the right (in a narrow pane, the parts and then
+// the part). Forms open in a window over it.
 
 type settingsState struct {
 	// The selected row (index into settingsRows) and the first line shown.
 	cursor, scroll int
+	// The chosen part (index into settingsParts) and whether the keys move
+	// in it (else in the list of parts).
+	part      int
+	inContent bool
 
-	// The open form ("username", "password", "photo", "delete") and its
+	// The open form ("username", "password", "delete", recovery's) and its
 	// inputs.
 	form      string
 	inputs    []textinput.Model
@@ -46,14 +47,11 @@ func (s *settingsState) restyle(p palette) {
 	}
 }
 
+// The forms' inputs fit their window (settingsFormView).
 func (s *settingsState) resize(w int) {
 	for i := range s.inputs {
-		s.inputs[i].Width = max(settingsContentWidth(w)-6, 10)
+		s.inputs[i].Width = max(min(60, w)-8, 10)
 	}
-}
-
-func settingsContentWidth(paneWidth int) int {
-	return min(paneWidth-4, 68)
 }
 
 func (m *model) openSettings() tea.Cmd {
@@ -175,15 +173,15 @@ func (m model) settingsRows() []settingsRow {
 
 			return m.showToast("Copied @"+m.user.User.Username, false)
 		}},
-		{kind: rowAction, id: "qr", icon: "▦", label: "My QR code", action: func(m *model) tea.Cmd {
-			m.qr = &qrState{title: "@" + m.user.User.Username + ": scanned, it opens a chat with you", text: profileLink(m.user.User.Username)}
-			return nil
-		}},
-		{kind: rowAction, id: "photo", icon: "▣", label: "Set photo from a file", form: "photo"},
-	}
+		{kind: rowAction, id: "link", icon: "⧉", label: "Copy profile link", hint: "Opened, it starts a chat with you", action: func(m *model) tea.Cmd {
+			link := profileLink(m.user.User.Username)
 
-	if u.AvatarID != nil {
-		rows = append(rows, settingsRow{kind: rowAction, id: "removephoto", icon: "✕", label: "Remove photo", action: (*model).removePhoto})
+			if err := copyText(link); err != nil {
+				return m.showToast(err.Error(), true)
+			}
+
+			return m.showToast("Copied "+link, false)
+		}},
 	}
 
 	rows = append(rows,
@@ -203,7 +201,19 @@ func (m model) settingsRows() []settingsRow {
 	}
 
 	rows = append(rows,
-		settingsRow{kind: rowAccents, id: "accent", icon: "●", label: "Accent color", value: findAccent(m.cfg.Accent).name},
+		settingsRow{kind: rowAccents, id: "accent", icon: "●", label: "Accent color", value: accentName(m.cfg.Accent)},
+		settingsRow{kind: rowToggle, id: "synclook", icon: "↻", label: "Sync the theme with my devices", on: m.cfg.SyncLook,
+			hint: "The light or dark theme and the accent, the same as the apps' with Sync on (encrypted with your account's key).",
+			action: func(m *model) tea.Cmd {
+				m.cfg.SyncLook = !m.cfg.SyncLook
+				m.cfg.save()
+
+				if m.cfg.SyncLook {
+					return m.loadSyncedLook()
+				}
+
+				return nil
+			}},
 
 		section("Account"),
 		settingsRow{kind: rowAction, id: "username", icon: "@", label: "Username", value: "@" + sanitize(u.Username), form: "username"},
@@ -289,26 +299,74 @@ func (m model) settingsRows() []settingsRow {
 	return rows
 }
 
+// settingsPart: a part of Settings, the rows from start to end (an
+// index range of settingsRows).
+type settingsPart struct {
+	title      string
+	start, end int
+}
+
+// settingsParts: the rows before the first heading are the profile.
+func (m model) settingsParts() []settingsPart {
+	rows := m.settingsRows()
+	parts := []settingsPart{{title: "Profile"}}
+
+	for i, r := range rows {
+		if r.kind == rowSection {
+			parts[len(parts)-1].end = i
+			parts = append(parts, settingsPart{title: r.label, start: i + 1})
+		}
+	}
+
+	parts[len(parts)-1].end = len(rows)
+
+	return parts
+}
+
+// currentPart is the part with the cursor's row in it (rows come and go,
+// e.g. the devices as they load).
+func (m model) currentPart() settingsPart {
+	parts := m.settingsParts()
+
+	return parts[min(max(m.settings.part, 0), len(parts)-1)]
+}
+
 func (m *model) selectFirstSettingsRow() {
-	for i, r := range m.settingsRows() {
-		if r.selectable() {
+	part := m.currentPart()
+	rows := m.settingsRows()
+
+	for i := part.start; i < part.end; i++ {
+		if rows[i].selectable() {
 			m.settings.cursor = i
 			return
 		}
 	}
+
+	m.settings.cursor = part.start
 }
 
+// moveSettingsCursor moves within the part.
 func (m *model) moveSettingsCursor(delta int) {
 	rows := m.settingsRows()
+	part := m.currentPart()
 	s := m.settings
 
-	for i := s.cursor + delta; i >= 0 && i < len(rows); i += delta {
+	for i := s.cursor + delta; i >= part.start && i < part.end; i += delta {
 		if rows[i].selectable() {
 			s.cursor = i
 			s.confirming = ""
 			return
 		}
 	}
+}
+
+// choosePart moves to another part (in the list of parts).
+func (m *model) choosePart(part int) {
+	s := m.settings
+	s.part = min(max(part, 0), len(m.settingsParts())-1)
+	s.scroll = 0
+	s.confirming = ""
+	m.selectFirstSettingsRow()
 }
 
 // --- forms ---
@@ -340,8 +398,6 @@ func (m *model) openForm(form string) tea.Cmd {
 			newInput("New password", 128, true, p),
 			newInput("Repeat the new password", 128, true, p),
 		}
-	case "photo":
-		s.inputs = []textinput.Model{newInput("Path to a JPEG, PNG or WebP image", 1024, false, p)}
 	case "delete":
 		s.inputs = []textinput.Model{
 			newInput("Password", 128, true, p),
@@ -487,42 +543,6 @@ func (m *model) submitForm() tea.Cmd {
 			return m.showToast("Password changed. Other devices have been logged out.", false)
 		})
 
-	case "photo":
-		path := strings.TrimSpace(value(0))
-
-		if strings.HasPrefix(path, "~/") {
-			if home, err := os.UserHomeDir(); err == nil {
-				path = filepath.Join(home, path[2:])
-			}
-		}
-
-		var account *Account
-
-		return run(func() error {
-			info, err := os.Stat(path)
-
-			switch {
-			case err != nil:
-				return fmt.Errorf("can't open the file: %w", err)
-			case info.Size() > maxAvatarBytes:
-				return fmt.Errorf("the image is larger than 8 MB")
-			}
-
-			image, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-
-			account, err = uploadAvatar(token, image)
-
-			return err
-		}, func(m *model) tea.Cmd {
-			m.user.User = *account
-			m.settings.form = ""
-
-			return m.showToast("Photo set", false)
-		})
-
 	case "delete":
 		password, id := value(0), value(1)
 
@@ -580,26 +600,6 @@ func (m *model) setPrivacy(showPresence, readReceipts *bool) tea.Cmd {
 	})
 }
 
-func (m *model) removePhoto() tea.Cmd {
-	token := m.user.Token
-
-	return task(func() func(*model) tea.Cmd {
-		account, err := removeAvatar(token)
-
-		return func(m *model) tea.Cmd {
-			if err != nil {
-				return m.fail(err)
-			}
-
-			if m.user != nil {
-				m.user.User = *account
-			}
-
-			return m.showToast("Photo removed", false)
-		}
-	})
-}
-
 func (m *model) endSession(session Session) tea.Cmd {
 	s := m.settings
 	id := "session:" + session.ID
@@ -652,13 +652,22 @@ func (m *model) logoutEverywhere() tea.Cmd {
 	})
 }
 
-func (m *model) setThemePreference(theme string) {
-	m.cfg.Theme = theme
+// lookChanged saves and shows a new theme or accent, and syncs it when
+// that is on (synclook.go).
+func (m *model) lookChanged() tea.Cmd {
 	m.cfg.save()
 	m.applyTheme()
+
+	return m.saveSyncedLook()
 }
 
-func (m *model) shiftAccent(delta int) {
+func (m *model) setThemePreference(theme string) tea.Cmd {
+	m.cfg.Theme = theme
+
+	return m.lookChanged()
+}
+
+func (m *model) shiftAccent(delta int) tea.Cmd {
 	i := 0
 
 	for j, a := range accents {
@@ -669,8 +678,8 @@ func (m *model) shiftAccent(delta int) {
 
 	i = (i + delta + len(accents)) % len(accents)
 	m.cfg.Accent = accents[i].id
-	m.cfg.save()
-	m.applyTheme()
+
+	return m.lookChanged()
 }
 
 var themeOptions = []struct{ id, label string }{
@@ -679,7 +688,7 @@ var themeOptions = []struct{ id, label string }{
 	{"dark", "Dark"},
 }
 
-func (m *model) shiftTheme(delta int) {
+func (m *model) shiftTheme(delta int) tea.Cmd {
 	i := 0
 
 	for j, option := range themeOptions {
@@ -689,7 +698,8 @@ func (m *model) shiftTheme(delta int) {
 	}
 
 	i = min(max(i+delta, 0), len(themeOptions)-1)
-	m.setThemePreference(themeOptions[i].id)
+
+	return m.setThemePreference(themeOptions[i].id)
 }
 
 // activateSettingsRow runs the selected row.
@@ -707,9 +717,9 @@ func (m *model) activateSettingsRow() tea.Cmd {
 	case r.form != "":
 		return m.openForm(r.form)
 	case r.kind == rowThemes:
-		m.shiftTheme(1)
+		return m.shiftTheme(1)
 	case r.kind == rowAccents:
-		m.shiftAccent(1)
+		return m.shiftAccent(1)
 	case r.action != nil:
 		return r.action(m)
 	}
@@ -721,37 +731,67 @@ func (m *model) updateSettingsKey(msg tea.KeyMsg) tea.Cmd {
 	s := m.settings
 
 	if s.form != "" && len(s.inputs) > 0 {
-		cmd := m.updateFormKey(msg)
-		m.scrollSettings()
-
-		return cmd
+		return m.updateFormKey(msg)
 	}
 
 	rows := m.settingsRows()
 	defer m.scrollSettings()
 
+	value := s.inContent && s.cursor < len(rows) && (rows[s.cursor].kind == rowThemes || rows[s.cursor].kind == rowAccents)
+	shift := func(delta int) tea.Cmd {
+		if rows[s.cursor].kind == rowThemes {
+			return m.shiftTheme(delta)
+		}
+
+		return m.shiftAccent(delta)
+	}
+
 	switch msg.String() {
 	case "esc", "q":
+		// Out of the part first, then out of Settings.
+		if s.inContent {
+			s.inContent = false
+			s.confirming = ""
+
+			return nil
+		}
+
 		return m.closeSettings()
 	case "up", "k":
-		m.moveSettingsCursor(-1)
+		if s.inContent {
+			m.moveSettingsCursor(-1)
+		} else {
+			m.choosePart(s.part - 1)
+		}
 	case "down", "j":
-		m.moveSettingsCursor(1)
+		if s.inContent {
+			m.moveSettingsCursor(1)
+		} else {
+			m.choosePart(s.part + 1)
+		}
 	case "left", "h":
-		switch rows[s.cursor].kind {
-		case rowThemes:
-			m.shiftTheme(-1)
-		case rowAccents:
-			m.shiftAccent(-1)
+		switch {
+		case value:
+			return shift(-1)
+		case s.inContent:
+			s.inContent = false
 		}
 	case "right", "l":
-		switch rows[s.cursor].kind {
-		case rowThemes:
-			m.shiftTheme(1)
-		case rowAccents:
-			m.shiftAccent(1)
+		switch {
+		case value:
+			return shift(1)
+		case !s.inContent:
+			s.inContent = true
+			m.selectFirstSettingsRow()
 		}
 	case "enter", " ":
+		if !s.inContent {
+			s.inContent = true
+			m.selectFirstSettingsRow()
+
+			return nil
+		}
+
 		return m.activateSettingsRow()
 	case "tab":
 		if m.wide() {
@@ -765,6 +805,26 @@ func (m *model) updateSettingsKey(msg tea.KeyMsg) tea.Cmd {
 func (m *model) updateSettingsMouse(msg tea.MouseMsg) tea.Cmd {
 	s := m.settings
 
+	if s.form != "" {
+		for i := range s.inputs {
+			if clicked(msg, fmt.Sprintf("set:field:%d", i)) {
+				m.focus = paneSettings
+				return m.focusFormField(i)
+			}
+		}
+
+		if clicked(msg, "set:submit") {
+			return m.submitForm()
+		}
+
+		// A click outside the form closes it.
+		if msg.Action == tea.MouseActionPress && !zone.Get("set:form").InBounds(msg) {
+			s.form = ""
+		}
+
+		return nil
+	}
+
 	if d := wheel(msg, "set:body"); d != 0 {
 		s.scroll = max(s.scroll+d*wheelLines, 0)
 		return nil
@@ -774,12 +834,21 @@ func (m *model) updateSettingsMouse(msg tea.MouseMsg) tea.Cmd {
 		return m.closeSettings()
 	}
 
+	for i := range m.settingsParts() {
+		if clicked(msg, fmt.Sprintf("set:part:%d", i)) {
+			m.focus = paneSettings
+			m.choosePart(i)
+			s.inContent = true
+
+			return nil
+		}
+	}
+
 	for _, option := range themeOptions {
 		if clicked(msg, "set:theme:"+option.id) {
 			m.focus = paneSettings
-			m.setThemePreference(option.id)
 
-			return nil
+			return m.setThemePreference(option.id)
 		}
 	}
 
@@ -787,22 +856,9 @@ func (m *model) updateSettingsMouse(msg tea.MouseMsg) tea.Cmd {
 		if clicked(msg, fmt.Sprintf("set:accent:%d", i)) {
 			m.focus = paneSettings
 			m.cfg.Accent = a.id
-			m.cfg.save()
-			m.applyTheme()
 
-			return nil
+			return m.lookChanged()
 		}
-	}
-
-	for i := range s.inputs {
-		if s.form != "" && clicked(msg, fmt.Sprintf("set:field:%d", i)) {
-			m.focus = paneSettings
-			return m.focusFormField(i)
-		}
-	}
-
-	if s.form != "" && clicked(msg, "set:submit") {
-		return m.submitForm()
 	}
 
 	for i, r := range m.settingsRows() {
@@ -814,6 +870,7 @@ func (m *model) updateSettingsMouse(msg tea.MouseMsg) tea.Cmd {
 			}
 
 			s.cursor = i
+			s.inContent = true
 
 			return m.activateSettingsRow()
 		}
@@ -824,76 +881,116 @@ func (m *model) updateSettingsMouse(msg tea.MouseMsg) tea.Cmd {
 
 // --- view ---
 
-// settingsBody draws everything below the header; rowAt[i] is the first
-// line of row i.
+// settingsPartsWidth: the parts' column, none in a narrow pane (the parts,
+// then the part, one at a time).
+func settingsPartsWidth(w int) int {
+	if w < 70 {
+		return 0
+	}
+
+	return 27
+}
+
+// settingsContentWidth is the width of the part's rows.
+func settingsContentWidth(paneWidth int) int {
+	if parts := settingsPartsWidth(paneWidth); parts > 0 {
+		return paneWidth - parts - 1
+	}
+
+	return paneWidth
+}
+
+// settingsBody draws the chosen part's rows in w cells; rowAt[i] is the
+// first line of row i (of settingsRows; -1 for rows of other parts).
 func (m model) settingsBody(w int) (lines []string, rowAt []int) {
 	s := m.settings
 	p := m.pal
 	bg := p.bg
-	cw := settingsContentWidth(w)
-	left := max((w-cw)/2, 0)
-	card := p.panel
+	cw := min(w-4, 76)
+	rows := m.settingsRows()
+	part := m.currentPart()
+	rowAt = make([]int, len(rows))
 
-	// put adds a line (or a block of lines) of the content column.
-	put := func(block string) {
-		for _, line := range strings.Split(block, "\n") {
-			lines = append(lines, blank(left, bg)+line+blank(w-left-cw, bg))
-		}
+	for i := range rowAt {
+		rowAt[i] = -1
 	}
 
-	rows := m.settingsRows()
-	rowAt = make([]int, len(rows))
+	put := func(line string) {
+		lines = append(lines, blank(2, bg)+fitLine(line, cw, bg)+blank(max(w-2-cw, 0), bg))
+	}
+
+	put("")
 	u := m.user.User
 
-	for i, r := range rows {
+	for i := part.start; i < part.end; i++ {
+		r := rows[i]
 		rowAt[i] = len(lines)
-		selected := i == s.cursor && m.focus == paneSettings
-		rowBg := card
-
-		if selected {
-			rowBg = p.hover
-		}
+		selected := i == s.cursor && s.inContent && m.focus == paneSettings
 
 		switch r.kind {
 		case rowSection:
-			put(blank(cw, bg))
-			put(fitLine(bold(" "+strings.ToUpper(r.label), p.muted, bg), cw, bg))
-
+			continue
 		case rowProfile:
-			name := bold("@"+sanitize(u.Username), p.text, card)
+			put(bold("@"+sanitize(u.Username), p.text, bg))
+			put(seg(clip("Friends start chats with you by your @username.", cw), p.muted, bg))
+			put("")
 
-			if u.IsDeveloper {
-				name += blank(1, card) + devBadge()
+			continue
+		}
+
+		fg := p.text
+
+		if r.danger {
+			fg = p.danger
+		}
+
+		bar := blank(1, bg)
+		label := r.label
+
+		if selected {
+			bar = seg("▌", p.accent, bg)
+		}
+
+		if s.confirming == r.id {
+			switch {
+			case r.id == "logoutall":
+				label = "Press Enter again to log out on all devices"
+			case strings.HasPrefix(r.id, "session:"):
+				label = "Press Enter again to log this device out"
+			case r.id == "recovery-remove":
+				label = "Press Enter again to remove all guardians"
 			}
+		}
 
-			photo := "no photo"
+		labelText := seg(label, fg, bg)
 
-			if u.AvatarID != nil {
-				photo = "photo set (shown in the apps)"
+		if selected {
+			labelText = bold(label, fg, bg)
+		}
+
+		var right string
+
+		switch r.kind {
+		case rowToggle:
+			right = seg("off", p.muted, bg)
+
+			if r.on {
+				right = bold("on", p.accent, bg)
 			}
-
-			put(blank(cw, card))
-			put(center(name, cw, card))
-			put(center(seg(photo, p.muted, card), cw, card))
-			put(center(seg("Friends start chats with you by your username.", p.muted, card), cw, card))
-			put(blank(cw, card))
-
 		case rowThemes:
 			var options []string
 
 			for _, option := range themeOptions {
-				fg, optionBg := p.muted, p.panelAlt
+				text := seg(option.label, p.muted, bg)
 
 				if m.cfg.Theme == option.id {
-					fg, optionBg = p.accent, p.accentSoft
+					text = bold(option.label, p.accent, bg)
 				}
 
-				options = append(options, zone.Mark("set:theme:"+option.id, bold(" "+option.label+" ", fg, optionBg)))
+				options = append(options, zone.Mark("set:theme:"+option.id, text))
 			}
 
-			label := seg(" "+r.icon+"  ", p.muted, rowBg) + seg(r.label, p.text, rowBg)
-			put(zone.Mark(fmt.Sprintf("set:row:%d", i), row(label, strings.Join(options, blank(1, rowBg))+blank(1, rowBg), cw, rowBg)))
-
+			right = strings.Join(options, blank(2, bg))
 		case rowAccents:
 			var swatches []string
 
@@ -904,94 +1001,44 @@ func (m model) settingsBody(w int) (lines []string, rowAt []int) {
 					variant = a.light
 				}
 
+				color := lipgloss.Color(variant.accent)
+
+				if p.terminal {
+					color = lipgloss.Color(ansiAccents[a.id])
+				}
+
 				mark := " ● "
 
 				if a.id == m.cfg.Accent {
 					mark = "[●]"
 				}
 
-				swatches = append(swatches, zone.Mark(fmt.Sprintf("set:accent:%d", j), seg(mark, lipgloss.Color(variant.accent), rowBg)))
+				swatches = append(swatches, zone.Mark(fmt.Sprintf("set:accent:%d", j), seg(mark, color, bg)))
 			}
 
-			label := seg(" "+r.icon+"  ", p.accent, rowBg) + seg(r.label, p.text, rowBg)
-			put(zone.Mark(fmt.Sprintf("set:row:%d", i), row(label, strings.Join(swatches, "")+blank(1, rowBg), cw, rowBg)))
-
+			right = strings.Join(swatches, "")
 		default:
-			fg := p.text
-
-			if r.danger {
-				fg = p.danger
+			if r.value != "" {
+				right = seg(clip(r.value, cw/2), p.muted, bg)
 			}
 
-			label := r.label
-
-			if s.confirming == r.id {
-				switch {
-				case r.id == "logoutall":
-					label = "Press Enter again to log out on all devices"
-				case strings.HasPrefix(r.id, "session:"):
-					label = "Press Enter again to log this device out"
-				case r.id == "recovery-remove":
-					label = "Press Enter again to remove all guardians"
-				}
-			}
-
-			right := ""
-
-			switch {
-			case r.kind == rowToggle:
-				right = toggleView(r.on, p, rowBg)
-			case r.value != "":
-				right = seg(clip(r.value, cw/2), p.muted, rowBg) + blank(1, rowBg)
-			case r.form != "":
-				arrow := "▾"
-
-				if s.form == r.form {
-					arrow = "▴"
-				}
-
-				right = seg(arrow+" ", p.muted, rowBg)
-			}
-
-			if r.form != "" && r.value != "" {
-				arrow := " ▾ "
-
-				if s.form == r.form {
-					arrow = " ▴ "
-				}
-
-				right = seg(clip(r.value, cw/2), p.muted, rowBg) + seg(arrow, p.muted, rowBg)
-			}
-
-			iconColor := p.muted
-
-			if r.danger {
-				iconColor = p.danger
-			}
-
-			line := row(seg(" "+r.icon+"  ", iconColor, rowBg)+bold(label, fg, rowBg), right, cw, rowBg)
-			block := []string{line}
-
-			if r.hint != "" && (r.kind == rowToggle || selected) {
-				for _, hint := range wrap(r.hint, cw-6) {
-					block = append(block, blank(4, rowBg)+fitLine(seg(hint, p.muted, rowBg), cw-4, rowBg))
-				}
-			}
-
-			put(zone.Mark(fmt.Sprintf("set:row:%d", i), strings.Join(block, "\n")))
-
-			if r.form != "" && s.form == r.form {
-				for _, line := range m.formLines(cw) {
-					put(line)
-				}
+			if r.form != "" {
+				right += seg(" ›", p.muted, bg)
 			}
 		}
+
+		block := []string{blank(2, bg) + row(bar+blank(1, bg)+labelText, right, cw, bg) + blank(max(w-2-cw, 0), bg)}
+
+		if r.hint != "" && selected {
+			for _, hint := range wrap(r.hint, cw-4) {
+				block = append(block, blank(2, bg)+fitLine(blank(2, bg)+seg(hint, p.muted, bg), cw, bg)+blank(max(w-2-cw, 0), bg))
+			}
+		}
+
+		lines = append(lines, zone.Mark(fmt.Sprintf("set:row:%d", i), strings.Join(block, "\n")))
 	}
 
-	put(blank(cw, bg))
-	// This client's version, small, at the bottom (as in the apps).
-	put(center(seg("Ostrich "+sanitize(version)+" · terminal", p.muted, bg), cw, bg))
-	put(blank(cw, bg))
+	put("")
 
 	return lines, rowAt
 }
@@ -1005,35 +1052,35 @@ func toggleView(on bool, p palette, bg lipgloss.Color) string {
 	return seg("●", p.muted, bg) + seg("━━", p.panelAlt, bg) + blank(1, bg)
 }
 
-// formLines draws the open form.
-func (m model) formLines(cw int) []string {
+// settingsFormView: the open form, in a window over Settings.
+func (m model) settingsFormView() string {
 	s := m.settings
 	p := m.pal
-	bg := p.panel
-	inner := cw - 4
+	bg := p.bg
+	w := min(60, m.width-4)
+	inner := w - 4
 	var lines []string
 
-	add := func(line string) {
-		lines = append(lines, blank(2, bg)+fitLine(line, inner, bg)+blank(2, bg))
+	title := "Settings"
+
+	for _, r := range m.settingsRows() {
+		if r.form == s.form {
+			title = r.label
+		}
 	}
 
 	intro := map[string]string{
 		"username": "You log in with your username, and others find you by it. It can be changed once every 28 days.",
 		"password": "Your other devices will be logged out.",
-		"photo":    "Shown to your contacts in the apps. Re-encoded as a square picture without metadata.",
 		"delete":   "Deletes your account, all your chats (for the people you talk to as well) and your messages. This cannot be undone.",
 	}
 
-	add("")
-
 	if s.form == "username" && m.user.User.NextUsernameChangeAt != nil {
 		for _, line := range wrap("You can change it again on "+formatDate(*m.user.User.NextUsernameChangeAt)+".", inner) {
-			add(seg(line, p.muted, bg))
+			lines = append(lines, seg(line, p.muted, bg))
 		}
 
-		add("")
-
-		return lines
+		return zone.Mark("set:form", m.box(clip(title, w-6), append(lines, "", seg("Esc close", p.muted, bg)), w))
 	}
 
 	text := intro[s.form]
@@ -1043,28 +1090,29 @@ func (m model) formLines(cw int) []string {
 		text = recoveryIntro
 	}
 
+	lines = append(lines, "")
+
 	for _, line := range wrap(text, inner) {
-		add(seg(line, p.textSoft, bg))
+		lines = append(lines, seg(line, p.textSoft, bg))
 	}
 
-	add("")
+	lines = append(lines, "")
 
 	for i := range s.inputs {
-		add(zone.Mark(fmt.Sprintf("set:field:%d", i), m.inputBox(s.inputs[i].View(), s.formFocus == i, inner)))
+		lines = append(lines, zone.Mark(fmt.Sprintf("set:field:%d", i), m.inputBox(s.inputs[i].View(), s.formFocus == i, inner)))
 	}
 
 	if s.formErr != "" {
-		add("")
+		lines = append(lines, "")
 
 		for _, line := range wrap(sanitize(s.formErr), inner) {
-			add(seg(line, p.danger, bg))
+			lines = append(lines, seg(line, p.danger, bg))
 		}
 	}
 
 	label := map[string]string{
 		"username": "Change username",
 		"password": "Change password",
-		"photo":    "Set photo",
 		"delete":   "Delete account",
 	}[s.form]
 
@@ -1080,19 +1128,18 @@ func (m model) formLines(cw int) []string {
 		label = "…"
 	}
 
-	add("")
-	add(zone.Mark("set:submit", m.button(label, inner, s.form != "delete", true)))
+	button := m.button(label, inner, true, true)
 
 	if s.form == "delete" {
-		lines[len(lines)-1] = blank(2, bg) + zone.Mark("set:submit", center(bold(label, p.onAccent, p.danger), inner, p.danger)) + blank(2, bg)
+		button = center(bold("[ "+label+" ]", p.danger, bg), inner, bg)
 	}
 
-	add("")
+	lines = append(lines, "", zone.Mark("set:submit", button))
 
-	return lines
+	return zone.Mark("set:form", m.box(clip(title, w-6), lines, w))
 }
 
-// scrollSettings keeps the selected row (and an open form) on screen.
+// scrollSettings keeps the selected row on screen.
 func (m *model) scrollSettings() {
 	s := m.settings
 
@@ -1100,18 +1147,21 @@ func (m *model) scrollSettings() {
 		return
 	}
 
-	lines, rowAt := m.settingsBody(m.paneWidth())
+	lines, rowAt := m.settingsBody(settingsContentWidth(m.paneWidth()))
 	area := m.innerHeight() - 2
 
-	if s.cursor >= len(rowAt) {
+	if s.cursor >= len(rowAt) || rowAt[s.cursor] < 0 {
 		return
 	}
 
 	top := rowAt[s.cursor]
 	bottom := len(lines)
 
-	if s.cursor+1 < len(rowAt) {
-		bottom = rowAt[s.cursor+1]
+	for i := s.cursor + 1; i < len(rowAt); i++ {
+		if rowAt[i] >= 0 {
+			bottom = rowAt[i]
+			break
+		}
 	}
 
 	if bottom-s.scroll > area {
@@ -1126,26 +1176,78 @@ func (m *model) scrollSettings() {
 }
 
 func (m model) settingsView(w, h int) string {
+	s := m.settings
 	p := m.pal
-	bg := p.surface
+	bg := p.bg
+	parts := m.settingsParts()
+	partsW := settingsPartsWidth(w)
+	part := m.currentPart()
 
-	closeIcon := " ✕ "
+	title := bold(" Settings", p.text, bg)
 
-	if !m.wide() {
-		closeIcon = " ‹ "
+	if partsW == 0 && s.inContent {
+		title = zone.Mark("set:close", seg(" ‹ ", p.accent, bg)) + bold(part.title, p.text, bg)
+	} else if partsW > 0 {
+		title += seg("  ›  "+part.title, p.muted, bg)
 	}
 
 	header := []string{
-		row(blank(1, bg)+bold("Settings", p.text, bg), zone.Mark("set:close", seg(closeIcon, p.accent, bg)), w, bg),
+		row(title, zone.Mark("set:close", seg("Esc close ", p.muted, bg)), w, bg),
 		seg(strings.Repeat("─", w), p.line, bg),
 	}
 
-	// The key hints are under the frame (ui_frame.go).
-	lines, _ := m.settingsBody(w)
 	area := h - 2
-	scroll := min(m.settings.scroll, max(len(lines)-area, 0))
-	end := min(scroll+area, len(lines))
-	body := zone.Mark("set:body", fitBlock(strings.Join(lines[scroll:end], "\n"), w, area, p.bg))
+
+	partLines := func(pw int) []string {
+		out := []string{blank(pw, bg)}
+
+		for i, pt := range parts {
+			bar := blank(1, bg)
+			text := seg(clip(pt.title, pw-3), p.textSoft, bg)
+
+			if i == s.part {
+				fg := p.muted
+
+				if !s.inContent && m.focus == paneSettings {
+					fg = p.accent
+				}
+
+				bar = seg("▌", fg, bg)
+				text = bold(clip(pt.title, pw-3), p.text, bg)
+			}
+
+			out = append(out, zone.Mark(fmt.Sprintf("set:part:%d", i), fitLine(bar+blank(1, bg)+text, pw, bg)))
+		}
+
+		return out
+	}
+
+	content := func(cw int) string {
+		lines, _ := m.settingsBody(cw)
+		scroll := min(s.scroll, max(len(lines)-area, 0))
+		end := min(scroll+area, len(lines))
+
+		return zone.Mark("set:body", fitBlock(strings.Join(lines[scroll:end], "\n"), cw, area, bg))
+	}
+
+	var body string
+
+	switch {
+	case partsW > 0:
+		left := strings.Split(fitBlock(strings.Join(partLines(partsW), "\n"), partsW, area, bg), "\n")
+		right := strings.Split(content(w-partsW-1), "\n")
+		var out []string
+
+		for i := 0; i < area; i++ {
+			out = append(out, left[i]+seg("│", p.line, bg)+right[i])
+		}
+
+		body = strings.Join(out, "\n")
+	case s.inContent:
+		body = content(w)
+	default:
+		body = fitBlock(strings.Join(partLines(w), "\n"), w, area, bg)
+	}
 
 	return strings.Join(append(header, body), "\n")
 }

@@ -70,5 +70,11 @@
     "sealed_share": "aAquurhYPLWHl5Sm6VHfgqoYwB7q0rCCCN+zelzomjLVl7cuJZrBCS4RZ+eF3Ri9cjpuZSNV6+Dm1QH+Cg==",
     "sealer_public_key": "4OxXmI4BJK+nnbqMswuu6gASvXQYVKkJ+wY1FVEvWG0=",
     "recovery_code": "756 923"
+  },
+  "settings": {
+    "comment": "Synced settings (crypto.ts encryptSettings) as the apps write them; the CLI reads the theme from them (apps/cli/synclook.go).",
+    "user_id": "708324f0-3be4-4319-a3e2-8c87b39c24ce",
+    "json": "{\"v\":1,\"look\":{\"theme\":\"light\",\"accent\":\"teal\",\"preferences\":{\"textSize\":\"large\"}},\"chats\":{\"x\":{\"accent\":\"pink\"}}}",
+    "encrypted": "s1:XK1iEZ5dunzwpfAhfQWm9Qih0NcikMrzR9uuYVSEV/TrRZZb41eziTAOfkLKilY8EwNLQdSuI3BttkXqVPNZ/lV3fO1Scwdw26RIeZQVA4Hp6qDGQA5iuLkOKRW2ykO0XhbCQV0W/kfbwmI2ISDmbweFjymFxJGztdFNSl256QZ6u7V3Lf4ouM0F0t2nUNedXq4XkmkEULgLHcw="
   }
 }

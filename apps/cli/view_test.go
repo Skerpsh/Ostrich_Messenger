@@ -303,17 +303,24 @@ func TestKeys(t *testing.T) {
 		m = press(m, "t", "s")
 		check(m.settings != nil && m.focus == paneSettings, "settings open")
 
-		// Settings: the colors' switch, theme, accent, a form; then every row.
-		m = press(m, "down", "down", "down", "down", "right")
-		m = press(m, "down", "right")
+		// Settings: the parts, Appearance's accent, Account's form; then
+		// every row of every part.
+		m = press(m, "down", "enter", "down", "down", "right")
 		check(m.cfg.Accent != defaultAccent, "accent changed")
-		m = press(m, "down", "enter")
+		m = press(m, "esc", "down", "enter", "enter")
 		check(m.settings.form != "", "form open")
 		m = press(m, "x", "tab", "esc")
 		check(m.settings.form == "", "form closed")
+		m = press(m, "esc")
 
-		for i := 0; i < 30; i++ {
-			m = press(m, "down")
+		for range m.settingsParts() {
+			m = press(m, "down", "enter")
+
+			for i := 0; i < 12; i++ {
+				m = press(m, "down")
+			}
+
+			m = press(m, "esc")
 		}
 
 		m = press(m, "esc")
@@ -389,6 +396,7 @@ func TestMouse(t *testing.T) {
 		t.Fatal("settings not opened")
 	}
 
+	m = click(t, m, "set:part:1", tea.MouseButtonLeft)
 	m = click(t, m, "set:accent:4", tea.MouseButtonLeft)
 
 	if m.cfg.Accent != "blue" {

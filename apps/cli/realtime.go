@@ -302,6 +302,10 @@ func (m *model) handleEvent(event WSMessage) tea.Cmd {
 	case "recovery":
 		return m.loadRecovery()
 
+	// The apps' synced settings were saved: the theme may have changed.
+	case "settings_changed":
+		return m.loadSyncedLook()
+
 	case "call_incoming":
 		if call := event.Call; call != nil {
 			if i := m.findChat(call.ChatID); i >= 0 {

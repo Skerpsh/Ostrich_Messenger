@@ -130,7 +130,49 @@ var ansiAccents = map[string]string{
 	"teal": "6", "green": "2", "gold": "3", "mono": "",
 }
 
+// isCustomAccent: an accent of the user's own, "#rrggbb" (the apps').
+func isCustomAccent(id string) bool {
+	if len(id) != 7 || id[0] != '#' {
+		return false
+	}
+
+	_, err := strconv.ParseUint(id[1:], 16, 32)
+
+	return err == nil
+}
+
+// nearestAccent: the listed accent closest to a color of the user's own.
+func nearestAccent(hex string) accent {
+	best, bestDistance := accents[0], -1
+	c := hexRGB(hex)
+
+	for _, a := range accents {
+		v := hexRGB(a.dark.accent)
+		d := (c[0]-v[0])*(c[0]-v[0]) + (c[1]-v[1])*(c[1]-v[1]) + (c[2]-v[2])*(c[2]-v[2])
+
+		if bestDistance < 0 || d < bestDistance {
+			best, bestDistance = a, d
+		}
+	}
+
+	return best
+}
+
+func accentName(id string) string {
+	if isCustomAccent(id) {
+		return "Your own (" + id + ")"
+	}
+
+	return findAccent(id).name
+}
+
 func newPalette(terminal bool, mode themeMode, accentID string) palette {
+	custom := isCustomAccent(accentID)
+
+	if custom && terminal {
+		accentID = nearestAccent(accentID).id
+	}
+
 	if terminal {
 		accent := lipgloss.Color(ansiAccents[findAccent(accentID).id])
 		none := lipgloss.Color("")
@@ -149,6 +191,18 @@ func newPalette(terminal bool, mode themeMode, accentID string) palette {
 
 	if mode == themeLight {
 		variant = findAccent(accentID).light
+	}
+
+	// The user's own: as it is, text on it black or white.
+	if custom {
+		c := hexRGB(accentID)
+		on := "#ffffff"
+
+		if c[0]*299+c[1]*587+c[2]*114 > 150_000 {
+			on = "#111113"
+		}
+
+		variant = accentVariant{accentID, on}
 	}
 
 	return palette{

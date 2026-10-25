@@ -17,6 +17,9 @@ type config struct {
 	Accent string `json:"accent"`
 	// Ring the terminal bell for new messages in other chats.
 	Bell bool `json:"bell"`
+	// Take the theme and accent from the apps' synced settings, and save
+	// them there (synclook.go).
+	SyncLook bool `json:"sync_look"`
 }
 
 func configPath() (string, bool) {
@@ -47,7 +50,9 @@ func loadConfig() config {
 		cfg.Colors = "terminal"
 	}
 
-	cfg.Accent = findAccent(cfg.Accent).id
+	if !isCustomAccent(cfg.Accent) {
+		cfg.Accent = findAccent(cfg.Accent).id
+	}
 
 	return cfg
 }

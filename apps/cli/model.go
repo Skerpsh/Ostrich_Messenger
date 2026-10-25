@@ -630,7 +630,7 @@ func (m *model) startSession(result *LoginResponse) tea.Cmd {
 	m.connStatus = connConnecting
 	m.recovery = recoveryState{}
 
-	return tea.Batch(m.loadChats(), connectCmd(result.Token, m.connGen, 0), m.loadRecovery())
+	return tea.Batch(m.loadChats(), connectCmd(result.Token, m.connGen, 0), m.loadRecovery(), m.loadSyncedLook())
 }
 
 // signOut drops the session (and forgets a remembered one) and returns
