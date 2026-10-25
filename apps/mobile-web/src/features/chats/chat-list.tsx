@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DisappearBanner } from "@/features/disappear/disappear";
 import { RecoveryBanner } from "@/features/recovery/recovery";
 import { UpdateBanner } from "@/features/updates/update-banner";
+import { lockNow, useLock } from "@/features/lock/lock";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { usePathname, useRouter } from "expo-router";
@@ -62,6 +63,7 @@ export default function ChatList() {
   const insets = useSafeAreaInsets();
   const wide = useIsWide();
   const user = useCurrentUser();
+  const lockConfig = useLock().config;
   const { withToken } = useAuth();
   const privateKey = usePrivateKey();
   const { chats, error, reload, typing, updateChatSettings, removeChat, leaveGroup, drafts } =
@@ -275,6 +277,8 @@ export default function ChatList() {
     <IconButton icon="settings-outline" label="Settings" onPress={() => go("/chats/settings")} />
   );
   const savedButton = <IconButton icon="bookmark-outline" label="Saved messages" onPress={openSaved} />;
+  // With an app lock: locks it now (also Ctrl/⌘ L).
+  const lockButton = lockConfig ? <IconButton icon="lock-closed-outline" label="Lock Ostrich" onPress={lockNow} /> : null;
   const newChatButton = (
     <IconButton icon="create-outline" label="New chat or group" onPress={() => go("/chats/new")} />
   );
@@ -289,6 +293,7 @@ export default function ChatList() {
           subtitle={status === "online" ? `@${user.username}` : statusText}
           right={
             <>
+              {lockButton}
               {savedButton}
               {settingsButton}
             </>
@@ -518,6 +523,7 @@ export default function ChatList() {
               {statusText}
             </Text>
           </View>
+          {lockButton}
           {savedButton}
           {settingsButton}
         </View>

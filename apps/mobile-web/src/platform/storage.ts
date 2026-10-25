@@ -14,3 +14,8 @@ export async function setItem(key: string, value: string): Promise<void> {
 export async function removeItem(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key);
 }
+
+// Removes the keys given (the Keychain / Keystore cannot list them).
+export async function removeItems(keys: string[]): Promise<void> {
+  await Promise.all(keys.map((key) => SecureStore.deleteItemAsync(key).catch(() => {})));
+}

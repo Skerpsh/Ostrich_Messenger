@@ -53,6 +53,7 @@
 - ✉️ **Letters to the future**: seal a message with its files until a date (up to 10 years); nobody can open it before then, the sender and the server neither (time-lock encryption with [drand](https://drand.love)). Send it as an envelope that waits in the chat, or as a surprise that arrives on the day
 - ⌛ **If I disappear**: messages written ahead (with files, and your OstrichID only if you choose) that are sent for you when you have not opened Ostrich for the days you choose; your phones are warned a week, a day and an hour before, and opening Ostrich on any device starts the days again. They are encrypted on your device: the server keeps ciphertext and only knows whom they go to and when
 - 🤝 **Recovery through friends**: your OstrichID split among friends you choose (any 3 of 5, or as you set), each share encrypted for one of them, so neither the server nor any one friend learns it. Lost it? Ask from a new device with your password, read a code to your friends by voice, and after a day (in which your devices can cancel it) you are back in with a new OstrichID
+- 🔒 **App lock**: a 4-digit PIN when Ostrich starts and after it was in the background (as you choose), only on the device; a **wipe PIN** and, if you want, 10 wrong PINs in a row remove everything Ostrich keeps on the device and log it out
 - 🗄 **What the server sees**: any message or chat exactly as the server stores it, fetched from it, next to what stays encrypted
 - 📲 **Log in with a QR code**: a logged-in device scans it and sends the account's key encrypted for the new device only
 

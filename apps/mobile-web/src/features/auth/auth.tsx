@@ -22,6 +22,9 @@ import {
   wrapAccountKey,
 } from "@/crypto/crypto";
 import { RECOVERED_KEY } from "@/features/recovery/saved";
+import { forgetLock, LOCK_KEYS } from "@/features/lock/lock";
+import { wipeLocalData } from "@/features/lock/wipe";
+import { reloadApp } from "@/platform/reload";
 import { getItem, removeItem, setItem } from "@/platform/storage";
 
 const TOKEN_KEY = "ostrich-token";
@@ -77,6 +80,9 @@ type AuthContextValue = {
   signOut: () => Promise<void>;
   // Ends all sessions of the user (every device), then signs out here.
   signOutEverywhere: () => Promise<void>;
+  // Ends this device's session and removes everything Ostrich keeps here
+  // (the app lock's wipe), then starts the app again.
+  wipeDevice: () => Promise<void>;
   // The user has saved their OstrichID: forget it on this device.
   confirmOstrichIdSaved: () => Promise<void>;
   // Replaces the signed-in user, e.g. after a username change.
@@ -113,7 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removeItem(PENDING_OSTRICH_ID_KEY),
       removeItem(PRIVATE_KEY_KEY),
       removeItem(RECOVERED_KEY),
+      ...LOCK_KEYS.map(removeItem),
     ]);
+    forgetLock();
     clearChatKeys();
     clearGroupKeys();
     forgetLoadedAttachments();
@@ -347,6 +355,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await clearSession();
   };
 
+  const wipeDevice = async () => {
+    const signedIn = state.status === "signedIn" ? state : null;
+
+    // Ended on the server too, if it answers soon: a device that cannot
+    // reach it is wiped anyway.
+    if (signedIn) {
+      await Promise.race([
+        api.logout(signedIn.token).catch(() => {}),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    }
+
+    await wipeLocalData(signedIn?.user.id ?? null);
+    await clearSession();
+    reloadApp();
+  };
+
   const confirmOstrichIdSaved = async () => {
     await removeItem(PENDING_OSTRICH_ID_KEY);
     setState((current) =>
@@ -397,6 +422,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         unlock,
         signOut,
         signOutEverywhere,
+        wipeDevice,
         confirmOstrichIdSaved,
         updateUser,
         withToken,

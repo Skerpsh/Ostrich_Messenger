@@ -20,3 +20,21 @@ export async function removeItem(key: string): Promise<void> {
     globalThis.localStorage?.removeItem(key);
   } catch {}
 }
+
+// Removes the keys given, and on the web every other one of Ostrich's too
+// (localStorage can be listed).
+export async function removeItems(keys: string[]): Promise<void> {
+  try {
+    const all = globalThis.localStorage;
+
+    if (!all) {
+      return;
+    }
+
+    const ours = Array.from({ length: all.length }, (_, i) => all.key(i)).filter(
+      (key): key is string => key !== null && key.startsWith("ostrich-"),
+    );
+
+    [...new Set([...keys, ...ours])].forEach((key) => all.removeItem(key));
+  } catch {}
+}

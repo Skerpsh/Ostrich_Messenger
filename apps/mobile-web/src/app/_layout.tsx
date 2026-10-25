@@ -10,7 +10,7 @@ import {
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
-import { Platform } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { AuthProvider, useAuth } from "@/features/auth/auth";
 import { CallsProvider } from "@/features/calls/calls-context";
 import { ChatsProvider } from "@/features/chats/chats";
@@ -25,6 +25,8 @@ import { preventZoom } from "@/platform/no-zoom";
 import { registerServiceWorker } from "@/platform/pwa";
 import SettingsSync from "@/features/settings/settings-sync";
 import { nearestAccent } from "@/ui/colors";
+import { loadLock, useLock } from "@/features/lock/lock";
+import { LockScreen, LockWatch } from "@/features/lock/lock-screen";
 
 // Keep the splash screen until the saved session has been checked.
 SplashScreen.preventAutoHideAsync();
@@ -57,6 +59,12 @@ export default function RootLayout() {
 function RootNavigator() {
   const { state } = useAuth();
   const { mode, colors, accent, accentPicked } = useAppTheme();
+  const lock = useLock();
+
+  // Whether the app is locked, before anything of the account is shown.
+  useEffect(() => {
+    loadLock();
+  }, []);
 
   useEffect(() => {
     if (state.status !== "loading") {
@@ -99,15 +107,21 @@ function RootNavigator() {
     }
   }, [state.status]);
 
-  if (state.status === "loading") {
+  if (state.status === "loading" || !lock.loaded) {
     return null;
   }
 
   const signedIn = state.status === "signedIn";
+
+  // The screens stay mounted under it (unlocking goes back where the user
+  // was), but are not drawn: display none, for the eyes and screen readers.
+  const locked = signedIn && lock.config !== null && lock.locked;
+
   // A new OstrichID must be saved before anything else.
   const mustSaveOstrichId = signedIn && state.pendingOstrichId !== null;
   // A device without the account's keys must unlock them first.
-  const mustUnlock = signedIn && !mustSaveOstrichId && state.privateKey === null;
+  const mustUnlock =
+    signedIn && !mustSaveOstrichId && state.privateKey === null;
   const baseTheme = mode === "dark" ? DarkTheme : DefaultTheme;
 
   return (
@@ -125,33 +139,49 @@ function RootNavigator() {
       }}
     >
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
+      {signedIn ? <LockWatch /> : null}
+      {locked ? <LockScreen /> : null}
 
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.bg },
-        }}
-      >
-        <Stack.Protected guard={!signedIn}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="login" />
-          <Stack.Screen name="register" />
-          <Stack.Screen name="link-device" />
-          <Stack.Screen name="recover" />
-        </Stack.Protected>
+      <View style={[styles.screens, locked && styles.hidden]}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.bg },
+          }}
+        >
+          <Stack.Protected guard={!signedIn}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="login" />
+            <Stack.Screen name="register" />
+            <Stack.Screen name="link-device" />
+            <Stack.Screen name="recover" />
+          </Stack.Protected>
 
-        <Stack.Protected guard={mustSaveOstrichId}>
-          <Stack.Screen name="ostrich-id" />
-        </Stack.Protected>
+          <Stack.Protected guard={mustSaveOstrichId}>
+            <Stack.Screen name="ostrich-id" />
+          </Stack.Protected>
 
-        <Stack.Protected guard={mustUnlock}>
-          <Stack.Screen name="unlock" />
-        </Stack.Protected>
+          <Stack.Protected guard={mustUnlock}>
+            <Stack.Screen name="unlock" />
+          </Stack.Protected>
 
-        <Stack.Protected guard={signedIn && !mustSaveOstrichId && !mustUnlock}>
-          <Stack.Screen name="chats" />
-        </Stack.Protected>
-      </Stack>
+          <Stack.Protected
+            guard={signedIn && !mustSaveOstrichId && !mustUnlock}
+          >
+            <Stack.Screen name="chats" />
+          </Stack.Protected>
+        </Stack>
+      </View>
     </ThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  screens: {
+    flex: 1,
+  },
+
+  hidden: {
+    display: "none",
+  },
+});
