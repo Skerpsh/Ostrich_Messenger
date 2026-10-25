@@ -20,11 +20,32 @@ deploy/deploy.sh                # backend + web
 deploy/deploy.sh --web-only     # only the website
 deploy/deploy.sh --backend-only
 deploy/deploy.sh --no-backup    # skip the database backup before migrating
+deploy/deploy.sh --no-release   # no new version of the apps
 ```
 
 The script stops at the first error. Before the migration it backs up the
 database; after restarting the backend it checks `/api/health` and prints the
 service log if the backend does not come up.
+
+### Releasing the apps with each deploy
+
+The desktop app, the Android app and the CLI carry their own copy of the code,
+so a deploy alone does not change them. At its end the script tags the
+deployed commit with the next version (v1.5.1 → v1.5.2), which starts
+[`release.yml`](../.github/workflows/release.yml); the apps update themselves
+from that release (the Android app over the air). Nothing is tagged if the
+commit has a version already.
+
+It tags through GitHub's API with a token, so the server needs no key to push.
+Once: on GitHub, Settings → Developer settings → Fine-grained tokens → Generate,
+only this repository, **Contents: Read and write**; then on the server:
+
+```bash
+sudo install -d -m 700 /etc/ostrich && sudo sh -c 'read -r t && printf %s "$t" > /etc/ostrich/release-token' && sudo chmod 600 /etc/ostrich/release-token
+```
+
+(paste the token and press Enter). Without the file the deploy says so and
+releases nothing.
 
 ## Database migrations
 

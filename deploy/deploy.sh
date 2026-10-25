@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Deploys Ostrich on the server: pulls the code, backs up the database,
-# builds and migrates the backend, restarts it, checks it answers, and
-# publishes the web app.
+# builds and migrates the backend, restarts it, checks it answers,
+# publishes the web app, and releases the apps (the next version's tag).
 #
 #   deploy/deploy.sh                 # backend and web
 #   deploy/deploy.sh --backend-only
 #   deploy/deploy.sh --web-only
 #   deploy/deploy.sh --no-backup     # skip the database backup
+#   deploy/deploy.sh --no-release    # no new version of the apps
 #
 # Paths and names can be changed with the variables below.
 set -euo pipefail
@@ -24,18 +25,24 @@ SERVICE="${SERVICE:-ostrich}"
 SERVICES="${SERVICES:-$SERVICE}"
 WEB_ROOT="${WEB_ROOT:-/var/www/ostrich-web}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
+# The release of the apps (below): a fine-grained GitHub token of the
+# repository with "Contents: Read and write", in a file only root reads.
+RELEASE_TOKEN_FILE="${RELEASE_TOKEN_FILE:-/etc/ostrich/release-token}"
+GITHUB_REPO="${GITHUB_REPO:-Skerpsh/Ostrich_Messenger}"
 
 backend=1
 web=1
 backup=1
+release=1
 
 for arg in "$@"; do
   case "$arg" in
     --backend-only) web=0 ;;
     --web-only) backend=0 ;;
     --no-backup) backup=0 ;;
+    --no-release) release=0 ;;
     -h | --help)
-      sed -n '2,11p' "$0"
+      sed -n '2,12p' "$0"
       exit 0
       ;;
     *)
@@ -142,6 +149,39 @@ if [ "$web" = 1 ]; then
   mkdir -p "$WEB_ROOT"
   # New files first, old ones removed after: the site never goes blank.
   rsync -a --delete-after dist/ "$WEB_ROOT/"
+fi
+
+# The apps (desktop, Android, CLI) carry their own copy of the code: the
+# next version's tag on what was deployed starts their release
+# (.github/workflows/release.yml), from which they update themselves. Made
+# through GitHub's API, so the server needs no key to push; a failure does
+# not undo the deploy.
+if [ "$release" = 1 ] && [ -r "$RELEASE_TOKEN_FILE" ]; then
+  step "Releasing the apps"
+  cd "$REPO"
+  commit=$(git rev-parse HEAD)
+  git fetch --tags --quiet origin || true
+
+  if git tag --points-at "$commit" | grep -q '^v'; then
+    echo "This commit is released already ($(git tag --points-at "$commit" | grep '^v' | head -1))"
+  else
+    last=$(git tag -l 'v*' --sort=-v:refname | head -1)
+    IFS=. read -r major minor patch <<<"${last:-v0.0.0}"
+    next="v${major#v}.$minor.$((patch + 1))"
+
+    if curl -fsS -o /dev/null -X POST \
+      -H "Authorization: Bearer $(cat "$RELEASE_TOKEN_FILE")" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/$GITHUB_REPO/git/refs" \
+      -d "{\"ref\": \"refs/tags/$next\", \"sha\": \"$commit\"}"; then
+      echo "Tagged $next: GitHub Actions builds and publishes it, and the apps update to it"
+    else
+      echo "deploy: could not tag $next (is the token in $RELEASE_TOKEN_FILE valid?); the deploy itself is done" >&2
+    fi
+  fi
+elif [ "$release" = 1 ]; then
+  echo
+  echo "No $RELEASE_TOKEN_FILE: the apps are not released (see deploy/README.md)"
 fi
 
 step "Done"

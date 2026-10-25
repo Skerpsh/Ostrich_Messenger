@@ -1,9 +1,17 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -93,17 +101,137 @@ func versionParts(v string) []int {
 	return parts
 }
 
-// checkForUpdate tells about a newer release, once, at start.
+// checkForUpdate looks for a newer release at start and puts it in place
+// of this program (selfUpdate), or tells about it where it cannot.
+// OSTRICH_NO_SELF_UPDATE=1: only tells.
 func checkForUpdate() tea.Cmd {
 	return task(func() func(*model) tea.Cmd {
+		cleanOldBinary()
 		latest := newerRelease()
 
+		if latest == "" {
+			return nil
+		}
+
+		err := errors.New("self-update is off")
+
+		if os.Getenv("OSTRICH_NO_SELF_UPDATE") == "" {
+			err = selfUpdate(latest)
+		}
+
 		return func(m *model) tea.Cmd {
-			if latest == "" {
-				return nil
+			if err != nil {
+				return m.showToast("Ostrich "+latest+" is out: "+releasesURL, false)
 			}
 
-			return m.showToast("Ostrich "+latest+" is out: "+releasesURL, false)
+			return m.showToast("Updated to Ostrich "+latest+": it runs from the next start", false)
 		}
 	})
+}
+
+// releaseBinary is this system's file in a release.
+func releaseBinary() string {
+	name := "ostrich-" + runtime.GOOS + "-" + runtime.GOARCH
+
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+
+	return name
+}
+
+// selfUpdate downloads the release's program for this system, checks it
+// against the release's SHA256SUMS and puts it in place of this one (next
+// to it first, then renamed, so it is never half written). An error where
+// the program's folder is not the user's to write (installed by root).
+func selfUpdate(tag string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	if exe, err = filepath.EvalSymlinks(exe); err != nil {
+		return err
+	}
+
+	return replaceBinary(exe, tag)
+}
+
+// replaceBinary puts the release's program for this system at exe.
+func replaceBinary(exe, tag string) error {
+	base := "https://github.com/" + repository + "/releases/download/" + url.PathEscape(tag) + "/"
+	name := releaseBinary()
+
+	sums, err := download(base+"SHA256SUMS", 1<<20)
+	if err != nil {
+		return err
+	}
+
+	want := ""
+
+	for _, line := range strings.Split(string(sums), "\n") {
+		if fields := strings.Fields(line); len(fields) == 2 && strings.TrimPrefix(fields[1], "*") == name {
+			want = fields[0]
+		}
+	}
+
+	if want == "" {
+		return errors.New("the release has no " + name)
+	}
+
+	data, err := download(base+name, 200<<20)
+	if err != nil {
+		return err
+	}
+
+	if sum := sha256.Sum256(data); hex.EncodeToString(sum[:]) != want {
+		return errors.New("the download does not match SHA256SUMS")
+	}
+
+	next := exe + ".new"
+
+	if err := os.WriteFile(next, data, 0o755); err != nil {
+		return err
+	}
+
+	// Windows cannot write over a running program, but can rename it.
+	if runtime.GOOS == "windows" {
+		_ = os.Remove(exe + ".old")
+
+		if err := os.Rename(exe, exe+".old"); err != nil {
+			os.Remove(next)
+			return err
+		}
+	}
+
+	if err := os.Rename(next, exe); err != nil {
+		os.Remove(next)
+		return err
+	}
+
+	return nil
+}
+
+// cleanOldBinary removes what a self-update left on Windows.
+func cleanOldBinary() {
+	if exe, err := os.Executable(); err == nil && runtime.GOOS == "windows" {
+		_ = os.Remove(exe + ".old")
+	}
+}
+
+func download(address string, limit int64) ([]byte, error) {
+	client := http.Client{Timeout: 3 * time.Minute}
+
+	resp, err := client.Get(address)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s: HTTP %d", address, resp.StatusCode)
+	}
+
+	return io.ReadAll(io.LimitReader(resp.Body, limit))
 }

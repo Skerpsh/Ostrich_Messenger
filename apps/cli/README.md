@@ -19,8 +19,12 @@ SHA-256 and puts it in `~/.local/bin/ostrich`. Windows: download
 [latest release](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest)
 (SmartScreen asks once: *More info* → *Run anyway*).
 
-`ostrich --version` shows the version; at start the CLI says when a newer
-release is out (`OSTRICH_NO_UPDATE_CHECK=1` turns that off).
+`ostrich --version` shows the version. At start the CLI looks for a newer
+release and puts it in place of itself (checked against the release's
+`SHA256SUMS`; it runs from the next start). Where it cannot write its own file
+(installed by root), it says the release is out instead;
+`OSTRICH_NO_SELF_UPDATE=1` only says it, `OSTRICH_NO_UPDATE_CHECK=1` turns the
+check off.
 
 From the source: `cd apps/cli && go build -o ostrich . && ./ostrich`.
 

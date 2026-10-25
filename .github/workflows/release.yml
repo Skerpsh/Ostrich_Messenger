@@ -1,7 +1,7 @@
 # Publishes a release of every app when a version tag is pushed
 # (git tag v1.3.0 && git push origin v1.3.0): the CLI for Linux, macOS and
 # Windows, the Android app (an APK built with EAS) and the desktop app for
-# Linux (AppImage, .deb, .rpm, Flatpak) and Windows (an installer), all
+# Linux (AppImage, .deb, .rpm, .pacman, Flatpak) and Windows (an installer), all
 # under the same version, with SHA-256 checksums and a table of what to
 # download. The desktop app updates itself from these releases
 # (latest*.yml).
@@ -77,23 +77,44 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-      - name: Build the APK with EAS
+      - name: Build the APK with EAS, and publish the update over the air
         if: steps.token.outputs.set == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           npm ci
           # The app's version is the tag's (v1.3.0 → 1.3.0); EAS counts the
           # build number up by itself (eas.json, "github" profile).
           version="${GITHUB_REF_NAME#v}"
           jq --arg v "$version" '.expo.version = $v' app.json > app.json.new && mv app.json.new app.json
-          eas build --platform android --profile github --non-interactive --wait --json > build.json
-          url=$(jq -r '.[0].artifacts.buildUrl' build.json)
           mkdir -p dist
-          curl -fsSL "$url" -o dist/Ostrich-Android.apk
+          # The native part's fingerprint (fingerprint.config.js leaves the
+          # version out). The same as the last release's: its APK runs this
+          # version's code too, over the air, so it is kept instead of
+          # spending an EAS build.
+          runtime=$(npx expo-updates runtimeversion:resolve --platform android | jq -r .runtimeVersion)
+          echo "$runtime" > dist/android-runtime.txt
+          last=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
+          if [ -n "$last" ] \
+            && gh release download "$last" -p android-runtime.txt -O last-runtime.txt 2>/dev/null \
+            && [ "$(cat last-runtime.txt)" = "$runtime" ] \
+            && gh release download "$last" -p Ostrich-Android.apk -D dist; then
+            echo "The native part is as in $last: its APK is kept"
+          else
+            eas build --platform android --profile github --non-interactive --wait --json > build.json
+            url=$(jq -r '.[0].artifacts.buildUrl' build.json)
+            curl -fsSL "$url" -o dist/Ostrich-Android.apk
+          fi
+          # The installed apps of this runtime get the code at their next
+          # start (platform/app-update.ts); older ones are offered the APK.
+          eas update --channel production --platform android --message "$GITHUB_REF_NAME" --non-interactive
       - uses: actions/upload-artifact@v4
         if: steps.token.outputs.set == 'true'
         with:
           name: android
-          path: apps/mobile-web/dist/Ostrich-Android.apk
+          path: |
+            apps/mobile-web/dist/Ostrich-Android.apk
+            apps/mobile-web/dist/android-runtime.txt
 
   # The desktop app: the web app built into it (apps/desktop/scripts/
   # build-web.mjs), packed by electron-builder. Its version is the tag's.
@@ -106,13 +127,13 @@ jobs:
           node-version: 22
       - name: Build
         run: |
-          sudo apt-get update && sudo apt-get install -y rpm
+          sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
           (cd apps/mobile-web && npm ci)
           cd apps/desktop
           npm ci
           npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
           npm run web
-          npx electron-builder --linux AppImage deb rpm --publish never
+          npx electron-builder --linux AppImage deb rpm pacman --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-linux
@@ -190,7 +211,7 @@ jobs:
           soon() { [ -n "$1" ] && printf '%s' "$1" || printf 'coming soon'; }
           android=$(soon "$(file Ostrich-Android.apk Ostrich-Android.apk)")
           windows=$(soon "$(file Ostrich-Windows-Setup.exe Ostrich-Windows-Setup.exe)")
-          linux=$(soon "$(for f in AppImage deb rpm flatpak; do file "Ostrich-Linux.$f" ".$f"; printf ' '; done | sed 's/  */ /g; s/ $//; s/) \[/), [/g')")
+          linux=$(soon "$(for f in AppImage deb rpm pacman flatpak; do file "Ostrich-Linux.$f" ".$f"; printf ' '; done | sed 's/  */ /g; s/ $//; s/) \[/), [/g')")
           cat > notes.md <<EOF
           ## Download
 
@@ -205,7 +226,8 @@ jobs:
 
           - **Android:** open the APK on the phone and allow installing from that app when asked.
           - **Windows:** run the installer; Windows may warn about an unknown publisher: More info → Run anyway.
-          - **Linux:** the AppImage runs anywhere (\`chmod +x Ostrich-Linux.AppImage\`, then open it) and updates itself; the \`.deb\` is for Ubuntu and Debian, the \`.rpm\` for Fedora and openSUSE.
+          - **Linux:** the AppImage runs anywhere (\`chmod +x Ostrich-Linux.AppImage\`, then open it); the \`.deb\` is for Ubuntu and Debian, the \`.rpm\` for Fedora and openSUSE, the \`.pacman\` for Arch (\`sudo pacman -U Ostrich-Linux.pacman\`). They all update themselves (the packages ask for your password to install the new version); the Flatpak does not yet.
+          - **Updates:** the Android app gets new versions over the air at its next start, and offers a new APK when one is needed; the desktop apps install them themselves; the CLI replaces itself with the new version.
 
           Check a download with \`sha256sum -c SHA256SUMS\`.
 

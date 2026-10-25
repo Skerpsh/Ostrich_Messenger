@@ -2,8 +2,8 @@
 // scripts/build-web.mjs) in a window of its own, with what a desktop
 // messenger needs on top: an icon in the tray with the unread count, a
 // window that hides there instead of quitting, ostrich:// links, and
-// updates from the GitHub releases (AppImage, Windows).
-import { app, BrowserWindow, Menu, nativeImage, net, protocol, session, shell, Tray } from "electron";
+// updates from the GitHub releases.
+import { app, BrowserWindow, Menu, nativeImage, net, Notification, protocol, session, shell, Tray } from "electron";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -19,9 +19,15 @@ const BOUNDS_FILE = path.join(app.getPath("userData"), "window.json");
 // --hidden: start in the tray (when started with the system).
 const startHidden = process.argv.includes("--hidden");
 
+// It stays open in the tray for days: new versions are looked for this
+// often, not only at start.
+const UPDATE_CHECK_MS = 4 * 60 * 60 * 1000;
+
 let window = null;
 let tray = null;
 let quitting = false;
+// A new version downloaded and waiting: "Restart to update" in the tray.
+let updateReady = null;
 
 // app://ostrich behaves like an https site: its own origin for storage,
 // fetch and the API's CORS.
@@ -68,11 +74,81 @@ function start() {
   createTray();
   openLink(process.argv.find((arg) => arg.startsWith("ostrich://")));
 
-  // New versions from the GitHub releases, where the format can update
-  // itself (the .deb and .rpm are updated by downloading the new one).
-  if (app.isPackaged && (process.env.APPIMAGE || process.platform === "win32")) {
-    updater.autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  startUpdates();
+}
+
+// The package this is: "appimage", "deb", "rpm", "pacman", "windows", or
+// null where it cannot update itself (Flatpak, not packaged).
+function packageType() {
+  if (!app.isPackaged || process.env.FLATPAK_ID) {
+    return null;
   }
+
+  if (process.platform === "win32") {
+    return "windows";
+  }
+
+  if (process.env.APPIMAGE) {
+    return "appimage";
+  }
+
+  // electron-builder leaves it in the .deb, .rpm and .pacman.
+  try {
+    const type = readFileSync(path.join(process.resourcesPath, "package-type"), "utf8").trim();
+    return ["deb", "rpm", "pacman"].includes(type) ? type : null;
+  } catch {
+    return null;
+  }
+}
+
+// New versions from the GitHub releases (latest.yml, latest-linux.yml),
+// downloaded in the background. The AppImage and Windows install them when
+// the app quits; the .deb, .rpm and .pacman ask for the password
+// (pkexec), so only when the user restarts to update.
+function startUpdates() {
+  const type = packageType();
+
+  if (!type) {
+    return;
+  }
+
+  const { autoUpdater } = updater;
+  const silent = type === "appimage" || type === "windows";
+  autoUpdater.autoInstallOnAppQuit = silent;
+
+  autoUpdater.on("update-downloaded", (info) => {
+    if (updateReady === info.version) {
+      return;
+    }
+
+    updateReady = info.version;
+    updateTrayMenu();
+
+    if (Notification.isSupported()) {
+      const notice = new Notification({
+        title: `Ostrich ${info.version} is ready`,
+        body: silent
+          ? "It is installed when you quit Ostrich. Click to restart now."
+          : "Click to restart and install it (your password is asked).",
+        icon: ICON,
+      });
+
+      notice.on("click", installUpdate);
+      notice.show();
+    }
+  });
+
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+
+  check();
+  setInterval(check, UPDATE_CHECK_MS);
+}
+
+function installUpdate() {
+  quitting = true;
+  // Not silent: the installer of Windows shows its progress; the app is
+  // started again after it.
+  updater.autoUpdater.quitAndInstall(false, true);
 }
 
 function isFile(file) {
@@ -153,9 +229,15 @@ function createTray() {
   }
 
   tray.setToolTip("Ostrich");
-  tray.setContextMenu(
+  updateTrayMenu();
+  tray.on("click", () => (window?.isVisible() && window.isFocused() ? window.hide() : showWindow()));
+}
+
+function updateTrayMenu() {
+  tray?.setContextMenu(
     Menu.buildFromTemplate([
       { label: "Open Ostrich", click: showWindow },
+      ...(updateReady ? [{ label: `Restart to update to ${updateReady}`, click: installUpdate }] : []),
       { type: "separator" },
       {
         label: "Quit",
@@ -166,7 +248,6 @@ function createTray() {
       },
     ]),
   );
-  tray.on("click", () => (window?.isVisible() && window.isFocused() ? window.hide() : showWindow()));
 }
 
 function showWindow() {

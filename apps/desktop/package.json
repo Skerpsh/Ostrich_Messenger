@@ -52,7 +52,8 @@
       "target": [
         "AppImage",
         "deb",
-        "rpm"
+        "rpm",
+        "pacman"
       ],
       "category": "Network;InstantMessaging",
       "synopsis": "End-to-end encrypted messenger",

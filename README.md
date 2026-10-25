@@ -84,9 +84,9 @@
 
 | System | Get Ostrich |
 |---|---|
-| 🤖 **Android** | [**Download the APK**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Android.apk) — open it on the phone and allow installing when asked |
+| 🤖 **Android** | [**Download the APK**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Android.apk) — open it on the phone and allow installing when asked; it updates itself |
 | 🪟 **Windows** | [**Download the installer**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Windows-Setup.exe) · Terminal: [ostrich-windows-amd64.exe](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-windows-amd64.exe) |
-| 🐧 **Linux** | [**AppImage**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.AppImage) (any distribution, updates itself) · [.deb](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.deb) (Ubuntu, Debian) · [.rpm](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.rpm) (Fedora, openSUSE) · [Flatpak](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.flatpak) · Terminal: [x86-64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-amd64), [ARM64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-arm64) or the [one-line install](#terminal-client-cli) |
+| 🐧 **Linux** | [**AppImage**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.AppImage) (any distribution) · [.deb](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.deb) (Ubuntu, Debian) · [.rpm](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.rpm) (Fedora, openSUSE) · [.pacman](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.pacman) (Arch: `sudo pacman -U Ostrich-Linux.pacman`), all updating themselves · [Flatpak](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.flatpak) · Terminal: [x86-64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-amd64), [ARM64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-arm64) or the [one-line install](#terminal-client-cli) |
 | 🍎 **macOS** | Terminal: [Apple silicon](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-arm64), [Intel](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-amd64) |
 | 📱 **iOS** | Coming to the App Store |
 | 🌐 **Web** | [ostrich-messenger.online](https://ostrich-messenger.online): nothing to install, and installable as an app from the browser |
@@ -181,6 +181,7 @@ other details are in [`apps/cli/README.md`](apps/cli/README.md).
 | `OSTRICH_SERVER` | Use another backend, e.g. `http://localhost:3000` |
 | `OSTRICH_WEB` | The web app's address for invite and profile links (default: Ostrich's site, or `OSTRICH_SERVER` when set) |
 | `OSTRICH_NO_UPDATE_CHECK=1` | Do not check for a newer release at start |
+| `OSTRICH_NO_SELF_UPDATE=1` | Only say that a newer release is out, instead of installing it |
 
 ## How the encryption works
 
@@ -665,7 +666,8 @@ person using it asks for it, except what a messenger needs to work:
 - push notifications on Android and iOS: through Expo and Google's or Apple's push service; they
   only say "New message", never its text or sender
 - link previews: made by the sender's device, which loads the linked page
-- the desktop app checks GitHub releases for updates
+- the desktop apps and the CLI check GitHub releases for updates, and the Android app Expo's
+  update service (EAS Update) and GitHub releases
 
 Questions: [privacy@ostrich-messenger.com](mailto:privacy@ostrich-messenger.com).
 
