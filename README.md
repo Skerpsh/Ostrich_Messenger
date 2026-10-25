@@ -185,18 +185,22 @@ cd apps/cli && go build -o ostrich . && ./ostrich
 </td></tr></table>
 
 Then run `ostrich`. Chats are on the left and the open chat is on the right, or one at a time
-in a narrow terminal. The keyboard and the mouse both work.
+in a narrow terminal, in a frame drawn with lines and in the terminal's own colors (or Ostrich's
+theme, synced with your other devices if you like). The keyboard and the mouse both work;
+`Ctrl+P` lists everything that can be done and `F1` shows the keys.
 
 ### Most useful keys
 
 | Where | Keys |
 |---|---|
+| Everywhere | `Ctrl+P` commands · `F1` keys · `Tab` chats / chat · `Esc` back · `Ctrl+C` quit |
 | Login screen | `Tab` log in / create account · `Ctrl+L` log in with a QR code · `Ctrl+F` recover with friends · `Ctrl+R` remember me |
-| Chats list | `↑↓` move · `Enter` open · `/` search · `n` new chat · `m` chat menu · `s` settings · `t` theme · `q` quit |
+| Chats list | `↑↓` move · `Enter` open · `/` search · `n` new chat · `N` new group · `m` chat menu · `s` settings · `t` theme · `q` quit |
 | Chat | `Enter` send · `Alt+Enter` new line · `Ctrl+A` attach a file · `↑` choose a message · `Ctrl+F` search · `Ctrl+K` safety code · `Esc` back |
 | Chosen message | `r` reply · `e` edit · `d` delete · `c` copy · `s` what the server sees · `1`–`8` react · `Enter` more |
 
 Voice messages are shown with their waveform and length; play them in the web or mobile app.
+The profile photo and the profile's QR code are set in the apps.
 Calls are answered in the web or mobile app; the CLI says who is calling and shows the chat's
 call entries.
 Link previews are shown as text.

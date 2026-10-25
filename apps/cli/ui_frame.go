@@ -198,6 +198,8 @@ func (m model) hints() string {
 	c := m.chat
 
 	switch {
+	case m.helpOpen && len(m.helpLines()) > m.helpRoom():
+		return "↑↓ scroll  Esc close"
 	case m.helpOpen:
 		return "Esc close"
 	case m.menu != nil:
@@ -297,10 +299,21 @@ func (m model) box(title string, lines []string, w int) string {
 	return strings.Join(append(out, line("└"+strings.Repeat("─", w-2)+"┘")), "\n")
 }
 
-func (m model) helpView() string {
+func (m model) helpWidth() int {
+	return min(m.width-4, 64)
+}
+
+// helpRoom: how many of the help's lines fit on the screen.
+func (m model) helpRoom() int {
+	return max(m.height-6, 3)
+}
+
+// helpLines: the keys under their headings, a long one's words wrapped
+// under it.
+func (m model) helpLines() []string {
 	p := m.pal
-	w := min(m.width-4, 64)
 	keyW := 13
+	textW := m.helpWidth() - 4 - keyW
 	var lines []string
 
 	for i, section := range helpSections {
@@ -311,9 +324,47 @@ func (m model) helpView() string {
 		lines = append(lines, bold(section.title, p.accent, p.bg))
 
 		for _, k := range section.keys {
-			lines = append(lines, seg(k[0], p.text, p.bg)+blank(keyW-width(k[0]), p.bg)+seg(clip(k[1], w-4-keyW), p.muted, p.bg))
+			for j, text := range wrap(k[1], textW) {
+				key := ""
+
+				if j == 0 {
+					key = k[0]
+				}
+
+				lines = append(lines, seg(key, p.text, p.bg)+blank(keyW-width(key), p.bg)+seg(text, p.muted, p.bg))
+			}
 		}
 	}
 
-	return m.box("Keys", lines, w)
+	return lines
+}
+
+// helpMaxScroll: the first line shown when scrolled to the end (the
+// last line of the window says there is more).
+func (m model) helpMaxScroll() int {
+	if n := len(m.helpLines()); n > m.helpRoom() {
+		return n - m.helpRoom() + 1
+	}
+
+	return 0
+}
+
+func (m model) helpView() string {
+	p := m.pal
+	lines := m.helpLines()
+	room := m.helpRoom()
+
+	// Taller than the screen: a part of it, scrolled with the arrows.
+	if len(lines) > room {
+		from := min(m.helpScroll, m.helpMaxScroll())
+		more := "↓ more"
+
+		if from+room-1 >= len(lines) {
+			more = "↑ back up"
+		}
+
+		lines = append(append([]string{}, lines[from:from+room-1]...), seg(more, p.muted, p.bg))
+	}
+
+	return m.box("Keys", lines, m.helpWidth())
 }

@@ -245,7 +245,9 @@ func (m model) drawMessage(chat Chat, message Message, own, read, grouped, quiet
 
 	for _, a := range shown.attachments {
 		if isVoice(a) {
-			lines = append(lines, seg("▪ ", p.accent, bg)+seg(clip("voice message · "+formatDuration(a.Duration), w-2), p.text, bg))
+			label := "voice message · " + formatDuration(a.Duration)
+			lines = append(lines, seg("▪ ", p.accent, bg)+seg(clip(label, w-2), p.text, bg)+blank(1, bg)+
+				seg(waveform(a.Waveform, min(w-3-width(label), 24)), p.muted, bg))
 			continue
 		}
 

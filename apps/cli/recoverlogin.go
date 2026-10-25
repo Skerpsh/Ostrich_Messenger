@@ -513,7 +513,7 @@ func (m model) recoverLoginView() string {
 	}
 
 	phase := r.phase()
-	hints := "Esc Back"
+	hints := "Esc back"
 	submit := ""
 
 	switch phase {
@@ -522,7 +522,7 @@ func (m model) recoverLoginView() string {
 		field(0, "Username")
 		field(1, "Password")
 		submit = "Ask my guardians"
-		hints = "↑↓ Field   Enter Next / Ask   Ctrl+R Remember me   Esc Back"
+		hints = "↑↓ field  Enter next / ask  Ctrl+R remember me  Esc back"
 	case "waiting":
 		text("Call or meet your guardians and read each of them this code. They type it in Settings → Recovery through friends to approve. Do not send it in a message.")
 		code, _ := recoveryCode(r.saved.PublicKey)
@@ -559,12 +559,12 @@ func (m model) recoverLoginView() string {
 		)
 		text("You can close Ostrich meanwhile: this request is kept on this computer until " + formatDateTime(r.saved.ExpiresAt) + ".")
 		lines = append(lines, m.link("recover:forget", "Ctrl+X", "Stop recovering", inner, true))
-		hints = "Ctrl+N Check now   Ctrl+X Stop recovering   Esc Back"
+		hints = "Ctrl+N check now  Ctrl+X stop recovering  Esc back"
 	case "ready":
 		text("Your guardians have given back your OstrichID. Enter your password to log in as @" + sanitize(r.saved.Username) + ": you get a new OstrichID, and your other devices are logged out.")
 		field(1, "Password")
 		submit = "Log in"
-		hints = "Enter Log in   Ctrl+R Remember me   Esc Back"
+		hints = "Enter log in  Ctrl+R remember me  Esc back"
 	case "over":
 		switch r.progress.State {
 		case "cancelled":
@@ -576,7 +576,7 @@ func (m model) recoverLoginView() string {
 		}
 
 		lines = append(lines, m.link("recover:forget", "Enter", "Start again", inner, true))
-		hints = "Enter Start again   Esc Back"
+		hints = "Enter start again  Esc back"
 	}
 
 	if r.err != "" {

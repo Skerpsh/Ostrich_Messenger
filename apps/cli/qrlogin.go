@@ -226,5 +226,5 @@ func (m model) qrLoginView() string {
 		m.link("qrlogin:back", "Esc", "Log in with a password instead", inner, true),
 	)
 
-	return m.screen(m.box("Log in with a QR code", lines, w), "r new code   Ctrl+R remember me   Esc back")
+	return m.screen(m.box("Log in with a QR code", lines, w), "r new code  Ctrl+R remember me  Esc back")
 }

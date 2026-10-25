@@ -462,11 +462,11 @@ func (m model) listRowView(r listRow, cursor bool, w int) string {
 		bar = seg("▏", p.muted, bg)
 	}
 
-	inner := w - 2
+	inner := w - 3
 	two := func(left1, right1, left2, right2 string) string {
 		return strings.Join([]string{
-			bar + blank(1, bg) + row(left1, right1, inner, bg),
-			bar + blank(1, bg) + row(left2, right2, inner, bg),
+			bar + blank(1, bg) + row(left1, right1, inner, bg) + blank(1, bg),
+			bar + blank(1, bg) + row(left2, right2, inner, bg) + blank(1, bg),
 			blank(w, bg),
 		}, "\n")
 	}

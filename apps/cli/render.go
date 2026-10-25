@@ -170,6 +170,12 @@ func overlay(base, box string, w, h int) string {
 		under := baseLines[at]
 		left := ansi.Truncate(under, x, "")
 		right := ansi.TruncateLeft(under, x+boxW, "")
+
+		// A wide character (an emoji) cut in two at an edge leaves a gap:
+		// filled, so the line keeps its width.
+		left += strings.Repeat(" ", max(x-width(left), 0))
+		right = strings.Repeat(" ", max(width(under)-x-boxW-width(right), 0)) + right
+		line += strings.Repeat(" ", max(boxW-width(line), 0))
 		baseLines[at] = left + "\x1b[0m" + line + "\x1b[0m" + right
 	}
 

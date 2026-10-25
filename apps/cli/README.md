@@ -1,9 +1,24 @@
 # Ostrich CLI
 
 The terminal client: the same chats, end-to-end encryption and settings as
-the apps, laid out like the web app (chats on the left, the chat on the
-right; one at a time in a narrow terminal). Works with the keyboard and the
-mouse.
+the apps, in one frame drawn with lines: the chats on the left and the open
+chat on the right (one at a time in a narrow terminal), the keys that matter
+on the line under it. Works with the keyboard and the mouse.
+
+```
+┌ Ostrich ───────────────┬───────────────────────────── @bob · online ┐
+│ Chats  1 unread      + │ alice                               pinned │
+├────────────────────────┼────────────────────────────────────────────┤
+│▌ alice           20:11 │  alice                               20:10 │
+│▌ See you then        1 │  See you at eight?                         │
+│                        │                                            │
+│  # Ostrich team  23.10 │  you                              ✓✓ 20:11 │
+│  carol: Hello          │  See you then                              │
+│                        ├────────────────────────────────────────────┤
+│                        │ > Message                                  │
+└────────────────────────┴────────────────────────────────────────────┘
+ Enter send  Alt+Enter new line  ↑ choose a message  Ctrl+P commands
+```
 
 ## Install
 
@@ -43,8 +58,24 @@ notes from the commits since the last tag.
 to the web app: Ostrich's site for the default server, the server's own address for another
 one, or `OSTRICH_WEB` when set.
 
-Preferences (theme, accent color, bell) and the contacts' keys seen so far
-are kept in `~/.config/ostrich/`.
+Preferences (colors, theme, accent color, bell) and the contacts' keys seen
+so far are kept in `~/.config/ostrich/`.
+
+## Colors
+
+By default the CLI uses the terminal's own colors: its background, its text
+and its palette for the accent, so it fits whatever theme the terminal has.
+Settings → Appearance → *Use the terminal's colors* off switches to
+Ostrich's light or dark theme on one even background (`t` toggles light and
+dark), with the accent of your choice.
+
+*Sync the theme with my devices* takes the light or dark theme and the
+accent from the apps' synced settings and writes them back when they are
+changed here; the rest of those settings (text size, chats' looks) is left
+as it is. They are encrypted with a key of the account's, like in the apps.
+
+The profile photo and the profile's QR code are only in the apps; the CLI
+copies the profile's link.
 
 ## Remember me
 
@@ -69,23 +100,28 @@ logs out.
 
 ## Keys
 
+`Ctrl+P` lists everything that can be done where you are: the chosen
+message's actions, the open chat's and the rest, each with its key; type to
+filter, `Enter` does it. `F1` (or `?` outside a text field) shows the keys.
+
 | Where | Keys |
 |---|---|
-| Everywhere | `Ctrl+C` quit |
-| Login | `Tab` log in / create account, `↑↓` field, `Ctrl+R` remember me, `Ctrl+L` log in with a QR code, `Enter` next / submit |
-| Chats list | `↑↓` move, `Enter` open, `/` search, `n` new chat (type a @username), `m` chat menu (pin, mute, clear, delete), `s` settings, `t` light / dark, `Tab` to the chat, `q` quit |
-| Chat | `Enter` send, `Alt+Enter` new line, `Ctrl+A` attach a file (type or drop its path; `Ctrl+X` removes the last), `↑` (empty input) choose a message, `Ctrl+O` chat menu (also: seal the next message as a letter to the future), `Ctrl+F` search, `Ctrl+K` safety code, `PgUp/PgDn` scroll, `Tab` to the list, `Esc` back |
-| Chosen message | `Enter` menu (also: forward, pin, save its files to `~/Downloads`), `r` reply, `e` edit, `d` delete, `c` copy, `s` what the server sees, `1`–`8` react, `Esc` back |
-| Menus | `↑↓` choose, `Enter` select (destructive actions ask twice), `1`–`8` react, `Esc` close |
-| Settings | `↑↓` move, `Enter` open / toggle, `←→` theme and accent, `Esc` close |
+| Everywhere | `Ctrl+P` commands, `F1` keys, `Tab` between the chats and the chat, `Esc` back / close, `Ctrl+C` quit |
+| Login | `Tab` log in / create account, `↑↓` field, `Ctrl+R` remember me, `Ctrl+L` log in with a QR code, `Ctrl+F` recover with friends, `Enter` next / submit |
+| Chats list | `↑↓` move, `Enter` open, `/` search (or paste an invite or profile link), `n` new chat (type a @username), `N` new group, `v` Saved messages, `m` chat menu (pin, mute, clear, delete), `s` settings, `t` light / dark, `q` quit |
+| Chat | `Enter` send, `Alt+Enter` new line, `Ctrl+A` attach a file (type or drop its path; `Ctrl+X` removes the last), `↑` (empty input) choose a message, `Ctrl+O` chat menu (also: seal the next message as a letter to the future), `Ctrl+F` search, `Ctrl+K` safety code, `PgUp/PgDn` scroll |
+| Chosen message | `Enter` menu (also: forward, pin, save its files to `~/Downloads`), `r` reply, `e` edit, `d` delete, `c` copy, `s` what the server sees, `1`–`8` react |
+| Menus | type to filter, `↑↓` choose, `Enter` select (destructive actions ask twice), `1`–`8` react, `Esc` clear the filter / close |
+| Settings | `↑↓` the parts (Profile, Appearance, Account, Privacy, Notifications, Devices, Recovery through friends, Security, Danger zone), `Enter` open one, then `↑↓` its rows, `Enter` choose, `←→` change a value, `Esc` back to the parts / close |
 
 Mouse: click a chat to open it, right-click it (or a message) for its menu,
-scroll the wheel over the messages; the header buttons, settings rows, theme
-and accent choices are clickable too.
+scroll the wheel over the messages; the chat's name (its menu, or a group's
+info), your name at the top (Settings), the parts and rows of Settings and
+the menus' items are clickable too.
 
 ## Safety code
 
-`Ctrl+K` (or 🛡 in the chat header) shows 40 digits that are the same on
-both sides of a chat. Compare them with your contact: if they match, the
-server has not swapped your keys. When a contact's key changes, the chat
+`Ctrl+K` (or *Safety code* in the chat's menu) shows 40 digits that are the
+same on both sides of a chat. Compare them with your contact: if they match,
+the server has not swapped your keys. When a contact's key changes, the chat
 warns and holds back sending until the codes are confirmed (`y`).

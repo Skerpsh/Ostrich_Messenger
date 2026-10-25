@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -130,6 +131,7 @@ type model struct {
 	safetyOpen bool
 	// The keys' help (F1, ?; ui_frame.go).
 	helpOpen   bool
+	helpScroll int
 	safetyPeer *foundUser
 	prompt     *promptState
 	// "What the server sees" of a message or a chat (serverview.go).
@@ -395,16 +397,29 @@ func (m *model) updateKey(msg tea.KeyMsg) tea.Cmd {
 	}
 
 	if m.helpOpen {
-		if s := msg.String(); s == "esc" || s == "enter" || s == "q" || s == "?" || s == "f1" {
+		switch msg.String() {
+		case "esc", "enter", "q", "?", "f1":
 			m.helpOpen = false
+		case "up", "k":
+			m.helpScroll--
+		case "down", "j":
+			m.helpScroll++
+		case "pgup":
+			m.helpScroll -= m.helpRoom()
+		case "pgdown", " ":
+			m.helpScroll += m.helpRoom()
+		case "home":
+			m.helpScroll = 0
 		}
+
+		m.helpScroll = min(max(m.helpScroll, 0), m.helpMaxScroll())
 
 		return nil
 	}
 
 	// F1 anywhere; ? where it is not typed into a field.
 	if s := msg.String(); s == "f1" || s == "?" && m.helpKeyFree() {
-		m.helpOpen = true
+		m.helpOpen, m.helpScroll = true, 0
 		return nil
 	}
 
@@ -778,5 +793,33 @@ func (m model) hintLine(hints string, w int, bg lipgloss.Color) string {
 		return fitLine(seg(" "+clip(sanitize(m.toast), w-2), fg, bg), w, bg)
 	}
 
-	return fitLine(seg(" "+clip(hints, w-2), p.muted, bg), w, bg)
+	return fitLine(seg(" "+fitHints(hints, w-2), p.muted, bg), w, bg)
 }
+
+// fitHints: as many of the hints (split by two spaces or more) as fit in
+// w, whole, the first ones first (the first one cut if alone too long).
+func fitHints(hints string, w int) string {
+	out := ""
+
+	for _, hint := range hintSplit.Split(hints, -1) {
+		next := hint
+
+		if out != "" {
+			next = out + "  " + hint
+		}
+
+		if width(next) > w {
+			if out == "" {
+				return clip(hint, w)
+			}
+
+			break
+		}
+
+		out = next
+	}
+
+	return out
+}
+
+var hintSplit = regexp.MustCompile(` {2,}`)

@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	zone "github.com/lrstanley/bubblezone"
 )
 
@@ -410,6 +411,18 @@ func (m model) card(lines []string, w int) string {
 	return m.box("", append(append([]string{""}, lines...), ""), w)
 }
 
+// squeeze takes empty lines out of a framed block (from the bottom up)
+// until it is at most h lines tall, for short terminals.
+func squeeze(lines []string, h int) []string {
+	for i := len(lines) - 2; i > 0 && len(lines) > h; i-- {
+		if strings.Trim(ansi.Strip(lines[i]), " │") == "" {
+			lines = append(lines[:i:i], lines[i+1:]...)
+		}
+	}
+
+	return lines
+}
+
 // screen centers a block on the page background, with the hints at the
 // bottom.
 func (m model) screen(block, hints string) string {
@@ -422,6 +435,7 @@ func (m model) screen(block, hints string) string {
 	}
 
 	area := m.height - 1
+	lines = squeeze(lines, area)
 	top := max((area-len(lines))/2, 0)
 	out := make([]string, 0, m.height)
 
@@ -593,7 +607,7 @@ func (m model) authView() string {
 		)
 	}
 
-	return m.screen(m.box("Ostrich", lines, w), "Tab log in / create account   ↑↓ field   Enter next / submit   Ctrl+R remember me   Esc quit")
+	return m.screen(m.box("Ostrich", lines, w), "Tab log in / create account  ↑↓ field  Enter next / submit  Ctrl+R remember me  Esc quit")
 }
 
 func (m model) ostrichIDView() string {
@@ -631,7 +645,7 @@ func (m model) ostrichIDView() string {
 		m.link("id:copy", "c", "Copy it", inner, true),
 	)
 
-	hints := "c copy   Space saved   Enter continue"
+	hints := "c copy  Space saved  Enter continue"
 
 	if m.quitArmed {
 		hints = "Press Ctrl+C again to quit. You will not see this OstrichID again."

@@ -75,7 +75,7 @@ func (m *model) openPalette() tea.Cmd {
 		}},
 		menuItem{label: "Light or dark theme", key: "t", action: func(m *model) tea.Cmd { return m.toggleTheme() }},
 		menuItem{label: "Keys", key: "F1", action: func(m *model) tea.Cmd {
-			m.helpOpen = true
+			m.helpOpen, m.helpScroll = true, 0
 			return nil
 		}},
 		menuItem{label: "Log out", danger: true, confirm: "Log out of this computer?", action: func(m *model) tea.Cmd {

@@ -614,3 +614,107 @@ func TestAttachmentFiles(t *testing.T) {
 		t.Fatalf("size %q", got)
 	}
 }
+
+// TestAllScreens: every screen and window of the redesigned CLI at every
+// size, in both color modes; each keeps the frame whole (its corners in
+// place, nothing wider or taller than the terminal).
+func TestAllScreens(t *testing.T) {
+	for _, size := range [][2]int{{140, 40}, {100, 30}, {80, 24}, {60, 24}, {50, 20}} {
+		for _, colors := range []string{"terminal", "ostrich"} {
+			for _, mode := range []string{"dark", "light"} {
+				w, h := size[0], size[1]
+				name := fmt.Sprintf("%dx%d %s %s", w, h, colors, mode)
+				m := testModel(t, w, h, mode)
+				m.cfg.Colors = colors
+				m.applyTheme()
+
+				framed := func(what string) {
+					t.Helper()
+					view := m.View()
+					checkView(t, name+" "+what, view, w, h)
+					lines := strings.Split(ansi.Strip(view), "\n")
+
+					if !strings.HasPrefix(lines[0], "┌") || !strings.HasPrefix(lines[h-2], "└") || !strings.HasSuffix(lines[h-2], "┘") {
+						t.Errorf("%s %s: the frame is broken:\n%s", name, what, strings.Join(lines, "\n"))
+					}
+				}
+
+				framed("chat")
+
+				m.focus = paneList
+				framed("list")
+				m.focus = paneChat
+
+				_ = m.openPalette()
+				checkView(t, name+" palette", m.View(), w, h)
+				m.menu.filter.SetValue("theme")
+				checkView(t, name+" palette filtered", m.View(), w, h)
+				m.menu = nil
+
+				m = press(m, "f1")
+				checkView(t, name+" help", m.View(), w, h)
+
+				for i := 0; i < 40; i++ {
+					m = press(m, "down")
+				}
+
+				help := ansi.Strip(m.View())
+				checkView(t, name+" help scrolled", m.View(), w, h)
+
+				// Scrolled to the end, the last key is in view.
+				if !strings.Contains(help, "everything else") {
+					t.Errorf("%s: the help's end is not reachable:\n%s", name, help)
+				}
+
+				m = press(m, "esc")
+
+				_ = m.openSettings()
+				framed("settings")
+
+				for i := range m.settingsParts() {
+					m.choosePart(i)
+					m.settings.inContent = true
+					framed(fmt.Sprintf("settings part %d", i))
+				}
+
+				m.closeSettings()
+
+				m.serverView = messageServerViewState(messageServerView{}, shownMessage{text: "Hi! How are you?"})
+				checkView(t, name+" server view", m.View(), w, h)
+				m.serverView = nil
+
+				g, group := withGroup(t, m)
+				_ = g.openGroupInfo(group)
+				checkView(t, name+" group info", g.View(), w, h)
+
+				m.stage = stageAuth
+				checkView(t, name+" login", m.View(), w, h)
+
+				if login := ansi.Strip(m.View()); !strings.Contains(login, "┌ Ostrich") || !strings.Contains(login, "┘") {
+					t.Errorf("%s: the login card does not fit:\n%s", name, login)
+				}
+
+				_ = m.startQRLogin()
+				checkView(t, name+" QR login", m.View(), w, h)
+				m.auth.qr.text = "ostrich-login:" + newMessageID() + ":" + strings.Repeat("A", 43) + "="
+				checkView(t, name+" QR code", m.View(), w, h)
+				m.auth.qr = nil
+
+				_ = m.startRecoverLogin()
+				checkView(t, name+" recover", m.View(), w, h)
+				m.auth.recover = nil
+			}
+		}
+	}
+}
+
+// TestFitHints: hints that do not fit are left out whole.
+func TestFitHints(t *testing.T) {
+	if got := fitHints("Enter send  Alt+Enter new line  F1 help", 25); got != "Enter send" {
+		t.Errorf("got %q", got)
+	}
+
+	if got := fitHints("a  b", 10); got != "a  b" {
+		t.Errorf("got %q", got)
+	}
+}
