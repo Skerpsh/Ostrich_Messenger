@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Release job: the APK (.github/workflows/release.yml)
+/apk/

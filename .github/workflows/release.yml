@@ -87,23 +87,24 @@ jobs:
           # build number up by itself (eas.json, "github" profile).
           version="${GITHUB_REF_NAME#v}"
           jq --arg v "$version" '.expo.version = $v' app.json > app.json.new && mv app.json.new app.json
-          mkdir -p dist
+          # Not dist/: eas update exports the code there, emptying it first.
+          mkdir -p apk
           # The native part's fingerprint (fingerprint.config.js leaves the
           # version out). The same as the last release's: its APK runs this
           # version's code too, over the air, so it is kept instead of
           # spending an EAS build.
           runtime=$(npx expo-updates runtimeversion:resolve --platform android | jq -r .runtimeVersion)
-          echo "$runtime" > dist/android-runtime.txt
+          echo "$runtime" > apk/android-runtime.txt
           last=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
           if [ -n "$last" ] \
             && gh release download "$last" -p android-runtime.txt -O last-runtime.txt 2>/dev/null \
             && [ "$(cat last-runtime.txt)" = "$runtime" ] \
-            && gh release download "$last" -p Ostrich-Android.apk -D dist; then
+            && gh release download "$last" -p Ostrich-Android.apk -D apk; then
             echo "The native part is as in $last: its APK is kept"
           else
             eas build --platform android --profile github --non-interactive --wait --json > build.json
             url=$(jq -r '.[0].artifacts.buildUrl' build.json)
-            curl -fsSL "$url" -o dist/Ostrich-Android.apk
+            curl -fsSL "$url" -o apk/Ostrich-Android.apk
           fi
           # The installed apps of this runtime get the code at their next
           # start (platform/app-update.ts); older ones are offered the APK.
@@ -112,9 +113,10 @@ jobs:
         if: steps.token.outputs.set == 'true'
         with:
           name: android
+          if-no-files-found: error
           path: |
-            apps/mobile-web/dist/Ostrich-Android.apk
-            apps/mobile-web/dist/android-runtime.txt
+            apps/mobile-web/apk/Ostrich-Android.apk
+            apps/mobile-web/apk/android-runtime.txt
 
   # The desktop app: the web app built into it (apps/desktop/scripts/
   # build-web.mjs), packed by electron-builder. Its version is the tag's.
