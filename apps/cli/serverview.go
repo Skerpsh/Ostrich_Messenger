@@ -415,24 +415,24 @@ func (m *model) updateServerViewMouse(msg tea.MouseMsg) tea.Cmd {
 
 func (m model) serverViewView() string {
 	p := m.pal
-	bg := p.panel
+	bg := p.bg
 	w, inner := m.serverViewWidth()
 	lines := m.serverViewLines(inner)
 
-	// Taller than the terminal: scrolled, with the button kept below.
-	footer := []string{"", zone.Mark("serverview:close", m.button("Close (Esc)", inner, false, true))}
+	// Taller than the terminal: scrolled, with the keys kept below.
+	footer := []string{"", zone.Mark("serverview:close", seg("Esc close", p.muted, bg))}
 
 	if room := m.serverViewRoom(); len(lines) > room {
 		top := max(min(m.serverView.scroll, len(lines)-room), 0)
 		lines = append(lines[top:top+room-1], seg(clip("↑↓ scroll", inner), p.muted, bg))
 	}
 
-	return zone.Mark("serverview", m.card(append(lines, footer...), w))
+	return zone.Mark("serverview", m.box("What the server sees", append(lines, footer...), w))
 }
 
 func (m model) serverViewLines(inner int) []string {
 	p := m.pal
-	bg := p.panel
+	bg := p.bg
 	s := m.serverView
 
 	about := "This message exactly as the server stores it, fetched from it just now."
@@ -441,7 +441,7 @@ func (m model) serverViewLines(inner int) []string {
 		about = "This chat exactly as the server stores it, fetched from it just now."
 	}
 
-	lines := []string{seg("🗄  ", p.accent, bg) + bold("What the server sees", p.text, bg), ""}
+	lines := []string{""}
 
 	for _, line := range wrap(about, inner) {
 		lines = append(lines, seg(line, p.textSoft, bg))
@@ -457,7 +457,7 @@ func (m model) serverViewLines(inner int) []string {
 			lines = append(lines, seg(line, p.danger, bg))
 		}
 	default:
-		lines = append(lines, bold("THE SERVER KNOWS", p.muted, bg))
+		lines = append(lines, bold("The server knows", p.accent, bg))
 
 		for _, row := range s.rows {
 			label, color := row.label, p.muted
@@ -474,14 +474,14 @@ func (m model) serverViewLines(inner int) []string {
 		}
 
 		if len(s.hidden) > 0 {
-			lines = append(lines, "", bold("ONLY THE CHAT CAN READ", p.muted, bg))
+			lines = append(lines, "", bold("Only the chat can read", p.accent, bg))
 
 			for _, item := range s.hidden {
 				for i, line := range wrap(item, inner-3) {
 					prefix := "   "
 
 					if i == 0 {
-						prefix = seg("🔒 ", p.online, bg)
+						prefix = seg(" · ", p.online, bg)
 					}
 
 					lines = append(lines, prefix+seg(line, p.text, bg))

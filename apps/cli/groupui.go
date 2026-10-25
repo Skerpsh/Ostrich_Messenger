@@ -392,12 +392,12 @@ func (m *model) groupInfoMenu(chat Chat) *menuState {
 	title := fmt.Sprintf("%s · %d of %d members", m.chatName(chat), chat.MemberCount, maxGroupMembers)
 
 	if m.groupDistrusted[chat.ID] {
-		title += " · ⚠ a key came from a changed account key: compare safety codes"
+		title += " · ! a key came from a changed account key: compare safety codes"
 	}
 
 	if chat.isAdmin() {
 		if chat.MemberCount < maxGroupMembers {
-			items = append(items, menuItem{icon: "✚", label: "Add a member…", action: func(m *model) tea.Cmd {
+			items = append(items, menuItem{icon: "✚", label: "Add a member…", section: "Group", action: func(m *model) tea.Cmd {
 				return m.openPrompt("Add to "+m.chatName(chat), "@username", "", "", 33, func(m *model, value string) tea.Cmd {
 					return m.addMember(chat, cleanUsername(value))
 				})
@@ -411,19 +411,19 @@ func (m *model) groupInfoMenu(chat Chat) *menuState {
 		}
 
 		items = append(items,
-			menuItem{icon: "🔗", label: "Invite link…", action: func(m *model) tea.Cmd { return m.inviteMenu(chat) }},
-			menuItem{icon: "?", label: requests, action: func(m *model) tea.Cmd { return m.requestsMenu(chat) }},
-			menuItem{icon: "✎", label: "Rename…", action: func(m *model) tea.Cmd {
+			menuItem{icon: "🔗", label: "Invite link…", section: "Group", action: func(m *model) tea.Cmd { return m.inviteMenu(chat) }},
+			menuItem{icon: "?", label: requests, section: "Group", action: func(m *model) tea.Cmd { return m.requestsMenu(chat) }},
+			menuItem{icon: "✎", label: "Rename…", section: "Group", action: func(m *model) tea.Cmd {
 				return m.openPrompt("Rename the group", "Name", "", m.chatName(chat), 64, func(m *model, value string) tea.Cmd {
 					return m.renameGroup(chat, value)
 				})
 			}},
-			menuItem{icon: "🔑", label: "Change the group key", action: func(m *model) tea.Cmd { return m.rotateKey(chat) }},
+			menuItem{icon: "🔑", label: "Change the group key", section: "Group", action: func(m *model) tea.Cmd { return m.rotateKey(chat) }},
 		)
 	}
 
 	if m.members == nil {
-		items = append(items, menuItem{icon: " ", label: "Loading members…", action: func(m *model) tea.Cmd {
+		items = append(items, menuItem{icon: " ", label: "Loading members…", section: "Members", action: func(m *model) tea.Cmd {
 			return m.openGroupInfo(chat)
 		}})
 	}
@@ -431,15 +431,15 @@ func (m *model) groupInfoMenu(chat Chat) *menuState {
 	for _, member := range m.members {
 		member := member
 		label := "@" + member.Username + roleLabel(member.Role)
-		icon := "·"
+		online := ""
 
 		if member.ID == m.user.User.ID {
 			label += " (you)"
 		} else if m.connStatus == connOnline && m.presence[member.ID].online {
-			icon = "●"
+			online = "online"
 		}
 
-		items = append(items, menuItem{icon: icon, label: label, action: func(m *model) tea.Cmd {
+		items = append(items, menuItem{label: label, key: online, section: "Members", action: func(m *model) tea.Cmd {
 			if member.ID == m.user.User.ID {
 				m.openMenu(m.groupInfoMenu(chat))
 				return nil
@@ -451,11 +451,11 @@ func (m *model) groupInfoMenu(chat Chat) *menuState {
 		}})
 	}
 
-	items = append(items, menuItem{icon: "⇥", label: "Leave group", danger: true, confirm: "Leave the group?",
+	items = append(items, menuItem{icon: "⇥", label: "Leave group", section: "Leave", danger: true, confirm: "Leave the group?",
 		action: func(m *model) tea.Cmd { return m.leaveGroup(chat) }})
 
 	if chat.Role == "owner" {
-		items = append(items, menuItem{icon: "🗑", label: "Delete group", danger: true,
+		items = append(items, menuItem{icon: "🗑", label: "Delete group", section: "Leave", danger: true,
 			confirm: "Delete the group for everyone?",
 			action:  func(m *model) tea.Cmd { return m.removeChat(chat, "everyone") }})
 	}

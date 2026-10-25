@@ -562,7 +562,9 @@ func (m model) menuView() string {
 		}
 	}
 
-	room := max(m.height-12-len(lines)-2*len(headings), 3)
+	// Within the screen: the frame (2), what is above the items, the
+	// headings (a line each and a space between), "N more" (1), a margin.
+	room := max(m.height-2-2-len(lines)-max(2*len(headings)-1, 0)-1, 3)
 	top := 0
 
 	if menu.cursor >= room {
