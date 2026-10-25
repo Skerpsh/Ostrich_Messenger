@@ -8,6 +8,9 @@ import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import updater from "electron-updater";
+import runtime from "builder-util-runtime";
+import http from "node:http";
+import https from "node:https";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, "web");
@@ -132,6 +135,7 @@ function startUpdates() {
   }
 
   const { autoUpdater } = updater;
+  autoUpdater.httpExecutor = new NodeHttpExecutor();
   const silent = type === "appimage" || type === "windows";
   autoUpdater.autoInstallOnAppQuit = silent;
   autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} };
@@ -178,6 +182,35 @@ function startUpdates() {
 
   setTimeout(checkForUpdates, UPDATE_FIRST_MS);
   setInterval(checkForUpdates, UPDATE_CHECK_MS);
+}
+
+// Downloads with Node's HTTP, not Chromium's: Chromium drops every request
+// when it sees the network change, which some networks (a phone's
+// hotspot, two network managers renewing the address) do every few
+// seconds, so a download of the update never finished.
+class NodeHttpExecutor extends runtime.HttpExecutor {
+  createRequest(options, callback) {
+    return (options.protocol === "http:" ? http : https).request(options, callback);
+  }
+
+  download(url, destination, options) {
+    return options.cancellationToken.createPromise((resolve, reject, onCancel) => {
+      const requestOptions = { headers: options.headers || undefined };
+      runtime.configureRequestUrl(url, requestOptions);
+      runtime.configureRequestOptions(requestOptions);
+      this.doDownload(
+        requestOptions,
+        {
+          destination,
+          options,
+          onCancel,
+          callback: (error) => (error == null ? resolve(destination) : reject(error)),
+          responseHandler: null,
+        },
+        0,
+      );
+    });
+  }
 }
 
 function checkForUpdates() {
