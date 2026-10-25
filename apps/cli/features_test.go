@@ -63,7 +63,7 @@ func TestSavedAndBadges(t *testing.T) {
 	m.chats[1].JoinRequests = 2
 	list := ansi.Strip(m.listView(60, 40))
 
-	for _, want := range []string{"🔖 Saved messages", " @ ", "+2"} {
+	for _, want := range []string{"Saved messages", "@ +2", "3"} {
 		if !strings.Contains(list, want) {
 			t.Errorf("%q missing:\n%s", want, list)
 		}

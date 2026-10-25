@@ -38,7 +38,7 @@ const (
 	// The longest a letter can be sealed for.
 	maxSealYears = 10
 	// The text older clients show instead.
-	sealedFallback = "🔒 A sealed letter"
+	sealedFallback = "A sealed letter"
 )
 
 type sealedLetter struct {
@@ -273,10 +273,10 @@ func (m model) letterKey(id string) string {
 
 // envelopeLines: a letter not opened yet.
 func (m model) envelopeLines(id string, letter sealedLetter, surprise bool) []string {
-	title := "✉  Sealed letter"
+	title := "Sealed letter"
 
 	if letter.Surprise {
-		title = "🎁 Surprise letter"
+		title = "Surprise letter"
 	}
 
 	at := openingTime(letter.Round)

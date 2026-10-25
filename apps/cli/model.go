@@ -128,6 +128,8 @@ type model struct {
 	// one-line prompt.
 	menu       *menuState
 	safetyOpen bool
+	// The keys' help (F1, ?; ui_frame.go).
+	helpOpen   bool
 	safetyPeer *foundUser
 	prompt     *promptState
 	// "What the server sees" of a message or a chat (serverview.go).
@@ -256,7 +258,8 @@ func (m *model) applyTheme() {
 		}
 	}
 
-	m.pal = newPalette(mode, m.cfg.Accent)
+	terminalColors = m.cfg.Colors != "ostrich"
+	m.pal = newPalette(terminalColors, mode, m.cfg.Accent)
 	m.auth.restyle(m.pal)
 	m.list.restyle(m.pal)
 
@@ -391,6 +394,20 @@ func (m *model) updateKey(msg tea.KeyMsg) tea.Cmd {
 		return m.updateOstrichIDKey(msg)
 	}
 
+	if m.helpOpen {
+		if s := msg.String(); s == "esc" || s == "enter" || s == "q" || s == "?" || s == "f1" {
+			m.helpOpen = false
+		}
+
+		return nil
+	}
+
+	// F1 anywhere; ? where it is not typed into a field.
+	if s := msg.String(); s == "f1" || s == "?" && m.helpKeyFree() {
+		m.helpOpen = true
+		return nil
+	}
+
 	if m.prompt != nil {
 		return m.updatePromptKey(msg)
 	}
@@ -506,27 +523,46 @@ func wheel(msg tea.MouseMsg, id string) int {
 	return 0
 }
 
+// helpKeyFree: "?" is not text being typed (the list without the search,
+// a chosen message).
+func (m model) helpKeyFree() bool {
+	if m.prompt != nil || m.menu != nil || m.safetyOpen || m.serverView != nil {
+		return false
+	}
+
+	switch m.focus {
+	case paneChat:
+		return m.chat != nil && m.chat.selecting
+	case paneSettings:
+		return m.settings != nil && m.settings.form == ""
+	}
+
+	return !m.list.searching
+}
+
 // --- layout ---
 
 func (m model) wide() bool {
 	return m.width >= wideLayoutMinWidth
 }
 
+// sidebarWidth is the width of the chats list inside the frame
+// (ui_frame.go).
 func (m model) sidebarWidth() int {
 	if !m.wide() {
-		return m.width
+		return m.width - 2
 	}
 
-	return min(max(m.width*32/100, 32), 44)
+	return min(max(m.width*30/100, 28), 40)
 }
 
-// paneWidth is the width of the chat or Settings.
+// paneWidth is the width of the chat or Settings inside the frame.
 func (m model) paneWidth() int {
 	if !m.wide() {
-		return m.width
+		return m.width - 2
 	}
 
-	return m.width - m.sidebarWidth() - 1
+	return m.width - 2 - m.sidebarWidth() - 1
 }
 
 func (m model) showingChat() bool {
@@ -721,74 +757,6 @@ func (m model) View() string {
 	}
 
 	return zone.Scan(view)
-}
-
-func (m model) mainView() string {
-	var view string
-
-	switch {
-	case m.wide():
-		var right string
-
-		switch {
-		case m.settings != nil:
-			right = m.settingsView(m.paneWidth(), m.height)
-		case m.chat != nil:
-			right = m.chatView(m.paneWidth(), m.height)
-		default:
-			right = m.emptyPaneView(m.paneWidth(), m.height)
-		}
-
-		divider := fitBlock("", 1, m.height, m.pal.line)
-		view = hjoin(m.listView(m.sidebarWidth(), m.height), divider, right)
-
-	case m.focus == paneSettings && m.settings != nil:
-		view = m.settingsView(m.width, m.height)
-
-	case m.focus == paneChat && m.chat != nil:
-		view = m.chatView(m.width, m.height)
-
-	default:
-		view = m.listView(m.width, m.height)
-	}
-
-	switch {
-	case m.prompt != nil:
-		view = overlay(view, m.promptView(), m.width, m.height)
-	case m.qr != nil:
-		view = overlay(view, m.qrView(), m.width, m.height)
-	case m.menu != nil:
-		view = overlay(view, m.menuView(), m.width, m.height)
-	case m.safetyOpen && (m.chat != nil || m.safetyPeer != nil):
-		view = overlay(view, m.safetyView(), m.width, m.height)
-	case m.serverView != nil:
-		view = overlay(view, m.serverViewView(), m.width, m.height)
-	}
-
-	return view
-}
-
-// emptyPaneView is the right side with no chat open.
-func (m model) emptyPaneView(w, h int) string {
-	p := m.pal
-	lines := []string{
-		center(bold("Select a chat", p.text, p.bg), w, p.bg),
-		"",
-		center(seg("or start one by @username: press n", p.muted, p.bg), w, p.bg),
-	}
-
-	top := max((h-len(lines))/2, 0)
-	block := ""
-
-	for i := 0; i < top; i++ {
-		block += "\n"
-	}
-
-	for _, line := range lines {
-		block += line + "\n"
-	}
-
-	return fitBlock(block, w, h, p.bg)
 }
 
 // hintLine is the bottom line: key hints, or the toast.

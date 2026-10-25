@@ -56,15 +56,15 @@ func (m *model) stillHere() tea.Cmd {
 
 // sentAutomatically: over a message "If I disappear" sent.
 func sentAutomatically(message Message) string {
-	return fmt.Sprintf("⌛ Sent automatically: @%s had not opened Ostrich for %d days", sanitize(message.SenderUsername), *message.SentAfterDays)
+	return fmt.Sprintf("Sent automatically: @%s had not opened Ostrich for %d days", sanitize(message.SenderUsername), *message.SentAfterDays)
 }
 
 // heirLines: an OstrichID left in a message.
 func heirLines(id string, own bool, sender string) []string {
-	title := "🔑 @" + sender + " left you their OstrichID"
+	title := "@" + sender + " left you their OstrichID"
 
 	if own {
-		title = "🔑 Your OstrichID"
+		title = "Your OstrichID"
 	}
 
 	return []string{title, formatOstrichID(id), "With their username and password it opens their account and all their messages. Keep it somewhere safe."}

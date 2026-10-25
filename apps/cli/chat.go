@@ -101,7 +101,7 @@ func (c *chatState) restyle(p palette) {
 		Base:             lipgloss.NewStyle().Background(p.panelAlt),
 		CursorLine:       lipgloss.NewStyle().Foreground(p.text).Background(p.panelAlt),
 		CursorLineNumber: lipgloss.NewStyle().Background(p.panelAlt),
-		EndOfBuffer:      lipgloss.NewStyle().Foreground(p.panelAlt).Background(p.panelAlt),
+		EndOfBuffer:      lipgloss.NewStyle().Foreground(p.bg).Background(p.panelAlt),
 		LineNumber:       lipgloss.NewStyle().Background(p.panelAlt),
 		Placeholder:      lipgloss.NewStyle().Foreground(p.muted).Background(p.panelAlt),
 		Prompt:           lipgloss.NewStyle().Background(p.panelAlt),
@@ -124,9 +124,9 @@ func (c *chatState) restyle(p palette) {
 	c.cache = map[string][]string{}
 }
 
-// The composer sits in a box with the send button next to it.
+// The composer follows "> " (chatview.go).
 func (c *chatState) resize(w int) {
-	c.composer.SetWidth(max(w-10, 10))
+	c.composer.SetWidth(max(w-4, 10))
 	c.search.Width = max(w-30, 10)
 	c.attach.Width = max(w-12, 10)
 	c.fitComposer()
@@ -1471,7 +1471,7 @@ func unpickClicked(msg tea.MouseMsg, n int) int {
 
 // chatAreaHeight is the height of the messages area.
 func (m model) chatAreaHeight() int {
-	return max(m.height-m.chatChromeHeight(), 1)
+	return max(m.innerHeight()-m.chatChromeHeight(), 1)
 }
 
 // maxChatScroll is the scroll at which the oldest message is at the top.

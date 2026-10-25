@@ -16,8 +16,8 @@ import (
 const (
 	// Lines of a chat in the list: name, preview, space.
 	listRowHeight = 3
-	// Header (title, status, space, search, space) and hint line.
-	listHeaderHeight = 5
+	// Header: the title (or the search) and the rule.
+	listHeaderHeight = 2
 )
 
 type listState struct {
@@ -138,7 +138,7 @@ func (m *model) moveListCursor(delta int) {
 
 // visibleRows is how many chats fit in the list.
 func (m model) visibleRows() int {
-	return max((m.height-listHeaderHeight-1)/listRowHeight, 1)
+	return max((m.innerHeight()-listHeaderHeight)/listRowHeight, 1)
 }
 
 // scrollList keeps the cursor on screen.
@@ -380,84 +380,47 @@ func (m *model) toggleTheme() {
 
 // --- view ---
 
-// avatar draws the initial on the user's color.
-func avatar(name string) string {
-	return lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#111113")).
-		Background(avatarColor(name)).
-		Render(" " + initial(name) + " ")
-}
-
-// iconButton is a clickable icon.
+// iconButton is a clickable label.
 func iconButton(id, icon string, fg, bg lipgloss.Color) string {
 	return zone.Mark(id, seg(" "+icon+" ", fg, bg))
 }
 
 func (m model) listView(w, h int) string {
 	p := m.pal
-	bg := p.surface
+	bg := p.bg
 	var lines []string
 
-	// Header: own avatar, title, buttons; connection status.
-	me := m.user.User.Username
-	themeIcon := "☾"
-
-	if p.mode == themeDark {
-		themeIcon = "☀"
-	}
-
-	left := blank(1, bg) + avatar(me) + blank(1, bg) + bold("Chats", p.text, bg)
-	right := iconButton("list:new", "✎", p.accent, bg) +
-		iconButton("list:theme", themeIcon, p.textSoft, bg) +
-		iconButton("list:settings", "⚙", p.textSoft, bg)
-
-	status := "@" + sanitize(me)
-
-	switch m.connStatus {
-	case connConnecting:
-		status = "Connecting…"
-	case connOffline:
-		status = "Waiting for network…"
-	}
-
-	if m.user.User.IsDeveloper {
-		status += " " + devBadge()
-	}
-
-	lines = append(lines,
-		row(left, right, w, bg),
-		blank(5, bg)+seg(status, p.muted, bg),
-		"",
-	)
-
-	// Search box.
-	searchView := seg(m.list.search.Placeholder, p.muted, p.panelAlt)
-
+	// Title, or the search while searching; then the rule.
 	if m.list.searching {
-		searchView = onBackground(m.list.search.View(), p.panelAlt)
+		lines = append(lines, zone.Mark("list:search", seg(" / ", p.accent, bg)+fitLine(onBackground(m.list.search.View(), bg), w-3, bg)))
+	} else {
+		title := bold(" Chats", p.text, bg)
+
+		if unread := m.totalUnread(); unread > 0 {
+			title += seg(fmt.Sprintf("  %d unread", unread), p.muted, bg)
+		}
+
+		lines = append(lines, zone.Mark("list:search", row(title, iconButton("list:new", "+", p.accent, bg), w, bg)))
 	}
 
-	searchBox := blank(1, bg) + seg(" 🔍 ", p.muted, p.panelAlt) + fitLine(searchView, w-6, p.panelAlt) + blank(1, bg)
-	lines = append(lines, zone.Mark("list:search", searchBox), "")
+	lines = append(lines, seg(strings.Repeat("─", w), p.line, bg))
 
-	// Rows.
 	rows := m.listRows()
-	area := h - listHeaderHeight - 1
+	area := h - listHeaderHeight
 	var rowLines []string
 
 	switch {
 	case !m.chatsLoaded:
-		rowLines = append(rowLines, "", center(seg("Loading chats…", p.muted, bg), w, bg))
+		rowLines = append(rowLines, "", seg(" Loading chats…", p.muted, bg))
 	case len(rows) == 0 && m.list.query() != "":
-		rowLines = append(rowLines, "", center(seg(clip("No chats match “"+sanitize(m.list.search.Value())+"”", w-2), p.muted, bg), w, bg))
+		rowLines = append(rowLines, "", seg(clip(" Nothing matches “"+sanitize(m.list.search.Value())+"”", w), p.muted, bg))
 	case len(rows) == 0:
 		rowLines = append(rowLines,
 			"",
-			center(bold("No chats yet", p.text, bg), w, bg),
+			bold(" No chats yet", p.text, bg),
 			"",
-			center(seg("Press n and type a @username,", p.muted, bg), w, bg),
-			center(seg("or share yours: @"+sanitize(me), p.muted, bg), w, bg),
+			seg(clip(" Press n and type a @username,", w), p.muted, bg),
+			seg(clip(" or share yours: @"+sanitize(m.user.User.Username), w), p.muted, bg),
 		)
 	default:
 		end := min(m.list.top+m.visibleRows(), len(rows))
@@ -468,41 +431,41 @@ func (m model) listView(w, h int) string {
 		}
 	}
 
-	rowsBlock := zone.Mark("list:rows", fitBlock(strings.Join(rowLines, "\n"), w, area, bg))
-	lines = append(lines, rowsBlock)
-
-	hints := "↑↓ Move  Enter Open  / Search  n New chat  N New group  v Saved  m Menu  s Settings  t Theme  q Quit"
-
-	switch {
-	case m.list.searching && w < 60:
-		hints = "Enter Open  Esc Cancel"
-	case m.list.searching:
-		hints = "Type to search, @username to start a chat   Enter Open   Esc Cancel"
-	case w < 60:
-		hints = "/ Search  n New  m Menu  s Settings  q Quit"
-	}
-
-	// Next to a chat or Settings, messages show on their side only.
-	if m.wide() && (m.chat != nil || m.settings != nil) {
-		lines = append(lines, fitLine(seg(" "+clip(hints, w-2), p.muted, bg), w, bg))
-	} else {
-		lines = append(lines, m.hintLine(hints, w, bg))
-	}
+	lines = append(lines, zone.Mark("list:rows", fitBlock(strings.Join(rowLines, "\n"), w, area, bg)))
 
 	return fitBlock(strings.Join(lines, "\n"), w, h, bg)
 }
 
-// listRowView draws one chat (or the "start a chat" offer): two lines and
-// a spacer.
+// listRowView draws one row: two lines and a space. The bar on the left
+// marks the row the keys act on (the list has the focus) or else the open
+// chat.
 func (m model) listRowView(r listRow, cursor bool, w int) string {
 	p := m.pal
-	bg := p.surface
+	bg := p.bg
+	open := r.chat != nil && m.chat != nil && r.chat.ID == m.chat.id
+	listFocused := m.focus == paneList || !m.wide()
+
+	// What the keys act on: the cursor while the list has the focus, else
+	// the open chat.
+	marked := cursor && listFocused || open && !listFocused
+	bar := blank(1, bg)
+	nameFg := p.text
 
 	switch {
-	case r.chat != nil && m.chat != nil && r.chat.ID == m.chat.id:
-		bg = p.accentSoft
-	case cursor && (m.focus == paneList || !m.wide()):
-		bg = p.hover
+	case marked:
+		bar = seg("▌", p.accent, bg)
+		nameFg = p.accent
+	case open:
+		bar = seg("▏", p.muted, bg)
+	}
+
+	inner := w - 2
+	two := func(left1, right1, left2, right2 string) string {
+		return strings.Join([]string{
+			bar + blank(1, bg) + row(left1, right1, inner, bg),
+			bar + blank(1, bg) + row(left2, right2, inner, bg),
+			blank(w, bg),
+		}, "\n")
 	}
 
 	if r.linkKind != "" {
@@ -512,72 +475,52 @@ func (m model) listRowView(r listRow, cursor bool, w int) string {
 			label, sub = "Open @"+r.linkValue+"'s profile", "Start a chat with them"
 		}
 
-		return strings.Join([]string{
-			row(blank(1, bg)+seg(" 🔗 ", p.onAccent, p.accent)+blank(1, bg)+bold(clip(label, w-8), p.text, bg), "", w, bg),
-			blank(5, bg) + seg(clip(sub, w-6), p.muted, bg),
-			blank(w, p.surface),
-		}, "\n")
+		return two(bold(clip(label, inner), nameFg, bg), "", seg(clip(sub, inner), p.muted, bg), "")
 	}
 
-	if r.match != nil {
-		match := r.match
+	if match := r.match; match != nil {
 		who := ""
 
 		switch {
 		case match.message.SenderID == m.user.User.ID:
-			who = "You: "
+			who = "you: "
 		case match.chat.Type == "group":
-			who = "@" + match.message.SenderUsername + ": "
+			who = sanitize(match.message.SenderUsername) + ": "
 		}
 
-		return strings.Join([]string{
-			row(blank(1, bg)+seg(" 🔍 ", p.muted, bg)+bold(clip(sanitize(m.chatName(match.chat)), w-16), p.text, bg),
-				seg(formatChatDate(match.message.CreatedAt), p.muted, bg)+blank(1, bg), w, bg),
-			blank(5, bg) + seg(clip(oneLine(sanitize(who+match.text)), w-6), p.muted, bg),
-			blank(w, p.surface),
-		}, "\n")
+		return two(
+			bold(clip(sanitize(m.listTitle(match.chat)), inner-8), nameFg, bg),
+			seg(formatChatDate(match.message.CreatedAt), p.muted, bg),
+			seg(clip(oneLine(sanitize(who+match.text)), inner), p.muted, bg), "",
+		)
 	}
 
 	if r.chat == nil {
-		label := "Start a chat with @" + r.username
 		sub := "Find this user by their exact username"
 
 		if m.list.starting {
 			sub = "Starting…"
 		}
 
-		return strings.Join([]string{
-			row(blank(1, bg)+seg(" ✚ ", p.onAccent, p.accent)+blank(1, bg)+bold(clip(label, w-8), p.text, bg), "", w, bg),
-			blank(5, bg) + seg(clip(sub, w-6), p.muted, bg),
-			blank(w, p.surface),
-		}, "\n")
+		return two(bold(clip("Start a chat with @"+r.username, inner), nameFg, bg), "", seg(clip(sub, inner), p.muted, bg), "")
 	}
 
 	chat := *r.chat
 	group := chat.Type == "group"
-	name := bold(sanitize(m.chatName(chat)), p.text, bg)
+	unread := chat.UnreadCount > 0
 
-	if group {
-		name = seg("👥 ", p.muted, bg) + name
-	}
+	name := sanitize(m.listTitle(chat))
+	nameStyle := seg(name, nameFg, bg)
 
-	if chat.Type == "saved" {
-		name = seg("🔖 ", p.muted, bg) + name
-	}
-
-	if chat.IsDeveloper {
-		name += blank(1, bg) + devBadge()
-	}
-
-	if chat.Muted {
-		name += seg(" 🔕", p.muted, bg)
+	if unread || marked {
+		nameStyle = bold(name, nameFg, bg)
 	}
 
 	if !group && m.keyChanged[chat.UserID] || group && m.groupDistrusted[chat.ID] {
-		name += seg(" ⚠", p.danger, bg)
+		nameStyle = bold("! ", p.danger, bg) + nameStyle
 	}
 
-	// Time of the last message, ticks for own messages.
+	// Time of the last message, ticks for own ones.
 	last := chat.LastMessage
 	stamp := chat.Created
 
@@ -585,26 +528,17 @@ func (m model) listRowView(r listRow, cursor bool, w int) string {
 		stamp = last.CreatedAt
 	}
 
-	timeColor := p.muted
+	timeFg := p.muted
 
-	if chat.UnreadCount > 0 {
-		timeColor = p.accent
+	if unread && !chat.Muted {
+		timeFg = p.accent
 	}
 
-	right := seg(formatChatDate(stamp), timeColor, bg) + blank(1, bg)
+	right1 := seg(formatChatDate(stamp), timeFg, bg)
 	own := last != nil && last.SenderID == m.user.User.ID
 
 	if own && chat.Type != "saved" {
-		right = m.ticks(chat, last.CreatedAt, bg) + blank(1, bg) + right
-	}
-
-	line1 := row(blank(1, bg)+avatar(m.chatName(chat))+blank(1, bg)+name, right, w, bg)
-
-	// Presence dot under the avatar; preview; pin or unread count.
-	dot := blank(3, bg)
-
-	if !group && m.connStatus == connOnline && m.presence[chat.UserID].online {
-		dot = seg(" ● ", p.online, bg)
+		right1 = m.ticks(chat, last.CreatedAt, bg) + blank(1, bg) + right1
 	}
 
 	var preview string
@@ -621,50 +555,62 @@ func (m model) listRowView(r listRow, cursor bool, w int) string {
 		preview = italic("No messages yet", p.muted, bg)
 	default:
 		text := oneLine(sanitize(plainText(m.textOf(chat, last.ID, last.SenderID, last.Content))))
+		who := ""
 
 		switch {
 		case chat.Type == "saved":
 		case own:
-			preview = seg("You: ", p.textSoft, bg)
+			who = "you: "
 		case group:
-			preview = seg("@"+sanitize(last.SenderUsername)+": ", p.textSoft, bg)
+			who = sanitize(last.SenderUsername) + ": "
 		}
 
-		preview += seg(text, p.muted, bg)
+		preview = seg(who+text, p.muted, bg)
 	}
 
-	var badge string
+	// Mentions, people asking to join, unread count; muted ones dim.
+	var badges []string
 
 	if chat.UnreadMentions > 0 {
-		badge += bold(" @ ", p.onAccent, p.accent) + blank(1, bg)
+		badges = append(badges, bold("@", p.accent, bg))
 	}
 
 	if chat.JoinRequests > 0 {
-		badge += bold(fmt.Sprintf(" +%d ", chat.JoinRequests), p.accent, p.accentSoft) + blank(1, bg)
+		badges = append(badges, bold(fmt.Sprintf("+%d", chat.JoinRequests), p.accent, bg))
 	}
 
-	switch {
-	case chat.UnreadCount > 0:
+	if unread {
 		count := fmt.Sprint(chat.UnreadCount)
 
 		if chat.UnreadCount > 99 {
 			count = "99+"
 		}
 
-		fg, badgeBg := p.onAccent, p.accent
-
 		if chat.Muted {
-			fg, badgeBg = p.bg, p.muted
+			badges = append(badges, seg(count, p.muted, bg))
+		} else {
+			badges = append(badges, bold(count, p.accent, bg))
 		}
-
-		badge += bold(" "+count+" ", fg, badgeBg) + blank(1, bg)
-	case chat.Pinned:
-		badge += seg("📌", p.muted, bg) + blank(1, bg)
 	}
 
-	line2 := row(blank(1, bg)+dot+blank(1, bg)+preview, badge, w, bg)
+	if chat.Muted {
+		badges = append(badges, seg("muted", p.muted, bg))
+	}
 
-	return strings.Join([]string{line1, line2, blank(w, p.surface)}, "\n")
+	return two(nameStyle, right1, preview, strings.Join(badges, blank(1, bg)))
+}
+
+// listTitle: the name in the list and the chat's header, "# group" for
+// groups.
+func (m model) listTitle(chat Chat) string {
+	switch chat.Type {
+	case "group":
+		return "# " + m.chatName(chat)
+	case "saved":
+		return "Saved messages"
+	}
+
+	return m.chatName(chat)
 }
 
 // ticks: ✓ sent, ✓✓ read by the other member (if read receipts are on).

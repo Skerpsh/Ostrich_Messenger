@@ -75,15 +75,24 @@ func TestGroupViews(t *testing.T) {
 		checkView(t, "group", view, size[0], size[1])
 		plain := ansi.Strip(view)
 
-		for _, want := range []string{"Ostrich team", "@alice is typing…", "@alice added you", "Welcome to the group!", "Hello from carol", "@carol"} {
+		for _, want := range []string{"Ostrich team", "@alice is typing…", "@alice added you", "Welcome to the group!", "Hello from carol", "carol"} {
 			// A small terminal shows only the newest messages.
 			if size[0] == 140 && !strings.Contains(plain, want) {
 				t.Errorf("%dx%d: %q not shown:\n%s", size[0], size[1], want, plain)
 			}
 		}
 
-		// The sender's name shows once over their bubbles in a row.
-		if n := strings.Count(plain, "@alice\n"); strings.Count(plain, "Second one") == 1 && n > 1 {
+		// The sender's name shows once over their messages in a row: lines
+		// of the chat (after the list's border) that start with it.
+		n := 0
+
+		for _, line := range strings.Split(plain, "\n") {
+			if parts := strings.Split(line, "│"); len(parts) > 2 && strings.HasPrefix(parts[2], "  alice ") {
+				n++
+			}
+		}
+
+		if strings.Count(plain, "Second one") == 1 && n > 1 {
 			t.Errorf("sender shown %d times", n)
 		}
 
@@ -168,7 +177,7 @@ func TestGroupSendAndList(t *testing.T) {
 	_ = group2
 	list := ansi.Strip(m2.listView(50, 40))
 
-	if !strings.Contains(list, "@carol: Hello from carol") || !strings.Contains(list, "Ostrich team") {
+	if !strings.Contains(list, "carol: Hello from carol") || !strings.Contains(list, "Ostrich team") {
 		t.Fatalf("list:\n%s", list)
 	}
 }

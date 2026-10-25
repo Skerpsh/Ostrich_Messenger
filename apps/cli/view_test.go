@@ -393,6 +393,9 @@ func TestMouse(t *testing.T) {
 		t.Fatalf("accent %s", m.cfg.Accent)
 	}
 
+	// The theme buttons show with Ostrich's own colors.
+	m.cfg.Colors = "ostrich"
+	m.applyTheme()
 	m = click(t, m, "set:theme:light", tea.MouseButtonLeft)
 
 	if m.pal.mode != themeLight {
@@ -406,7 +409,8 @@ func TestMouse(t *testing.T) {
 		t.Fatal("settings not closed")
 	}
 
-	m = click(t, m, "chat:safety", tea.MouseButtonLeft)
+	m.focus = paneChat
+	m = press(m, "ctrl+k")
 
 	if !m.safetyOpen {
 		t.Fatal("safety code not shown")
@@ -508,7 +512,7 @@ func TestOutboxForwardDrafts(t *testing.T) {
 }
 
 func TestMarkupLines(t *testing.T) {
-	p := newPalette(themeDark, defaultAccent)
+	p := newPalette(false, themeDark, defaultAccent)
 
 	lines := markupLines("**bold** words that wrap around and a https://example.org/very/long/link", 20, p.text, p.bg, p.panelAlt, p.accent)
 
@@ -592,7 +596,7 @@ func TestAttachmentFiles(t *testing.T) {
 		t.Fatal("a missing file was accepted")
 	}
 
-	if got := attachmentsLabel([]attachment{{Mime: "image/png"}, {Mime: "image/jpeg"}}); got != "🖼 2 photos" {
+	if got := attachmentsLabel([]attachment{{Mime: "image/png"}, {Mime: "image/jpeg"}}); got != "2 photos" {
 		t.Fatalf("label %q", got)
 	}
 

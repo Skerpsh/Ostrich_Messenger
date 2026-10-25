@@ -398,7 +398,7 @@ func TestCallEntryVector(t *testing.T) {
 		t.Fatalf("written back differently:\n%s\n%s", got, v.Payload)
 	}
 
-	if got := callText(*p.call, false); got != "📞 Incoming call · 4:12" {
+	if got := callText(*p.call, false); got != "Incoming call · 4:12" {
 		t.Fatalf("text: %q", got)
 	}
 
@@ -412,7 +412,7 @@ func TestCallEntryVector(t *testing.T) {
 		t.Fatalf("written back differently:\n%s\n%s", got, v.Video)
 	}
 
-	if got := callText(*video.call, false); got != "🎥 Missed video call" {
+	if got := callText(*video.call, false); got != "Missed video call" {
 		t.Fatalf("text: %q", got)
 	}
 

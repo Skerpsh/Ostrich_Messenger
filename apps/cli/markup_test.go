@@ -72,7 +72,7 @@ func TestPayload(t *testing.T) {
 		t.Fatalf("voice message changed: %+v", again)
 	}
 
-	if got := attachmentsLabel(voice.attachments); got != "🎤 Voice message (0:07)" {
+	if got := attachmentsLabel(voice.attachments); got != "Voice message (0:07)" {
 		t.Fatalf("voice label %q", got)
 	}
 

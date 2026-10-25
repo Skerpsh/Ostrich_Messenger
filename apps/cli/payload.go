@@ -254,25 +254,23 @@ func decodePayload(plain string) payload {
 
 // callText: the call entry from this user's side, like the app's.
 func callText(c callEntry, own bool) string {
-	icon, kind := "📞", "call"
+	kind := "call"
 
 	if c.Video {
-		icon, kind = "🎥", "video call"
+		kind = "video call"
 	}
 
 	switch {
 	case c.Outcome == "answered" && own:
-		return icon + " Outgoing " + kind + " · " + formatDuration(c.Duration)
+		return "Outgoing " + kind + " · " + formatDuration(c.Duration)
 	case c.Outcome == "answered":
-		return icon + " Incoming " + kind + " · " + formatDuration(c.Duration)
-	case c.Outcome == "declined" && own:
-		return icon + " Declined"
+		return "Incoming " + kind + " · " + formatDuration(c.Duration)
 	case c.Outcome == "declined":
-		return icon + " Declined " + kind
+		return strings.ToUpper(kind[:1]) + kind[1:] + " declined"
 	case own:
-		return icon + " No answer"
+		return strings.ToUpper(kind[:1]) + kind[1:] + ", no answer"
 	default:
-		return icon + " Missed " + kind
+		return "Missed " + kind
 	}
 }
 

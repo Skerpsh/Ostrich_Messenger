@@ -9,7 +9,9 @@ import (
 // Preferences of this computer, like the web's per-device settings:
 // ~/.config/ostrich/settings.json (or the platform's config directory).
 type config struct {
-	// "system", "light" or "dark".
+	// "terminal" (its own colors) or "ostrich" (the apps' theme).
+	Colors string `json:"colors"`
+	// Ostrich's theme: "system", "light" or "dark".
 	Theme string `json:"theme"`
 	// An accent id (theme.go).
 	Accent string `json:"accent"`
@@ -27,7 +29,7 @@ func configPath() (string, bool) {
 }
 
 func loadConfig() config {
-	cfg := config{Theme: "system", Accent: defaultAccent, Bell: true}
+	cfg := config{Colors: "terminal", Theme: "system", Accent: defaultAccent, Bell: true}
 
 	if path, ok := configPath(); ok {
 		if data, err := os.ReadFile(path); err == nil {
@@ -39,6 +41,10 @@ func loadConfig() config {
 	case "system", "light", "dark":
 	default:
 		cfg.Theme = "system"
+	}
+
+	if cfg.Colors != "ostrich" {
+		cfg.Colors = "terminal"
 	}
 
 	cfg.Accent = findAccent(cfg.Accent).id

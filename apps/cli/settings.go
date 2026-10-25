@@ -188,7 +188,21 @@ func (m model) settingsRows() []settingsRow {
 
 	rows = append(rows,
 		section("Appearance"),
-		settingsRow{kind: rowThemes, id: "theme", icon: "◐", label: "Theme"},
+		settingsRow{kind: rowToggle, id: "colors", icon: "◐", label: "Use the terminal's colors", on: m.cfg.Colors != "ostrich",
+			hint: "Its background and palette, so Ostrich fits its theme. Off: Ostrich's own light or dark theme.",
+			action: func(m *model) tea.Cmd {
+				m.cfg.Colors = map[bool]string{true: "ostrich", false: "terminal"}[m.cfg.Colors != "ostrich"]
+				m.cfg.save()
+				m.applyTheme()
+				return nil
+			}},
+	)
+
+	if m.cfg.Colors == "ostrich" {
+		rows = append(rows, settingsRow{kind: rowThemes, id: "theme", icon: "◐", label: "Theme"})
+	}
+
+	rows = append(rows,
 		settingsRow{kind: rowAccents, id: "accent", icon: "●", label: "Accent color", value: findAccent(m.cfg.Accent).name},
 
 		section("Account"),
@@ -859,7 +873,6 @@ func (m model) settingsBody(w int) (lines []string, rowAt []int) {
 			}
 
 			put(blank(cw, card))
-			put(center(avatar(u.Username), cw, card))
 			put(center(name, cw, card))
 			put(center(seg(photo, p.muted, card), cw, card))
 			put(center(seg("Friends start chats with you by your username.", p.muted, card), cw, card))
@@ -1088,7 +1101,7 @@ func (m *model) scrollSettings() {
 	}
 
 	lines, rowAt := m.settingsBody(m.paneWidth())
-	area := m.height - 3
+	area := m.innerHeight() - 2
 
 	if s.cursor >= len(rowAt) {
 		return
@@ -1127,17 +1140,12 @@ func (m model) settingsView(w, h int) string {
 		seg(strings.Repeat("─", w), p.line, bg),
 	}
 
+	// The key hints are under the frame (ui_frame.go).
 	lines, _ := m.settingsBody(w)
-	area := h - 3
+	area := h - 2
 	scroll := min(m.settings.scroll, max(len(lines)-area, 0))
 	end := min(scroll+area, len(lines))
 	body := zone.Mark("set:body", fitBlock(strings.Join(lines[scroll:end], "\n"), w, area, p.bg))
 
-	hints := "↑↓ Move  Enter Select  ←→ Change  Esc Close"
-
-	if m.settings.form != "" {
-		hints = "↑↓/Tab Field  Enter Next / Submit  Esc Cancel"
-	}
-
-	return strings.Join(append(header, body, m.hintLine(hints, w, bg)), "\n")
+	return strings.Join(append(header, body), "\n")
 }

@@ -338,18 +338,18 @@ func attachmentsLabel(list []attachment) string {
 	case len(list) == 0:
 		return ""
 	case len(list) == 1 && isImage(list[0].Mime):
-		return "🖼 Photo"
+		return "Photo"
 	case len(list) == 1 && isVoice(list[0]):
-		return "🎤 Voice message (" + formatDuration(list[0].Duration) + ")"
+		return "Voice message (" + formatDuration(list[0].Duration) + ")"
 	case len(list) == 1:
-		return "📎 " + list[0].Name
+		return list[0].Name
 	}
 
 	for _, a := range list {
 		if !isImage(a.Mime) {
-			return fmt.Sprintf("📎 %d files", len(list))
+			return fmt.Sprintf("%d files", len(list))
 		}
 	}
 
-	return fmt.Sprintf("🖼 %d photos", len(list))
+	return fmt.Sprintf("%d photos", len(list))
 }

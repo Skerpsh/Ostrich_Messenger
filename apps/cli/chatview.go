@@ -10,9 +10,12 @@ import (
 	zone "github.com/lrstanley/bubblezone"
 )
 
-// Drawing the open chat: header, message bubbles, banners, composer.
+// Drawing the open chat: its header, the messages one after another (who
+// and when on a line, then what they wrote), what is going on (a reply, a
+// warning), the line to write in. No bubbles and no fills: the left bar
+// marks the chosen message.
 
-// Messages of one sender closer than this are drawn as one group.
+// Messages of one sender closer than this go under one name.
 const groupGap = 5 * time.Minute
 
 // lineMeta tells what a line of the messages area shows: a message
@@ -31,6 +34,7 @@ type chatLinesResult struct {
 func (m model) chatLines(w int) chatLinesResult {
 	c := m.chat
 	p := m.pal
+	bg := p.bg
 	chat, _ := m.chatByID(c.id)
 	var out chatLinesResult
 
@@ -40,8 +44,14 @@ func (m model) chatLines(w int) chatLinesResult {
 	}
 
 	separator := lineMeta{message: -1}
+	label := func(text string, fg lipgloss.Color) string {
+		text = " " + text + " "
+		side := max((w-2-width(text))/2, 1)
+		return blank(1, bg) + seg(strings.Repeat("─", side), p.line, bg) + seg(text, fg, bg) +
+			seg(strings.Repeat("─", max(w-2-side-width(text), 1)), p.line, bg) + blank(1, bg)
+	}
+
 	unread := m.unreadLine()
-	content := w - 2
 	shown := m.shown()
 
 	for i, message := range shown {
@@ -55,25 +65,21 @@ func (m model) chatLines(w int) chatLinesResult {
 		newDay := prev == nil || at == nil || dayOf(parseTime(&prev.CreatedAt)) != dayOf(at)
 
 		if newDay {
-			add(blank(w, p.bg), separator)
-			add(center(seg(" "+formatDayLabel(message.CreatedAt)+" ", p.muted, p.panel), w, p.bg), separator)
+			if i > 0 {
+				add(blank(w, bg), separator)
+			}
+
+			add(label(formatDayLabel(message.CreatedAt), p.muted), separator)
 		}
 
 		if i == unread {
-			label := seg(" Unread messages ", p.accent, p.bg)
-			rule := max((content-width(label))/2, 0)
-			add(blank(1, p.bg)+seg(strings.Repeat("─", rule), p.accent, p.bg)+label+
-				seg(strings.Repeat("─", max(content-rule-width(label), 0)), p.accent, p.bg)+blank(1, p.bg), separator)
+			add(label("New messages", p.accent), separator)
 		}
 
-		// A group event: a line in the middle.
 		if message.Kind == "system" {
-			if !newDay {
-				add(blank(w, p.bg), separator)
-			}
-
+			add(blank(w, bg), separator)
 			text := clip(sanitize(systemText(message.SenderID, message.SenderUsername, message.Content, m.user.User.ID)), w-4)
-			add(center(seg(" "+text+" ", p.muted, p.panel), w, p.bg), lineMeta{message: i})
+			add(center(italic(text, p.muted, bg), w, bg), lineMeta{message: i})
 
 			continue
 		}
@@ -81,17 +87,14 @@ func (m model) chatLines(w int) chatLinesResult {
 		grouped := !newDay && i != unread && prev != nil && prev.SenderID == message.SenderID &&
 			prev.Kind != "system" && at != nil && at.Sub(*parseTime(&prev.CreatedAt)) < groupGap
 
-		if !grouped && !newDay {
-			add(blank(w, p.bg), separator)
+		if !grouped {
+			add(blank(w, bg), separator)
 		}
 
-		// Groups: who wrote it, over the first of their bubbles.
-		if chat.Type == "group" && !grouped && message.SenderID != m.user.User.ID {
-			name := "@" + sanitize(m.memberName(message.SenderID, message.SenderUsername))
-			add(blank(2, p.bg)+bold(clip(name, content-2), avatarColor(name), p.bg), lineMeta{message: i})
-		}
+		// Under one name, the time shows again only when it is another.
+		quiet := grouped && formatTime(prev.CreatedAt) == formatTime(message.CreatedAt)
 
-		for _, line := range m.bubble(chat, message, content) {
+		for _, line := range m.bubble(chat, message, grouped, quiet, w) {
 			add(line.text, lineMeta{message: i, quote: line.quote})
 		}
 	}
@@ -112,15 +115,13 @@ type bubbleLine struct {
 	quote bool
 }
 
-// bubble draws one message, aligned in a line of w cells plus a 1-cell
-// margin on each side (the left one marks the selected message).
-func (m model) bubble(chat Chat, message Message, w int) []bubbleLine {
+// bubble draws one message in w cells: the bar (chosen or found), a
+// space, the lines.
+func (m model) bubble(chat Chat, message Message, grouped, quiet bool, w int) []bubbleLine {
 	c := m.chat
 	p := m.pal
 	own := message.SenderID == m.user.User.ID
-	selected := c.selecting && c.selectedID == message.ID
 	sending := m.outgoingState(message.ID)
-	highlighted := c.highlight == message.ID
 	read := own && chat.PeerLastReadAt != nil && !later(&message.CreatedAt, chat.PeerLastReadAt)
 
 	var reactions []string
@@ -137,197 +138,58 @@ func (m model) bubble(chat Chat, message Message, w int) []bubbleLine {
 
 	key := strings.Join([]string{
 		message.ID, message.Content, edited, strings.Join(reactions, ","),
-		fmt.Sprint(read, w, p.mode, p.accent, chat.PublicKey, sending), m.letterKey(message.ID),
+		fmt.Sprint(read, w, grouped, quiet, p.mode, p.terminal, p.accent, chat.PublicKey, sending), m.letterKey(message.ID),
 	}, "|")
 
 	body, ok := c.cache[key]
 
 	if !ok {
-		body = m.drawBubble(chat, message, own, read, sending, w)
+		body = m.drawMessage(chat, message, own, read, grouped, quiet, sending, w-3)
 		c.cache[key] = body
 	}
 
-	marker := blank(1, p.bg)
+	bar := blank(1, p.bg)
 
 	switch {
-	case selected:
-		marker = seg("▌", p.accent, p.bg)
-	case highlighted:
-		marker = seg("▌", p.textSoft, p.bg)
+	case c.selecting && c.selectedID == message.ID:
+		bar = seg("▌", p.accent, p.bg)
+	case c.highlight == message.ID:
+		bar = seg("▌", p.muted, p.bg)
 	}
 
 	lines := make([]bubbleLine, len(body))
-	quoteLines := 0
+	quoteLine := -1
 
 	if message.ReplyTo != nil {
-		// Top edge, then the two quote lines.
-		quoteLines = 3
+		// The quote: under the name, unless grouped.
+		quoteLine = 1
+
+		if grouped {
+			quoteLine = 0
+		}
 	}
 
 	for i, line := range body {
-		lines[i] = bubbleLine{
-			text:  marker + line + blank(1, p.bg),
-			quote: i > 0 && i < quoteLines,
-		}
+		lines[i] = bubbleLine{text: bar + blank(1, p.bg) + fitLine(line, w-3, p.bg) + blank(1, p.bg), quote: i == quoteLine}
 	}
 
 	return lines
 }
 
-// drawBubble draws the bubble itself, aligned in w cells.
-func (m model) drawBubble(chat Chat, message Message, own, read bool, sending string, w int) []string {
+// drawMessage: "name ... 14:05 ✓✓", then the message, in w cells. A
+// message under the previous one's name has its time on its first line,
+// where it fits.
+func (m model) drawMessage(chat Chat, message Message, own, read, grouped, quiet bool, sending string, w int) []string {
 	p := m.pal
-	fill, fg, meta := p.panel, p.text, p.muted
-
-	if own {
-		fill, fg, meta = p.accent, p.onAccent, p.onAccent
-	}
-
-	maxInner := max(min(w*72/100, 64), 12)
+	bg := p.bg
 	shown := m.show(chat, message.ID, message.SenderID, message.Content)
 	text, status := sanitize(shown.text), shown.status
 
-	var content []string
-
-	// The quoted message.
-	if reply := message.ReplyTo; reply != nil {
-		quote := oneLine(sanitize(plainText(m.textOf(chat, reply.ID, reply.SenderID, reply.Content))))
-		name := bold(clip(m.quoteSender(reply), maxInner-2), fg, fill)
-
-		if reply.SenderIsDeveloper {
-			name += blank(1, fill) + devBadge()
-		}
-
-		content = append(content,
-			seg("▎", fg, fill)+name,
-			seg("▎", fg, fill)+seg(clip(quote, maxInner-1), meta, fill),
-		)
-	}
-
-	for _, a := range shown.attachments {
-		if isVoice(a) {
-			length := formatDuration(a.Duration)
-			label := "🎤 " + waveform(a.Waveform, min(32, maxInner-len(length)-6)) + " " + length
-			content = append(content, bold(clip(label, maxInner), fg, fill))
-
-			continue
-		}
-
-		icon := "📎 "
-
-		if isImage(a.Mime) {
-			icon = "🖼 "
-		}
-
-		label := icon + clip(sanitize(a.Name), maxInner-14) + " · " + formatSize(a.Size)
-		content = append(content, bold(clip(label, maxInner), fg, fill))
-	}
-
-	if l := shown.link; l != nil {
-		// The address's own host, not only the name the sender's app put in.
-		site := l.URL
-
-		if u, err := url.Parse(l.URL); err == nil && u.Hostname() != "" {
-			site = strings.TrimPrefix(u.Hostname(), "www.")
-		}
-
-		if l.Site != "" && !strings.EqualFold(l.Site, site) {
-			site = l.Site + " · " + site
-		}
-
-		content = append(content,
-			seg("▎", fg, fill)+bold(clip("🔗 "+sanitize(site), maxInner-1), fg, fill),
-			seg("▎", fg, fill)+seg(clip(sanitize(l.Title), maxInner-1), fg, fill),
-		)
-	}
-
-	if message.SentAfterDays != nil {
-		noteFg := p.accent
-
-		if own {
-			noteFg = fg
-		}
-
-		for _, line := range wrap(sentAutomatically(message), maxInner) {
-			content = append(content, bold(line, noteFg, fill))
-		}
-	}
-
-	if shown.sealed != nil && shown.opened {
-		noteFg := p.accent
-
-		if own {
-			noteFg = fg
-		}
-
-		content = append(content, bold(clip(openedNote(*shown.sealed), maxInner), noteFg, fill))
-	}
-
-	if shown.forwardedFrom != "" {
-		forwardFg := p.accent
-
-		if own {
-			forwardFg = fg
-		}
-
-		content = append(content, bold(clip("Forwarded from @"+sanitize(shown.forwardedFrom), maxInner), forwardFg, fill))
-	}
-
-	switch {
-	case status == decryptOK && shown.sealed != nil && !shown.opened:
-		for i, line := range m.envelopeLines(message.ID, *shown.sealed, message.DeliverAt != nil) {
-			if i == 0 {
-				content = append(content, bold(clip(line, maxInner), fg, fill))
-				continue
-			}
-
-			for _, part := range wrap(line, maxInner) {
-				content = append(content, seg(part, meta, fill))
-			}
-		}
-	case status == decryptOK && shown.call != nil:
-		content = append(content, bold(clip(callText(*shown.call, own), maxInner), fg, fill))
-	case status == decryptOK && strings.TrimSpace(text) == "" && len(shown.attachments) > 0:
-		// Only files.
-	case status == decryptOK:
-		codeBg, linkFg := p.panelAlt, p.accent
-
-		if own {
-			codeBg, linkFg = lipgloss.Color(blend(string(p.onAccent), string(p.accent), 0.18)), fg
-		}
-
-		content = append(content, markupLines(text, maxInner, fg, fill, codeBg, linkFg)...)
-	case status == decryptFailed:
-		for _, line := range wrap(text, maxInner) {
-			content = append(content, italic(line, meta, fill))
-		}
-	default:
-		for _, line := range wrap(text, maxInner) {
-			content = append(content, seg(line, fg, fill))
-		}
-	}
-
-	if status == decryptOK && shown.heir != "" {
-		for i, line := range heirLines(shown.heir, own, sanitize(message.SenderUsername)) {
-			for _, part := range wrap(line, maxInner) {
-				if i == 2 {
-					content = append(content, seg(part, meta, fill))
-				} else {
-					content = append(content, bold(part, fg, fill))
-				}
-			}
-		}
-	}
-
-	if len(message.Reactions) > 0 {
-		content = append(content, m.reactionChips(message.Reactions, fg, fill))
-	}
-
-	// not encrypted · edited · 14:05 ✓✓
+	// edited · 14:05 ✓✓
 	var info []string
 
 	if status == decryptPlain {
-		info = append(info, "🔓 not encrypted")
+		info = append(info, "not encrypted")
 	}
 
 	if status == decryptOK && isLegacyMessage(message.Content) {
@@ -339,56 +201,149 @@ func (m model) drawBubble(chat Chat, message Message, own, read bool, sending st
 	}
 
 	info = append(info, formatTime(message.CreatedAt))
-	metaLine := seg(strings.Join(info, " · "), meta, fill)
+	meta := seg(strings.Join(info, " · "), p.muted, bg)
 
 	switch {
 	case sending == "failed":
-		metaLine += blank(1, fill) + bold("⚠ Not sent", meta, fill)
+		meta += blank(1, bg) + bold("! not sent", p.danger, bg)
 	case sending != "":
-		metaLine += blank(1, fill) + seg("🕓", meta, fill)
-	case own:
-		tick := "✓"
+		meta += seg(" sending…", p.muted, bg)
+	case own && chat.Type != "saved" && read:
+		meta += seg(" ✓✓", p.accent, bg)
+	case own && chat.Type != "saved":
+		meta += seg(" ✓", p.muted, bg)
+	}
 
-		if read {
-			tick = "✓✓"
+	var lines []string
+
+	if !grouped {
+		name := bold("you", p.accent, bg)
+
+		if !own {
+			sender := sanitize(m.memberName(message.SenderID, message.SenderUsername))
+
+			if chat.Type != "group" {
+				sender = sanitize(m.chatName(chat))
+			}
+
+			name = bold(clip(sender, w-width(meta)-2), avatarColor(sender), bg)
 		}
 
-		metaLine += blank(1, fill) + bold(tick, meta, fill)
+		lines = append(lines, row(name, meta, w, bg))
 	}
 
-	inner := width(metaLine)
+	dim := func(s string) string { return seg(clip(s, w), p.muted, bg) }
 
-	for _, line := range content {
-		inner = max(inner, width(line))
+	if reply := message.ReplyTo; reply != nil {
+		quote := oneLine(sanitize(plainText(m.textOf(chat, reply.ID, reply.SenderID, reply.Content))))
+		lines = append(lines, dim("↳ "+m.quoteSender(reply)+": "+quote))
 	}
 
-	inner = min(inner, maxInner)
-
-	lines := []string{seg("▗"+strings.Repeat("▄", inner+2)+"▖", fill, p.bg)}
-
-	for _, line := range content {
-		lines = append(lines, blank(2, fill)+fitLine(line, inner, fill)+blank(2, fill))
+	if shown.forwardedFrom != "" {
+		lines = append(lines, italic(clip("forwarded from @"+sanitize(shown.forwardedFrom), w), p.muted, bg))
 	}
 
-	lines = append(lines,
-		blank(2, fill)+alignRight(metaLine, inner, fill)+blank(2, fill),
-		seg("▝"+strings.Repeat("▀", inner+2)+"▘", fill, p.bg),
-	)
+	for _, a := range shown.attachments {
+		if isVoice(a) {
+			lines = append(lines, seg("▪ ", p.accent, bg)+seg(clip("voice message · "+formatDuration(a.Duration), w-2), p.text, bg))
+			continue
+		}
 
-	pad := w - (inner + 4)
+		lines = append(lines, seg("▪ ", p.accent, bg)+seg(clip(sanitize(a.Name), w-14), p.text, bg)+seg(" · "+formatSize(a.Size), p.muted, bg))
+	}
 
-	for i, line := range lines {
-		if own {
-			lines[i] = blank(pad, p.bg) + line
-		} else {
-			lines[i] = line + blank(pad, p.bg)
+	if l := shown.link; l != nil {
+		// The address's own host, not only the name the sender's app put in.
+		site := l.URL
+
+		if u, err := url.Parse(l.URL); err == nil && u.Hostname() != "" {
+			site = strings.TrimPrefix(u.Hostname(), "www.")
+		}
+
+		line := seg("▪ ", p.accent, bg) + seg(clip(sanitize(site), w-2), p.text, bg)
+
+		if title := sanitize(l.Title); title != "" {
+			line += seg(clip(" — "+title, max(w-2-width(site), 0)), p.muted, bg)
+		}
+
+		lines = append(lines, line)
+	}
+
+	if message.SentAfterDays != nil {
+		for _, part := range wrap(sentAutomatically(message), w) {
+			lines = append(lines, seg(part, p.accent, bg))
+		}
+	}
+
+	if shown.sealed != nil && shown.opened {
+		lines = append(lines, seg(clip(openedNote(*shown.sealed), w), p.accent, bg))
+	}
+
+	switch {
+	case status == decryptOK && shown.sealed != nil && !shown.opened:
+		for i, line := range m.envelopeLines(message.ID, *shown.sealed, message.DeliverAt != nil) {
+			for _, part := range wrap(line, w) {
+				if i == 0 {
+					lines = append(lines, bold(part, p.accent, bg))
+				} else {
+					lines = append(lines, seg(part, p.muted, bg))
+				}
+			}
+		}
+	case status == decryptOK && shown.call != nil:
+		lines = append(lines, italic(clip(callText(*shown.call, own), w), p.muted, bg))
+	case status == decryptOK && strings.TrimSpace(text) == "" && len(shown.attachments) > 0:
+		// Only files.
+	case status == decryptOK:
+		lines = append(lines, markupLines(text, w, p.text, bg, bg, p.accent)...)
+	case status == decryptFailed:
+		for _, part := range wrap(text, w) {
+			lines = append(lines, italic(part, p.muted, bg))
+		}
+	default:
+		for _, part := range wrap(text, w) {
+			lines = append(lines, seg(part, p.text, bg))
+		}
+	}
+
+	if status == decryptOK && shown.heir != "" {
+		for i, line := range heirLines(shown.heir, own, sanitize(message.SenderUsername)) {
+			for _, part := range wrap(line, w) {
+				if i == 2 {
+					lines = append(lines, seg(part, p.muted, bg))
+				} else {
+					lines = append(lines, bold(part, p.accent, bg))
+				}
+			}
+		}
+	}
+
+	if len(message.Reactions) > 0 {
+		lines = append(lines, m.reactionChips(message.Reactions, p.text, bg))
+	}
+
+	// Under the previous one's name: the time where it fits on the first
+	// line, else on a line of its own; not at all when it is the same and
+	// there is nothing else to say.
+	if grouped && quiet && sending == "" && len(info) == 1 {
+		return lines
+	}
+
+	if grouped {
+		switch {
+		case len(lines) == 0:
+			lines = append(lines, alignRight(meta, w, bg))
+		case width(lines[0])+width(meta)+2 <= w:
+			lines[0] = row(lines[0], meta, w, bg)
+		default:
+			lines = append(lines, alignRight(meta, w, bg))
 		}
 	}
 
 	return lines
 }
 
-// reactionChips: "👍 2  🔥", the user's own underlined.
+// reactionChips: "👍 2  🔥", the user's own in the accent.
 func (m model) reactionChips(reactions []Reaction, fg, bg lipgloss.Color) string {
 	counts := map[string]int{}
 	mine := map[string]bool{}
@@ -415,84 +370,78 @@ func (m model) reactionChips(reactions []Reaction, fg, bg lipgloss.Color) string
 			label += fmt.Sprintf(" %d", counts[emoji])
 		}
 
-		style := lipgloss.NewStyle().Foreground(fg).Background(bg)
-
 		if mine[emoji] {
-			style = style.Underline(true).Bold(true)
+			chips = append(chips, bold(label, m.pal.accent, bg))
+		} else {
+			chips = append(chips, seg(label, fg, bg))
 		}
-
-		chips = append(chips, style.Render(label))
 	}
 
 	return strings.Join(chips, blank(2, bg))
 }
 
-// --- chrome ---
+// --- around the messages ---
 
-// chatBanners are the lines between the messages and the composer.
+// chatBanners are the lines between the messages and the input: warnings,
+// what is being done (a reply, an edit, files).
 func (m model) chatBanners(chat Chat, w int) []string {
 	c := m.chat
 	p := m.pal
-	bg := p.surface
+	bg := p.bg
 	var lines []string
 
-	closeButton := zone.Mark("chat:cancel", seg(" ✕ ", p.muted, bg))
+	note := func(prefix string, prefixFg lipgloss.Color, text string, textFg lipgloss.Color) string {
+		return fitLine(blank(1, bg)+bold(prefix, prefixFg, bg)+seg(clip(text, w-2-width(prefix)), textFg, bg), w, bg)
+	}
+
+	cancel := zone.Mark("chat:cancel", seg("Esc cancel ", p.muted, bg))
 
 	switch {
 	case chat.Type == "group" && m.groupDistrusted[chat.ID] && m.groupKeyOf(chat.ID, chat.KeyEpoch) == nil:
-		lines = append(lines, fitLine(seg(" ⚠ "+clip("The group's key came from someone whose security key has changed. Compare safety codes (Ctrl+G)", w-4), p.danger, bg), w, bg))
+		lines = append(lines, note("! ", p.danger, "The group's key came from someone whose security key has changed: compare safety codes (Ctrl+G)", p.danger))
 	case chat.Type == "group" && m.groupKeyOf(chat.ID, chat.KeyEpoch) == nil:
-		lines = append(lines, fitLine(seg(" "+clip("Loading the group's key…", w-2), p.muted, bg), w, bg))
+		lines = append(lines, note("", p.muted, "Loading the group's key…", p.muted))
 	case chat.Type != "group" && chat.PublicKey == "" && !chat.Blocked:
-		lines = append(lines, fitLine(seg(" "+clip("@"+sanitize(chat.Username)+" has not set up end-to-end encryption yet", w-2), p.muted, bg), w, bg))
+		lines = append(lines, note("", p.muted, "@"+sanitize(chat.Username)+" has not set up end-to-end encryption yet", p.muted))
 	}
 
 	if chat.Type != "group" && m.keyChanged[chat.UserID] {
-		lines = append(lines, zone.Mark("chat:keywarning", fitLine(
-			seg(" ⚠ ", p.danger, bg)+seg(clip("The security key of @"+sanitize(chat.Username)+" has changed. ", w-30), p.text, bg)+
-				bold("Compare the safety code", p.accent, bg), w, bg)))
+		lines = append(lines, zone.Mark("chat:keywarning", note("! ", p.danger,
+			"The security key of @"+sanitize(chat.Username)+" has changed. Compare the safety code: Ctrl+K", p.text)))
 	}
 
 	if names := m.mentionSuggestions(chat); len(names) > 0 {
-		hint := seg(" Tab ", p.accent, bg)
+		hint := blank(1, bg) + seg("Tab ", p.accent, bg)
 
 		for _, name := range names {
-			hint += bold("@"+sanitize(name), p.text, bg) + blank(2, bg)
+			hint += seg("@"+sanitize(name), p.text, bg) + blank(2, bg)
 		}
 
 		lines = append(lines, fitLine(hint, w, bg))
 	}
 
 	if c.err != "" {
-		lines = append(lines, zone.Mark("chat:error", row(seg(" "+clip(sanitize(c.err), w-6), p.danger, bg), seg(" ✕ ", p.danger, bg), w, bg)))
+		lines = append(lines, zone.Mark("chat:error", note("! ", p.danger, sanitize(c.err), p.danger)))
 	}
 
 	if c.attaching {
-		input := seg(" 📎 ", p.accent, bg) + seg("▌", p.accent, p.panelAlt) +
-			fitLine(onBackground(c.attach.View(), p.panelAlt), w-6, p.panelAlt)
-		lines = append(lines, fitLine(input, w, bg))
+		lines = append(lines, fitLine(blank(1, bg)+bold("File: ", p.accent, bg)+fitLine(onBackground(c.attach.View(), bg), w-8, bg), w, bg))
 	}
 
 	for i, file := range c.picked {
-		icon := "📎 "
-
-		if isImage(file.mime) {
-			icon = "🖼 "
-		}
-
 		status := formatSize(file.size)
 
 		if c.uploading {
 			status = "uploading…"
 		}
 
-		left := seg(" "+icon, p.accent, bg) + bold(clip(sanitize(file.name), w/2), p.text, bg) + seg("  "+status, p.muted, bg)
-		lines = append(lines, row(left, zone.Mark(fmt.Sprintf("chat:unpick:%d", i), seg(" ✕ ", p.muted, bg)), w, bg))
+		left := blank(1, bg) + seg("▪ ", p.accent, bg) + seg(clip(sanitize(file.name), w/2), p.text, bg) + seg("  "+status, p.muted, bg)
+		lines = append(lines, row(left, zone.Mark(fmt.Sprintf("chat:unpick:%d", i), seg("remove ", p.muted, bg)), w, bg))
 	}
 
 	if c.editing != nil {
 		text := oneLine(sanitize(m.textOf(chat, c.editing.ID, c.editing.SenderID, c.editing.Content)))
-		lines = append(lines, row(seg(" ✎ ", p.accent, bg)+bold("Edit message ", p.accent, bg)+seg(text, p.muted, bg), closeButton, w, bg))
+		lines = append(lines, row(blank(1, bg)+bold("Editing  ", p.accent, bg)+seg(clip(text, w-24), p.muted, bg), cancel, w, bg))
 	}
 
 	if s := c.sealing; s != nil {
@@ -502,8 +451,8 @@ func (m model) chatBanners(chat Chat, w int) []string {
 			kind = "Surprise letter"
 		}
 
-		lines = append(lines, row(seg(" 🔒 ", p.accent, bg)+bold(kind+" ", p.accent, bg)+seg("opens "+s.opensAt.Format("02.01.2006 at 15:04"), p.muted, bg),
-			zone.Mark("chat:unseal", seg(" ✕ ", p.muted, bg)), w, bg))
+		lines = append(lines, row(blank(1, bg)+bold(kind+"  ", p.accent, bg)+seg("opens "+s.opensAt.Format("02.01.2006 15:04"), p.muted, bg),
+			zone.Mark("chat:unseal", seg("Esc cancel ", p.muted, bg)), w, bg))
 	}
 
 	if c.replyTo != nil {
@@ -514,7 +463,7 @@ func (m model) chatBanners(chat Chat, w int) []string {
 		}
 
 		text := oneLine(sanitize(m.textOf(chat, c.replyTo.ID, c.replyTo.SenderID, c.replyTo.Content)))
-		lines = append(lines, row(seg(" ↪ ", p.accent, bg)+bold("Reply to "+name+" ", p.accent, bg)+seg(text, p.muted, bg), closeButton, w, bg))
+		lines = append(lines, row(blank(1, bg)+bold("Replying to "+name+"  ", p.accent, bg)+seg(clip(text, w-30), p.muted, bg), cancel, w, bg))
 	}
 
 	return lines
@@ -524,7 +473,7 @@ func (m model) chatBanners(chat Chat, w int) []string {
 func (m model) chatChromeHeight() int {
 	c := m.chat
 	chat, _ := m.chatByID(c.id)
-	h := 3 // header
+	h := 2 // the header and its rule
 
 	if chat.PinnedMessage != nil {
 		h++
@@ -536,46 +485,41 @@ func (m model) chatChromeHeight() int {
 
 	h += len(m.chatBanners(chat, m.paneWidth()))
 
+	// The rule, then the input (or what replaces it).
 	if chat.Blocked {
-		return h + 4
+		return h + 2
 	}
 
-	// Space, the input, the hints.
-	return h + c.composer.Height() + 2
+	return h + 1 + c.composer.Height()
 }
 
 func (m model) chatView(w, h int) string {
 	c := m.chat
 	p := m.pal
+	bg := p.bg
 	chat, _ := m.chatByID(c.id)
 	var lines []string
 
 	lines = append(lines, m.chatHeader(chat, w)...)
 
 	if pinned := chat.PinnedMessage; pinned != nil {
-		bg := p.surface
 		text := oneLine(sanitize(plainText(m.textOf(chat, pinned.ID, pinned.SenderID, pinned.Content))))
-		left := seg(" ▎", p.accent, bg) + bold("Pinned  ", p.accent, bg) + seg(text, p.textSoft, bg)
-		lines = append(lines, row(zone.Mark("chat:pinned", left), zone.Mark("chat:unpin", seg(" ✕ ", p.muted, bg)), w, bg))
+		lines = append(lines, zone.Mark("chat:pinned", fitLine(blank(1, bg)+bold("Pinned  ", p.accent, bg)+seg(clip(text, w-10), p.textSoft, bg), w, bg)))
 	}
 
 	if c.searching {
-		lines = append(lines, m.chatSearchBar(w), seg(strings.Repeat("─", w), p.line, p.surface))
+		lines = append(lines, m.chatSearchBar(w), seg(strings.Repeat("─", w), p.line, bg))
 	}
 
-	// Messages.
 	area := m.chatAreaHeight()
 	var messages string
 
 	switch {
 	case !c.loaded:
-		messages = fitBlock(strings.Repeat("\n", area/2)+center(seg("Loading…", p.muted, p.bg), w, p.bg), w, area, p.bg)
+		messages = strings.Repeat("\n", area/2) + center(seg("Loading…", p.muted, bg), w, bg)
 	case len(m.shown()) == 0:
-		card := []string{
-			center(bold("  No messages yet  ", p.text, p.panel), w, p.bg),
-			center(seg("  "+m.sayHi(chat)+"  ", p.muted, p.panel), w, p.bg),
-		}
-		messages = fitBlock(strings.Repeat("\n", max(area/2-1, 0))+strings.Join(card, "\n"), w, area, p.bg)
+		messages = strings.Repeat("\n", max(area/2-1, 0)) +
+			center(bold("No messages yet", p.text, bg), w, bg) + "\n" + center(seg(m.sayHi(chat), p.muted, bg), w, bg)
 	default:
 		all := m.chatLines(w)
 		start, end := m.chatWindow(len(all.text))
@@ -583,25 +527,25 @@ func (m model) chatView(w, h int) string {
 
 		// Few messages: they sit at the bottom.
 		for len(visible) < area {
-			visible = append([]string{blank(w, p.bg)}, visible...)
+			visible = append([]string{blank(w, bg)}, visible...)
 		}
 
 		messages = strings.Join(visible, "\n")
 	}
 
-	lines = append(lines, zone.Mark("chat:messages", fitBlock(messages, w, area, p.bg)))
+	lines = append(lines, zone.Mark("chat:messages", fitBlock(messages, w, area, bg)))
 	lines = append(lines, m.chatBanners(chat, w)...)
 	lines = append(lines, m.composerView(chat, w)...)
 
-	return fitBlock(strings.Join(lines, "\n"), w, h, p.surface)
+	return fitBlock(strings.Join(lines, "\n"), w, h, bg)
 }
 
-// chatHeader: back (narrow), avatar, name, status; search, safety code,
-// menu. Three lines with the divider.
+// chatHeader: the name and how they are (online, typing, members), then
+// the rule.
 func (m model) chatHeader(chat Chat, w int) []string {
 	c := m.chat
 	p := m.pal
-	bg := p.surface
+	bg := p.bg
 
 	left := blank(1, bg)
 
@@ -609,45 +553,23 @@ func (m model) chatHeader(chat Chat, w int) []string {
 		left = zone.Mark("chat:back", seg(" ‹ ", p.accent, bg))
 	}
 
-	group := chat.Type == "group"
-	name := bold(sanitize(m.chatName(chat)), p.text, bg)
+	// Clicked: the group's screen, or the chat's menu.
+	name := bold(sanitize(m.listTitle(chat)), p.text, bg)
 
-	if group {
-		name = zone.Mark("chat:groupinfo", seg("👥 ", p.muted, bg)+name)
+	if chat.Type == "group" {
+		name = zone.Mark("chat:groupinfo", name)
+	} else {
+		name = zone.Mark("chat:menu", name)
 	}
-
-	if chat.Type == "saved" {
-		name = seg("🔖 ", p.muted, bg) + name
-	}
-
-	if chat.IsDeveloper {
-		name += blank(1, bg) + devBadge()
-	}
-
-	// Groups: the group's screen instead of the safety code.
-	middle := iconButton("chat:safety", "🛡", p.textSoft, bg)
-
-	if group {
-		middle = iconButton("chat:groupinfo", "👥", p.textSoft, bg)
-	}
-
-	if chat.Type == "saved" {
-		middle = ""
-	}
-
-	right := iconButton("chat:search", "🔍", p.textSoft, bg) + middle +
-		iconButton("chat:menu", "⋮", p.textSoft, bg)
 
 	var status string
 
 	switch {
-	case m.connStatus == connConnecting:
-		status = seg("connecting…", p.muted, bg)
-	case m.connStatus == connOffline:
-		status = seg("waiting for network…", p.muted, bg)
+	case m.connStatus != connOnline:
+		status = ""
 	case m.isTyping(c.id):
 		status = seg(m.typingText(chat), p.accent, bg)
-	case group:
+	case chat.Type == "group":
 		status = seg(m.membersText(chat), p.muted, bg)
 	case chat.Type == "saved":
 		status = seg("only you", p.muted, bg)
@@ -658,19 +580,26 @@ func (m model) chatHeader(chat Chat, w int) []string {
 		status = seg(formatPresence(&pr, time.Now()), p.muted, bg)
 	}
 
+	var marks []string
+
 	if chat.Pinned {
-		status += seg("  📌", p.muted, bg)
+		marks = append(marks, "pinned")
 	}
 
 	if chat.Muted {
-		status += seg("  🔕", p.muted, bg)
+		marks = append(marks, "muted")
 	}
 
-	indent := width(left) + 4
+	if chat.Type != "group" && chat.Type != "saved" && m.keyChanged[chat.UserID] {
+		status += seg("  key changed", p.danger, bg)
+	}
+
+	if len(marks) > 0 {
+		status += seg("  "+strings.Join(marks, " · "), p.muted, bg)
+	}
 
 	return []string{
-		row(left+avatar(m.chatName(chat))+blank(1, bg)+name, right, w, bg),
-		fitLine(blank(indent, bg)+status, w, bg),
+		row(left+name, status+blank(1, bg), w, bg),
 		seg(strings.Repeat("─", w), p.line, bg),
 	}
 }
@@ -678,108 +607,71 @@ func (m model) chatHeader(chat Chat, w int) []string {
 func (m model) chatSearchBar(w int) string {
 	c := m.chat
 	p := m.pal
-	bg := p.surface
+	bg := p.bg
 	matches := m.matches()
 	count := ""
 
 	switch {
 	case strings.TrimSpace(c.search.Value()) == "":
 	case len(matches) == 0:
-		count = "0"
+		count = "no matches"
 	default:
-		count = fmt.Sprintf("%d/%d", c.matchIndex+1, len(matches))
+		count = fmt.Sprintf("%d of %d", c.matchIndex+1, len(matches))
 	}
 
-	right := seg(count+" ", p.muted, bg)
+	right := seg(count, p.muted, bg)
 
 	if c.hasMore {
-		label := "load older"
+		label := "  load older (Ctrl+L)"
 
 		if c.loadingOlder {
-			label = "loading…"
+			label = "  loading…"
 		}
 
-		right += zone.Mark("chat:older", seg(label, p.accent, bg)) + blank(1, bg)
+		right += zone.Mark("chat:older", seg(label, p.accent, bg))
 	}
 
-	right += zone.Mark("chat:searchclose", seg(" ✕ ", p.muted, bg))
+	right += blank(1, bg)
+	box := bold(" Search  ", p.accent, bg) + fitLine(onBackground(c.search.View(), bg), max(w-width(right)-10, 4), bg)
 
-	box := seg(" 🔍 ", p.muted, p.panelAlt) + fitLine(onBackground(c.search.View(), p.panelAlt), max(w-width(right)-8, 4), p.panelAlt)
-
-	return row(blank(1, bg)+box, right, w, bg)
+	return row(box, right, w, bg)
 }
 
-// composerView: the input with the send button and the key hints; or the
-// bar that replaces it when either has blocked the other.
+// composerView: the rule, then "> " and what is being written; or what
+// replaces it when either has blocked the other.
 func (m model) composerView(chat Chat, w int) []string {
 	c := m.chat
 	p := m.pal
-	bg := p.surface
+	bg := p.bg
+	rule := seg(strings.Repeat("─", w), p.line, bg)
 
 	if chat.Blocked {
-		lines := []string{blank(w, bg)}
+		text := "You can't message @" + sanitize(chat.Username)
 
 		if chat.BlockedByMe {
-			lines = append(lines,
-				center(seg("You blocked @"+sanitize(chat.Username), p.muted, bg), w, bg),
-				center(zone.Mark("chat:unblock", bold(" Unblock ", p.text, p.panelAlt)), w, bg),
-			)
-		} else {
-			lines = append(lines, center(seg("You can't message @"+sanitize(chat.Username), p.muted, bg), w, bg), blank(w, bg))
+			text = "You blocked @" + sanitize(chat.Username) + ". Unblock: Ctrl+O"
 		}
 
-		return append(lines, blank(w, bg))
+		return []string{rule, zone.Mark("chat:unblock", fitLine(seg(" "+text, p.muted, bg), w, bg))}
 	}
 
-	inputW := w - 8
-	inputLines := strings.Split(onBackground(c.composer.View(), p.panelAlt), "\n")
-	sendFg, sendBg := p.muted, p.panelAlt
-
-	if strings.TrimSpace(c.composer.Value()) != "" && !c.sending {
-		sendFg, sendBg = p.onAccent, p.accent
-	}
-
-	icon := "➤"
+	prompt := "> "
 
 	if c.editing != nil {
-		icon = "✓"
+		prompt = "✎ "
 	}
 
 	var box []string
 
-	for i, line := range inputLines {
-		send := blank(3, bg)
+	for i, line := range strings.Split(onBackground(c.composer.View(), bg), "\n") {
+		lead := blank(3, bg)
 
-		if i == len(inputLines)-1 {
-			send = zone.Mark("chat:send", bold(" "+icon+" ", sendFg, sendBg))
+		if i == 0 {
+			lead = blank(1, bg) + bold(prompt, p.accent, bg)
 		}
 
-		box = append(box, blank(1, bg)+blank(1, p.panelAlt)+fitLine(line, inputW, p.panelAlt)+
-			blank(1, p.panelAlt)+blank(1, bg)+send+blank(1, bg))
+		box = append(box, lead+fitLine(line, w-3, bg))
 	}
 
-	composer := zone.Mark("chat:composer", strings.Join(box, "\n"))
-
-	hints := "Enter Send  ↑ Messages  Ctrl+A Attach  Ctrl+O Menu  Ctrl+F Search  Ctrl+K Safety code  Alt+Enter New line  Esc Back"
-
-	if chat, _ := m.chatByID(c.id); chat.Type == "group" {
-		hints = "Enter Send  ↑ Messages  Ctrl+A Attach  Ctrl+G Group  Ctrl+O Menu  Ctrl+F Search  Alt+Enter New line  Esc Back"
-	}
-
-	switch {
-	case c.attaching:
-		hints = "Type or drop a file's path  Enter Add  Esc Cancel"
-	case len(c.picked) > 0:
-		hints = "Enter Send with the files  Ctrl+A Another  Ctrl+X Remove the last  Esc Back"
-	case c.selecting:
-		hints = "↑↓ Choose  Enter Menu  r Reply  e Edit  d Delete  c Copy  s Server  1–8 React  Esc Back"
-	case c.searching:
-		hints = "Enter/↑ Older match  ↓ Newer match  Ctrl+L Load older  Esc Close search"
-	}
-
-	return []string{
-		blank(w, bg),
-		composer,
-		m.hintLine(hints, w, bg),
-	}
+	return []string{rule, zone.Mark("chat:composer", strings.Join(box, "\n"))}
 }

@@ -7,9 +7,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Colors of the app's themes, the same as the web's
-// (apps/mobile-web/src/ui/colors.ts). Semi-transparent web colors are blended
-// into solid ones, since terminals have no transparency.
+// Colors, in one of two ways (Settings → Appearance):
+//   - the terminal's own: no backgrounds at all, text in the 16 ANSI colors,
+//     so it looks at home in any theme, tmux or ssh (the default);
+//   - Ostrich's theme, the same as the apps' (apps/mobile-web/src/ui/
+//     colors.ts): one even background, the theme's text colors.
+// Nothing is drawn on a filled panel: lines and the color of the text do
+// the layout. The bg-like fields (surface, panel...) are all the same
+// background, so screens drawn the older way get no fills either.
 
 type themeMode int
 
@@ -20,6 +25,8 @@ const (
 
 type palette struct {
 	mode themeMode
+	// The terminal's own colors (no backgrounds, ANSI colors).
+	terminal bool
 
 	// Page behind everything (the chat), side bar and bars, cards and
 	// other people's bubbles, inputs.
@@ -117,7 +124,26 @@ func findAccent(id string) accent {
 	return accents[0]
 }
 
-func newPalette(mode themeMode, accentID string) palette {
+// The accents as ANSI colors, for the terminal's own colors.
+var ansiAccents = map[string]string{
+	"orange": "3", "red": "1", "pink": "5", "purple": "5", "blue": "4",
+	"teal": "6", "green": "2", "gold": "3", "mono": "",
+}
+
+func newPalette(terminal bool, mode themeMode, accentID string) palette {
+	if terminal {
+		accent := lipgloss.Color(ansiAccents[findAccent(accentID).id])
+		none := lipgloss.Color("")
+
+		return palette{
+			mode: mode, terminal: true,
+			bg: none, surface: none, panel: none, panelAlt: none, hover: none,
+			text: none, textSoft: none, muted: lipgloss.Color("8"), line: lipgloss.Color("8"),
+			accent: accent, onAccent: lipgloss.Color("0"), accentSoft: none, accentSoftBg: none,
+			danger: lipgloss.Color("1"), online: lipgloss.Color("2"),
+		}
+	}
+
 	base := basePalettes[mode]
 	variant := findAccent(accentID).dark
 
@@ -128,17 +154,17 @@ func newPalette(mode themeMode, accentID string) palette {
 	return palette{
 		mode:         mode,
 		bg:           lipgloss.Color(base.bg),
-		surface:      lipgloss.Color(base.surface),
-		panel:        lipgloss.Color(base.panel),
-		panelAlt:     lipgloss.Color(base.panelAlt),
-		hover:        lipgloss.Color(base.hover),
+		surface:      lipgloss.Color(base.bg),
+		panel:        lipgloss.Color(base.bg),
+		panelAlt:     lipgloss.Color(base.bg),
+		hover:        lipgloss.Color(base.bg),
 		text:         lipgloss.Color(base.text),
 		textSoft:     lipgloss.Color(base.textSoft),
 		muted:        lipgloss.Color(base.muted),
-		line:         lipgloss.Color(blend(base.lineRGB, base.surface, base.lineAlpha)),
+		line:         lipgloss.Color(blend(base.lineRGB, base.bg, 0.22)),
 		accent:       lipgloss.Color(variant.accent),
 		onAccent:     lipgloss.Color(variant.onAccent),
-		accentSoft:   lipgloss.Color(blend(variant.accent, base.surface, base.softAlpha)),
+		accentSoft:   lipgloss.Color(base.bg),
 		accentSoftBg: lipgloss.Color(blend(variant.accent, base.bg, base.softAlpha)),
 		danger:       lipgloss.Color(base.danger),
 		online:       lipgloss.Color(base.online),
@@ -164,12 +190,17 @@ func hexRGB(hex string) [3]int {
 	return [3]int{int(n >> 16 & 255), int(n >> 8 & 255), int(n & 255)}
 }
 
-// Avatar colors: initials on a color picked from the username, so a
-// contact keeps their color.
+// People's colors: a name keeps its color, picked from the username.
 var avatarColors = []string{
 	"#e57373", "#f06292", "#ba68c8", "#7986cb", "#4fc3f7",
 	"#4db6ac", "#81c784", "#ffb74d", "#a1887f", "#90a4ae",
 }
+
+// The same with the terminal's colors (no black, white or the dim one).
+var ansiNameColors = []string{"1", "2", "3", "4", "5", "6", "9", "10", "11", "12", "13", "14"}
+
+// terminalColors: the palette in use is the terminal's (applyTheme).
+var terminalColors = true
 
 func avatarColor(username string) lipgloss.Color {
 	h := 0
@@ -180,6 +211,10 @@ func avatarColor(username string) lipgloss.Color {
 
 	if h < 0 {
 		h = -h
+	}
+
+	if terminalColors {
+		return lipgloss.Color(ansiNameColors[h%len(ansiNameColors)])
 	}
 
 	return lipgloss.Color(avatarColors[h%len(avatarColors)])

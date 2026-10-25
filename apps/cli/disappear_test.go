@@ -21,7 +21,7 @@ func TestDisappearMessages(t *testing.T) {
 	days := 30
 	message := Message{SenderUsername: "ann", SentAfterDays: &days}
 
-	if got := sentAutomatically(message); got != "⌛ Sent automatically: @ann had not opened Ostrich for 30 days" {
+	if got := sentAutomatically(message); got != "Sent automatically: @ann had not opened Ostrich for 30 days" {
 		t.Error(got)
 	}
 
