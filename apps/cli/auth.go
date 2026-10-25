@@ -55,6 +55,8 @@ type authState struct {
 	// have been made (answers for older ones are ignored).
 	qr      *qrLogin
 	qrRound int
+	// Recovering the account through friends instead (recoverlogin.go).
+	recover *recoverLogin
 }
 
 // newInput is a text input in the app's style.
@@ -97,6 +99,12 @@ func newAuthState(p palette) authState {
 func (a *authState) restyle(p palette) {
 	for i := range a.inputs {
 		styleInput(&a.inputs[i], p)
+	}
+
+	if a.recover != nil {
+		for i := range a.recover.inputs {
+			styleInput(&a.recover.inputs[i], p)
+		}
 	}
 }
 
@@ -156,7 +164,17 @@ func (m *model) updateAuthKey(msg tea.KeyMsg) tea.Cmd {
 		return m.updateQRLoginKey(msg)
 	}
 
+	if a.recover != nil {
+		return m.updateRecoverLoginKey(msg)
+	}
+
 	switch msg.String() {
+	case "ctrl+f":
+		if !a.register {
+			return m.startRecoverLogin()
+		}
+
+		return nil
 	case "ctrl+l":
 		if !a.register {
 			return m.startQRLogin()
@@ -211,9 +229,15 @@ func (m *model) updateAuthMouse(msg tea.MouseMsg) tea.Cmd {
 		return m.updateQRLoginMouse(msg)
 	}
 
+	if a.recover != nil {
+		return m.updateRecoverLoginMouse(msg)
+	}
+
 	switch {
 	case clicked(msg, "auth:qr"):
 		return m.startQRLogin()
+	case clicked(msg, "auth:recover"):
+		return m.startRecoverLogin()
 	case clicked(msg, "auth:login"):
 		a.setMode(false)
 	case clicked(msg, "auth:register"):
@@ -328,13 +352,18 @@ func (m *model) updateOstrichIDKey(msg tea.KeyMsg) tea.Cmd {
 func (m *model) leaveOstrichID() tea.Cmd {
 	m.user.OstrichID = ""
 	m.stage = stageMain
+	var cmd tea.Cmd
+
+	if m.recovery.recovered {
+		cmd = m.showToast("You have a new OstrichID, so your guardians were reset: choose them again in Settings → Recovery through friends", false)
+	}
 
 	if m.rememberLater {
 		m.rememberLater = false
-		return m.rememberSession()
+		return tea.Batch(cmd, m.rememberSession())
 	}
 
-	return nil
+	return cmd
 }
 
 func (m *model) updateOstrichIDMouse(msg tea.MouseMsg) tea.Cmd {
@@ -461,6 +490,10 @@ func (m model) authView() string {
 		return m.qrLoginView()
 	}
 
+	if m.auth.recover != nil {
+		return m.recoverLoginView()
+	}
+
 	p := m.pal
 	a := m.auth
 	w := authCardWidth(m.width)
@@ -544,7 +577,10 @@ func (m model) authView() string {
 	lines = append(lines, zone.Mark("auth:submit", m.button(label, inner, true, !a.loading)))
 
 	if !a.register {
-		lines = append(lines, "", zone.Mark("auth:qr", m.button("Log in with a QR code (Ctrl+L)", inner, false, !a.loading)))
+		lines = append(lines,
+			"", zone.Mark("auth:qr", m.button("Log in with a QR code (Ctrl+L)", inner, false, !a.loading)),
+			"", zone.Mark("auth:recover", m.button("Lost your OstrichID? Recover with friends (Ctrl+F)", inner, false, !a.loading)),
+		)
 	}
 
 	header := []string{
@@ -557,7 +593,7 @@ func (m model) authView() string {
 
 	block := strings.Join(header, "\n") + "\n" + m.card(lines, w)
 
-	return m.screen(block, "Tab Log in / Create account   ↑↓ Field   Ctrl+R Remember me   Ctrl+L QR code   Enter Next / Submit   Esc Quit")
+	return m.screen(block, "Tab Log in / Create account   ↑↓ Field   Ctrl+R Remember me   Ctrl+L QR code   Ctrl+F Recover   Enter Next / Submit   Esc Quit")
 }
 
 func (m model) ostrichIDView() string {
@@ -589,7 +625,7 @@ func (m model) ostrichIDView() string {
 
 	lines = append(lines, "")
 
-	for _, line := range wrap("It is shown only this once. Ostrich cannot show it again or recover it: if you lose it, you lose access to your account.", inner) {
+	for _, line := range wrap("It is shown only this once. Ostrich cannot show it again: if you lose it, only friends you choose as guardians (Settings → Recovery through friends) can give it back.", inner) {
 		lines = append(lines, bold(line, p.danger, p.panel))
 	}
 

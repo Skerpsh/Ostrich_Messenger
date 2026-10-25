@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { useRouter } from "expo-router";
+import { useCallback, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   KeyboardAvoidingView,
   ScrollView,
@@ -16,6 +16,7 @@ import Button from "@/ui/button";
 import Reveal from "@/ui/reveal";
 import TextField from "@/ui/text-field";
 import { useAuth } from "./auth";
+import { loadRecovery } from "@/features/recovery/saved";
 import { useAppTheme } from "@/ui/theme";
 import {
   cleanUsername,
@@ -58,6 +59,15 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const ostrichIdRef = useRef<TextInput>(null);
 
   const isRegister = mode === "register";
+
+  // A recovery through friends going on this device (app/recover.tsx).
+  const [recovering, setRecovering] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadRecovery().then((saved) => setRecovering(saved !== null));
+    }, []),
+  );
 
   const submit = async () => {
     // "@alice" works too.
@@ -232,13 +242,22 @@ export default function AuthForm({ mode }: AuthFormProps) {
             />
 
             {isRegister ? null : (
-              <Button
-                title="Log in with a QR code"
-                variant="secondary"
-                disabled={loading}
-                onPress={() => router.push("/link-device")}
-                style={styles.qrLogin}
-              />
+              <>
+                <Button
+                  title="Log in with a QR code"
+                  variant="secondary"
+                  disabled={loading}
+                  onPress={() => router.push("/link-device")}
+                  style={styles.qrLogin}
+                />
+                <Button
+                  title={recovering ? "Continue recovering with friends" : "Lost your OstrichID? Recover with friends"}
+                  variant="secondary"
+                  disabled={loading}
+                  onPress={() => router.push("/recover")}
+                  style={styles.qrLogin}
+                />
+              </>
             )}
 
             <Button

@@ -14,6 +14,7 @@ import messagesRoutes from "./routes/messages.js";
 import serverViewRoutes from "./routes/server-view.js";
 import drandRoutes from "./routes/drand.js";
 import disappearRoutes from "./routes/disappear.js";
+import recoveryRoutes from "./routes/recovery.js";
 import { checkSwitches, CHECK_INTERVAL_MS } from "./disappear.js";
 import { deliverDue, DELIVERY_INTERVAL_MS } from "./deliveries.js";
 import avatarsRoutes from "./routes/avatars.js";
@@ -242,6 +243,7 @@ const start = async () => {
     await server.register(serverViewRoutes);
     await server.register(drandRoutes);
     await server.register(disappearRoutes);
+    await server.register(recoveryRoutes);
     await server.register(avatarsRoutes);
     await server.register(pushRoutes);
     await server.register(attachmentsRoutes);

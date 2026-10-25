@@ -227,18 +227,22 @@ export function createAccountKeys(derived: DerivedKeys): {
   privateKey: Uint8Array;
 } {
   const privateKey = randomBytes(32);
+
+  return { privateKey, material: wrapAccountKey(derived, privateKey) };
+}
+
+// The account's private key encrypted for storage with what an OstrichID
+// derives (a new ID keeps the key pair).
+export function wrapAccountKey(derived: DerivedKeys, privateKey: Uint8Array): KeyMaterial {
   const nonce = randomBytes(24);
   const sealed = xchacha20poly1305(derived.wrapKey, nonce, PRIVATE_KEY_AAD).encrypt(
     privateKey,
   );
 
   return {
-    privateKey,
-    material: {
-      auth_key: derived.authKey,
-      public_key: publicKeyOf(privateKey),
-      encrypted_private_key: toBase64(concat(nonce, sealed)),
-    },
+    auth_key: derived.authKey,
+    public_key: publicKeyOf(privateKey),
+    encrypted_private_key: toBase64(concat(nonce, sealed)),
   };
 }
 
@@ -700,6 +704,183 @@ export function decryptGroupInfo(
   } catch {
     return null;
   }
+}
+
+// --- recovery through friends ---
+
+// An OstrichID split among friends ("guardians") with Shamir's secret
+// sharing over GF(256): any `threshold` of the shares give it back, fewer
+// tell nothing about it. Each share is sealed for its guardian's public key;
+// to recover, a new device asks with a one-time key pair, and the guardians
+// who approve seal their share again for it. The recovery code (of the new
+// device's public key) is compared aloud, so neither someone else nor the
+// server can put their own key in its place. The CLI does the same
+// (apps/cli/recovery_crypto.go).
+
+const RECOVERY_INFO = "ostrich/v1 recovery";
+const RECOVERY_CODE_INFO = utf8("ostrich/v1 recovery code");
+
+// GF(256) with the AES polynomial, by logarithms (generator 3).
+const GF_EXP = new Uint8Array(510);
+const GF_LOG = new Uint8Array(256);
+
+for (let i = 0, x = 1; i < 255; i++) {
+  GF_EXP[i] = x;
+  GF_EXP[i + 255] = x;
+  GF_LOG[x] = i;
+  x ^= (x << 1) ^ (x & 0x80 ? 0x11b : 0);
+}
+
+const gfMul = (a: number, b: number) => (a && b ? GF_EXP[GF_LOG[a] + GF_LOG[b]] : 0);
+const gfDiv = (a: number, b: number) => (a ? GF_EXP[GF_LOG[a] + 255 - GF_LOG[b]] : 0);
+
+// `total` shares of the secret, any `threshold` of which give it back;
+// each is its x (1–total) and then one byte per byte of the secret.
+// `random`: for the tests.
+export function splitSecret(
+  secret: Uint8Array,
+  total: number,
+  threshold: number,
+  random: (length: number) => Uint8Array = randomBytes,
+): Uint8Array[] {
+  if (threshold < 2 || threshold > total || total > 255) {
+    throw new Error("Choose at least 2 shares out of no more than all of them");
+  }
+
+  // Per byte: the secret, then threshold − 1 random coefficients.
+  const coefficients = random(secret.length * (threshold - 1));
+  const shares: Uint8Array[] = [];
+
+  for (let x = 1; x <= total; x++) {
+    const share = new Uint8Array(secret.length + 1);
+    share[0] = x;
+
+    for (let i = 0; i < secret.length; i++) {
+      let y = 0;
+
+      // Horner, from the highest coefficient down to the secret.
+      for (let c = threshold - 2; c >= 0; c--) {
+        y = gfMul(y ^ coefficients[i * (threshold - 1) + c], x);
+      }
+
+      share[i + 1] = y ^ secret[i];
+    }
+
+    shares.push(share);
+  }
+
+  return shares;
+}
+
+// The secret from `threshold` or more shares (Lagrange at 0).
+export function combineShares(shares: Uint8Array[]): Uint8Array {
+  const xs = shares.map((share) => share[0]);
+
+  if (new Set(xs).size !== xs.length || xs.includes(0)) {
+    throw new Error("The shares are not of one secret");
+  }
+
+  const secret = new Uint8Array(shares[0].length - 1);
+
+  for (let i = 0; i < secret.length; i++) {
+    let value = 0;
+
+    shares.forEach((share, j) => {
+      let weight = 1;
+
+      xs.forEach((x, m) => {
+        if (m !== j) {
+          weight = gfMul(weight, gfDiv(x, x ^ xs[j]));
+        }
+      });
+
+      value ^= gfMul(share[i + 1], weight);
+    });
+
+    secret[i] = value;
+  }
+
+  return secret;
+}
+
+function recoveryKey(ownPrivate: Uint8Array, otherPublic: string, context: string) {
+  const shared = x25519.getSharedSecret(ownPrivate, fromBase64(otherPublic));
+  return hkdf(sha256, shared, utf8(context), utf8(RECOVERY_INFO), 32);
+}
+
+// Seals data for a public key, with a one-time key of the sender's;
+// `context` binds it (whose share, which request).
+export function sealForRecovery(recipientPublic: string, data: Uint8Array, context: string) {
+  const own = randomBytes(32);
+  const nonce = randomBytes(24);
+  const sealed = xchacha20poly1305(
+    recoveryKey(own, recipientPublic, context),
+    nonce,
+    utf8(`${RECOVERY_INFO}\0${context}`),
+  ).encrypt(data);
+
+  return { sealed: toBase64(concat(nonce, sealed)), publicKey: publicKeyOf(own) };
+}
+
+// Throws if it was not sealed for this key in this context.
+export function openForRecovery(ownPrivate: Uint8Array, sealerPublic: string, sealed: string, context: string) {
+  const data = fromBase64(sealed);
+
+  return xchacha20poly1305(
+    recoveryKey(ownPrivate, sealerPublic, context),
+    data.subarray(0, 24),
+    utf8(`${RECOVERY_INFO}\0${context}`),
+  ).decrypt(data.subarray(24));
+}
+
+export const shareContext = (setupId: string, guardianId: string) => `share:${setupId}:${guardianId}`;
+export const requestContext = (requestId: string) => `request:${requestId}`;
+
+// "381 904": compared aloud between the one recovering and a guardian.
+export function recoveryCode(publicKey: string) {
+  const hash = sha256(concat(RECOVERY_CODE_INFO, fromBase64(publicKey)));
+  const n = new DataView(hash.buffer, hash.byteOffset, 4).getUint32(0) % 1_000_000;
+  const digits = String(n).padStart(6, "0");
+
+  return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+}
+
+// The OstrichID as the shared secret, and back.
+export const ostrichIdBytes = (normalizedId: string) => utf8(normalizedId);
+export const ostrichIdFromBytes = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
+
+// The OstrichID from the shares the guardians gave, or null: tries each
+// `threshold` of them (one guardian could have sent a wrong share) until
+// the ID opens the account's private key.
+export function recoverOstrichId(shares: Uint8Array[], threshold: number, encryptedPrivateKey: string) {
+  const pick = (from: number, chosen: Uint8Array[]): string | null => {
+    if (chosen.length === threshold) {
+      const id = normalizeOstrichId(ostrichIdFromBytes(combineShares(chosen)));
+
+      if (!id) {
+        return null;
+      }
+
+      try {
+        openPrivateKey(deriveFromOstrichId(id), encryptedPrivateKey);
+        return id;
+      } catch {
+        return null;
+      }
+    }
+
+    for (let i = from; i <= shares.length - (threshold - chosen.length); i++) {
+      const found = pick(i + 1, [...chosen, shares[i]]);
+
+      if (found) {
+        return found;
+      }
+    }
+
+    return null;
+  };
+
+  return shares.length >= threshold ? pick(0, []) : null;
 }
 
 function concat(a: Uint8Array, b: Uint8Array) {

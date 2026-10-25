@@ -39,7 +39,10 @@ export type ChatEvent =
   // The synced settings were saved (lib/settings-sync.ts).
   | { type: "settings_changed"; updatedAt: string }
   // "If I disappear" changed or warns (features/disappear).
-  | { type: "disappear" };
+  | { type: "disappear" }
+  // Recovery through friends: the user's guardians or requests, or a
+  // friend's the user guards (features/recovery).
+  | { type: "recovery" };
 
 // Calls (features/calls/calls-context.tsx); `data` is an encrypted signal (crypto.ts).
 export type CallEvent =
@@ -67,6 +70,7 @@ const CHAT_EVENTS = new Set([
   "chats_changed",
   "settings_changed",
   "disappear",
+  "recovery",
 ]);
 
 type Handlers = {

@@ -54,5 +54,21 @@
     "inner": "\u001eostrich1:{\"t\":\"Hello from 2023 🦤\",\"f\":\"ann\"}",
     "box_go": "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IHRsb2NrIDEwMDAwMDAgNTJkYjliYTcw\nZTBjYzBmNmVhZjc4MDNkZDA3NDQ3YTFmNTQ3NzczNWZkM2Y2NjE3OTJiYTk0NjAw\nYzg0ZTk3MQpxTDBkZnArUWlwemlnKzV2UzNnL2JpcnhueC9uOWxFZ21xUk9xVFhQ\nSmJJWHo4ZHVwVnZDaU9LSVI4QTNDSDBvCkFQK1o2Zkk3NDlzVzJaMTV0NDAwZnFO\nTzBvaE5LaHA3OEphODhlSFRHNUM3TnFNMS94c2dtdzlQOGRNUTU0QVkKWDdGaFNK\na2QwM2hTOHpWYnZ4dUhucTh4ZWxDRkJWOGVFVkozWDEzTWVOVQotLS0gcGExUWJl\nbVp1RmV2cUhtYzhRdUsweXlNQnYyZk1oeGp4a1FMcnZHdC9lMAowl2cEmb7uWDIQ\n5oz5Uff1rdPUK/FrE3DUhVwsl9tfNM6l68HgdjeUyIgIVlp2c1TvtVHm3QQSq9lY\nJ2ajBCkZY5UU/jiSMWM14LAUhC4Acw==\n-----END AGE ENCRYPTED FILE-----\n",
     "box_js": "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IHRsb2NrIDEwMDAwMDAgNTJkYjliYTcw\nZTBjYzBmNmVhZjc4MDNkZDA3NDQ3YTFmNTQ3NzczNWZkM2Y2NjE3OTJiYTk0NjAw\nYzg0ZTk3MQpxQW9QOTFBQlBFYmVjNW0rdVhWQXQwM3Ftdm9VQ0FXYkVPSStWalll\nZVBOcDRzS3Q5Q2JXc3F5OTJhd1JZMkNDCkE5Y295dHJUMVVyZ1EyeVhvTTZLTmZi\nTllSRFkyVStxeitLN0FWekNSbDNwcm45Q0UwZFhmRUhJT0p0MldhMkgKKzdadnRT\nRVBzL3MxWW1ZU2k0alFXZkF6MWNKUWtlbE5zWkx5SS9GSHBiMAotLS0gVG9kMlJs\nWjVEWTVJVmM1bG84dnFKTVFOWVhDMEgyME5TTTBiZDRHN00wVQp0uXotIHp/Yc43\nkZBnPgvt4b7JR/BSiDjM4Zm9Mw3soyjVpfbqwhgwA/Mlxqcrf7tJiupvxhv9yTvI\n+vzgSTBBdFSTyeWcQJaL/WBo6W4+Lg==\n-----END AGE ENCRYPTED FILE-----\n"
+  },
+  "recovery": {
+    "comment": "The OstrichID split 3 of 5 with these coefficients (byte i: (i*37+11) mod 256), and share 2 sealed for B; recovery_code is of public_key_a",
+    "secret_hex": "57334d3332344d44413858585952375051594e4d",
+    "coefficients_hex": "0b30557a9fc4e90e33587da2c7ec11365b80a5caef14395e83a8cdf2173c6186abd0f51a3f6489ae",
+    "shares_hex": [
+      "016c1c16d459eb66639a57a33f726d1cb72ab6156a",
+      "02816a55c22f7045bec16ccd49d236e9bc71c0bbca",
+      "03ba450e2544af6e991a03362ef909c25b0a2fe0ed",
+      "04569df35a09153e4dee8e922b0df28677641ba851",
+      "056db2a8bd62ca156a35e1694c26cdad901ff4f376"
+    ],
+    "setup_id": "44444444-4444-4444-8444-444444444444",
+    "sealed_share": "aAquurhYPLWHl5Sm6VHfgqoYwB7q0rCCCN+zelzomjLVl7cuJZrBCS4RZ+eF3Ri9cjpuZSNV6+Dm1QH+Cg==",
+    "sealer_public_key": "4OxXmI4BJK+nnbqMswuu6gASvXQYVKkJ+wY1FVEvWG0=",
+    "recovery_code": "756 923"
   }
 }

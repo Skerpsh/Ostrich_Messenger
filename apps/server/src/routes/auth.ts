@@ -29,6 +29,12 @@ import {
   SESSION_TTL_DAYS,
 } from "../middleware/auth.js";
 import { leaveAllGroups } from "../groups.js";
+import {
+  ACTIVE_REQUEST,
+  announceRecovery,
+  cancelActiveRequests,
+  recoveryAudience,
+} from "../recovery.js";
 import { sharedState } from "../shared-state.js";
 import {
   closeSessionSockets,
@@ -139,7 +145,7 @@ export function keysView(row: { public_key: string; encrypted_private_key: strin
 export const USER_COLUMNS = `id, username, created_at, username_changed_at, show_presence, read_receipts, ${PROFILE_COLUMNS}`;
 
 // Brute-force protection for endpoints that check passwords.
-const authRateLimit = {
+export const authRateLimit = {
   rateLimit: {
     max: 10,
     timeWindow: "1 minute",
@@ -171,24 +177,24 @@ function failedLoginKey(request: FastifyRequest, username: string) {
   return `${username.toLowerCase()} ${request.ip}`;
 }
 
-async function loginBlocked(request: FastifyRequest, username: string) {
+export async function loginBlocked(request: FastifyRequest, username: string) {
   return (await sharedState().failures(failedLoginKey(request, username))) >= MAX_FAILED_LOGINS;
 }
 
-function recordFailedLogin(request: FastifyRequest, username: string) {
+export function recordFailedLogin(request: FastifyRequest, username: string) {
   metrics.failedLogins++;
   return sharedState().addFailure(failedLoginKey(request, username), FAILED_LOGIN_WINDOW_MS);
 }
 
-function clearFailedLogins(request: FastifyRequest, username: string) {
+export function clearFailedLogins(request: FastifyRequest, username: string) {
   return sharedState().clearFailures(failedLoginKey(request, username));
 }
 
-const TOO_MANY_ATTEMPTS = "Too many failed attempts, try again later";
+export const TOO_MANY_ATTEMPTS = "Too many failed attempts, try again later";
 
 // Used to spend the same time on unknown usernames as on wrong passwords,
 // so login timing does not reveal which usernames exist.
-const dummyPasswordHash = argon2.hash(crypto.randomBytes(16).toString("hex"));
+export const dummyPasswordHash = argon2.hash(crypto.randomBytes(16).toString("hex"));
 
 export default async function authRoutes(server: FastifyInstance) {
   // REGISTER: the OstrichID was generated on the client; only the auth key
@@ -875,6 +881,118 @@ export default async function authRoutes(server: FastifyInstance) {
       closeUserSockets(request.user.id);
 
       return { deleted: true };
+    },
+  );
+
+  // NEW OSTRICHID: the same account key pair, its private key encrypted
+  // with what a new OstrichID derives, and the new ID's auth key. Needs
+  // the password and the current ID's auth key. The guardians' shares
+  // were of the old ID, so they go (recovery.ts). After a recovery through
+  // friends (a request of the user's is ready), every other session ends:
+  // a lost or stolen device loses the account too.
+  server.post<{ Body: { password: string; auth_key: string; keys: KeyMaterial } }>(
+    "/api/auth/ostrich-id",
+    {
+      preHandler: authenticate,
+      config: authRateLimit,
+      schema: {
+        body: {
+          type: "object",
+          required: ["password", "auth_key", "keys"],
+          properties: {
+            password: { type: "string", maxLength: 128 },
+            auth_key: { type: "string", pattern: AUTH_KEY_PATTERN },
+            keys: keyMaterialSchema,
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { password, auth_key, keys } = request.body;
+      const userId = request.user.id;
+
+      if (await loginBlocked(request, request.user.username)) {
+        return reply.status(429).send({ error: TOO_MANY_ATTEMPTS });
+      }
+
+      const result = await db.query(
+        "SELECT password_hash, auth_key_hash, public_key FROM users WHERE id = $1",
+        [userId],
+      );
+
+      const row = result.rows[0];
+      const passwordValid = await argon2.verify(row.password_hash, password);
+
+      if (!passwordValid || !row.auth_key_hash || !authKeyMatches(auth_key, row.auth_key_hash)) {
+        await recordFailedLogin(request, request.user.username);
+
+        return reply.status(403).send({ error: "Wrong password or OstrichID" });
+      }
+
+      if (keys.public_key !== row.public_key) {
+        return reply.status(400).send({ error: "The account's key pair stays the same" });
+      }
+
+      if (keys.auth_key === auth_key) {
+        return reply.status(400).send({ error: "This is the same OstrichID" });
+      }
+
+      const tokenHash = hashToken(request.token);
+      const audience = await recoveryAudience(db, userId);
+
+      const recovered = await withTransaction(async (client) => {
+        const updated = await client.query(
+          `
+          UPDATE users
+          SET auth_key_hash = $3, encrypted_private_key = $4, updated_at = NOW()
+          WHERE id = $1 AND auth_key_hash = $2
+          `,
+          [userId, row.auth_key_hash, hashAuthKey(keys.auth_key), keys.encrypted_private_key],
+        );
+
+        // Changed meanwhile from another device.
+        if (updated.rowCount === 0) {
+          return null;
+        }
+
+        const ready = await client.query(
+          `
+          UPDATE recovery_requests r SET completed_at = NOW()
+          FROM recovery_setups st
+          WHERE r.user_id = $1 AND st.id = r.setup_id AND ${ACTIVE_REQUEST}
+            AND r.ready_at <= NOW()
+            AND (SELECT COUNT(*) FROM recovery_approvals a WHERE a.request_id = r.id) >= st.threshold
+          RETURNING r.id
+          `,
+          [userId],
+        );
+
+        await cancelActiveRequests(client, userId);
+        await client.query("DELETE FROM recovery_setups WHERE user_id = $1", [userId]);
+
+        if (ready.rows.length > 0) {
+          await client.query("DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2", [
+            userId,
+            tokenHash,
+          ]);
+        }
+
+        return ready.rows.length > 0;
+      });
+
+      if (recovered === null) {
+        return reply.status(409).send({ error: "The OstrichID was changed meanwhile: log in again" });
+      }
+
+      await clearFailedLogins(request, request.user.username);
+
+      if (recovered) {
+        closeUserSockets(userId, tokenHash);
+      }
+
+      announceRecovery(audience);
+
+      return { keys: keysView({ public_key: row.public_key, encrypted_private_key: keys.encrypted_private_key }), recovered };
     },
   );
 

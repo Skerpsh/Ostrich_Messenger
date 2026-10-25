@@ -51,6 +51,7 @@
 - 👁 Optional online status and read receipts, blocking, per-device sessions with remote log out
 - ✉️ **Letters to the future**: seal a message with its files until a date (up to 10 years); nobody can open it before then, the sender and the server neither (time-lock encryption with [drand](https://drand.love)). Send it as an envelope that waits in the chat, or as a surprise that arrives on the day
 - ⌛ **If I disappear**: messages written ahead (with files, and your OstrichID only if you choose) that are sent for you when you have not opened Ostrich for the days you choose; your phones are warned a week, a day and an hour before, and opening Ostrich on any device starts the days again. They are encrypted on your device: the server keeps ciphertext and only knows whom they go to and when
+- 🤝 **Recovery through friends**: your OstrichID split among friends you choose (any 3 of 5, or as you set), each share encrypted for one of them, so neither the server nor any one friend learns it. Lost it? Ask from a new device with your password, read a code to your friends by voice, and after a day (in which your devices can cancel it) you are back in with a new OstrichID
 - 🗄 **What the server sees**: any message or chat exactly as the server stores it, fetched from it, next to what stays encrypted
 - 📲 **Log in with a QR code**: a logged-in device scans it and sends the account's key encrypted for the new device only
 
@@ -110,8 +111,9 @@ are already logged in: **Settings → Devices → Link a device**. Only scan cod
 devices.
 
 > [!IMPORTANT]
-> Lose your OstrichID and you lose access to your messages on new devices. This is the
-> price of the server knowing nothing about them.
+> Lose your OstrichID and you lose access to your messages on new devices, unless you chose
+> guardians in **Settings → Recovery through friends**. This is the price of the server
+> knowing nothing about them.
 
 To install the web app, use the browser's **Install app** / **Add to Home Screen** option.
 It keeps working offline and sends messages when it is back online.

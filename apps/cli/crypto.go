@@ -136,6 +136,12 @@ type AccountKeys struct {
 func createAccountKeys(derived derivedKeys) (KeyMaterial, []byte) {
 	privateKey := randomBytes(32)
 
+	return wrapAccountKey(derived, privateKey), privateKey
+}
+
+// wrapAccountKey: the account's private key encrypted for storage with
+// what an OstrichID derives (a new ID keeps the key pair).
+func wrapAccountKey(derived derivedKeys, privateKey []byte) KeyMaterial {
 	publicKey, err := curve25519.X25519(privateKey, curve25519.Basepoint)
 	if err != nil {
 		panic(err)
@@ -153,7 +159,7 @@ func createAccountKeys(derived derivedKeys) (KeyMaterial, []byte) {
 		AuthKey:             derived.authKey,
 		PublicKey:           base64.StdEncoding.EncodeToString(publicKey),
 		EncryptedPrivateKey: base64.StdEncoding.EncodeToString(append(nonce, sealed...)),
-	}, privateKey
+	}
 }
 
 var errWrongOstrichID = errors.New("wrong OstrichID")

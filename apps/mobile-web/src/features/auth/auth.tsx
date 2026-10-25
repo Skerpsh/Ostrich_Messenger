@@ -19,7 +19,9 @@ import {
   normalizeOstrichId,
   openPrivateKey,
   toBase64,
+  wrapAccountKey,
 } from "@/crypto/crypto";
+import { RECOVERED_KEY } from "@/features/recovery/saved";
 import { getItem, removeItem, setItem } from "@/platform/storage";
 
 const TOKEN_KEY = "ostrich-token";
@@ -59,6 +61,17 @@ type AuthContextValue = {
   // Logged in by another device that scanned this one's QR code
   // (app/link-device.tsx): the session and the account's private key.
   signInLinked: (response: api.AuthResponse, privateKey: Uint8Array) => Promise<void>;
+  // After a recovery through friends (app/recover.tsx): logs in with the
+  // OstrichID the guardians' shares gave and replaces it with `newId`
+  // (made and kept by the caller first, in case the answer is lost and
+  // this is tried again), shown like a new account's. `recoveredId` null:
+  // the server has the new one already.
+  signInRecovered: (
+    username: string,
+    password: string,
+    recoveredId: string | null,
+    newId: string,
+  ) => Promise<void>;
   // Gets the account's keys onto this device with the OstrichID.
   unlock: (ostrichId: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -99,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removeItem(USER_KEY),
       removeItem(PENDING_OSTRICH_ID_KEY),
       removeItem(PRIVATE_KEY_KEY),
+      removeItem(RECOVERED_KEY),
     ]);
     clearChatKeys();
     clearGroupKeys();
@@ -218,6 +232,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await startSession(response, privateKey, formatOstrichId(ostrichId));
   };
 
+  // Logs in with an OstrichID the account has; null if it is not its.
+  const loginWith = async (username: string, password: string, ostrichId: string) => {
+    const derived = deriveFromOstrichId(ostrichId);
+    let response: api.AuthResponse;
+
+    try {
+      response = await api.login(username, password, derived.authKey);
+    } catch (error) {
+      if (error instanceof api.ApiError && error.status === 401) {
+        return null;
+      }
+
+      throw error;
+    }
+
+    try {
+      return { response, derived, privateKey: openPrivateKey(derived, response.keys!.encrypted_private_key) };
+    } catch {
+      return null;
+    }
+  };
+
+  const signInRecovered = async (
+    username: string,
+    password: string,
+    recoveredId: string | null,
+    newId: string,
+  ) => {
+    const old = recoveredId ? await loginWith(username, password, recoveredId) : null;
+
+    if (!old) {
+      // Already changed by a try whose answer was lost.
+      const changed = await loginWith(username, password, newId);
+
+      if (!changed) {
+        throw new api.ApiError("Invalid username or password", 401);
+      }
+
+      await setItem(RECOVERED_KEY, "1");
+      await startSession(changed.response, changed.privateKey, formatOstrichId(newId));
+      return;
+    }
+
+    const { keys } = await api.changeOstrichId(
+      old.response.token,
+      password,
+      old.derived.authKey,
+      wrapAccountKey(deriveFromOstrichId(newId), old.privateKey),
+    );
+
+    await setItem(RECOVERED_KEY, "1");
+    await startSession({ ...old.response, keys }, old.privateKey, formatOstrichId(newId));
+  };
+
   const signInLinked = (response: api.AuthResponse, privateKey: Uint8Array) =>
     startSession(response, privateKey, null);
 
@@ -325,6 +393,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         signInLinked,
+        signInRecovered,
         unlock,
         signOut,
         signOutEverywhere,

@@ -142,6 +142,9 @@ type model struct {
 	// user is here, and whether its going off was shown.
 	aliveAt        time.Time
 	disappearShown bool
+
+	// Recovery through friends (recovery.go).
+	recovery recoveryState
 	// A QR code shown (invite and profile links).
 	qr *qrState
 
@@ -584,8 +587,9 @@ func (m *model) startSession(result *LoginResponse) tea.Cmd {
 
 	m.closeConnection()
 	m.connStatus = connConnecting
+	m.recovery = recoveryState{}
 
-	return tea.Batch(m.loadChats(), connectCmd(result.Token, m.connGen, 0))
+	return tea.Batch(m.loadChats(), connectCmd(result.Token, m.connGen, 0), m.loadRecovery())
 }
 
 // signOut drops the session (and forgets a remembered one) and returns
@@ -624,6 +628,7 @@ func (m *model) signOut(notice string) tea.Cmd {
 	m.letters = map[string]*letterState{}
 	m.aliveAt = time.Time{}
 	m.disappearShown = false
+	m.recovery = recoveryState{}
 	m.knownKeys = nil
 	m.keyChanged = nil
 	m.presence = map[string]presence{}

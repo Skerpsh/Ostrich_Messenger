@@ -531,6 +531,138 @@ export function deleteDisappearMessage(token: string, id: string) {
   return request<DisappearStatus>("DELETE", `/api/disappear/messages/${encodeURIComponent(id)}`, { token });
 }
 
+// --- recovery through friends (backend recovery.ts, features/recovery) ---
+
+export type RecoveryPerson = { id: string; username: string; avatar_id: string | null; is_developer: boolean };
+
+// A request to recover the account from a new device.
+export type RecoveryRequest = {
+  id: string;
+  // The new device's one-time key: its code is compared with the guardians.
+  public_key: string;
+  client: string;
+  created_at: string;
+  // The shares are given out after this (if not cancelled).
+  ready_at: string;
+  expires_at: string;
+  approvals: number;
+};
+
+export type RecoveryStatus = {
+  setup: { id: string; threshold: number; created_at: string; guardians: RecoveryPerson[] } | null;
+  requests: RecoveryRequest[];
+};
+
+export function getRecovery(token: string) {
+  return request<RecoveryStatus>("GET", "/api/recovery", { token });
+}
+
+// The guardians, replacing any before: each share sealed for its guardian.
+// `authKey`: of the OstrichID they are shares of.
+export function setRecovery(
+  token: string,
+  setup: {
+    id: string;
+    threshold: number;
+    authKey: string;
+    shares: { guardian_id: string; sealed: string; sealer_public: string }[];
+  },
+) {
+  return request<RecoveryStatus>("PUT", "/api/recovery", {
+    token,
+    body: { id: setup.id, threshold: setup.threshold, auth_key: setup.authKey, shares: setup.shares },
+  });
+}
+
+export function removeRecovery(token: string) {
+  return request<RecoveryStatus>("DELETE", "/api/recovery", { token });
+}
+
+// "It's not me."
+export function cancelRecoveryRequest(token: string, id: string) {
+  return request<RecoveryStatus>("DELETE", `/api/recovery/requests/${encodeURIComponent(id)}`, { token });
+}
+
+// The friends whose shares the user keeps.
+export type Guarding = {
+  setup_id: string;
+  threshold: number;
+  total: number;
+  // The share, sealed for the user.
+  sealed: string;
+  sealer_public: string;
+  owner: RecoveryPerson;
+  request: {
+    id: string;
+    public_key: string;
+    client: string;
+    created_at: string;
+    ready_at: string;
+    approved: boolean;
+  } | null;
+};
+
+export async function getGuarding(token: string) {
+  const { guarding } = await request<{ guarding: Guarding[] }>("GET", "/api/recovery/guarding", { token });
+
+  return guarding;
+}
+
+// The guardian's share, sealed again for the request's key.
+export function approveRecovery(token: string, requestId: string, sealed: { sealed: string; publicKey: string }) {
+  return request<{ approved: true }>("POST", `/api/recovery/requests/${encodeURIComponent(requestId)}/approve`, {
+    token,
+    body: { sealed: sealed.sealed, sealer_public: sealed.publicKey },
+  });
+}
+
+// Logged out: asks to recover, with a one-time public key. `secret`
+// fetches the shares later. "no_guardians" (404) if there are none.
+export type NewRecoveryRequest = {
+  id: string;
+  secret: string;
+  user_id: string;
+  username: string;
+  ready_at: string;
+  expires_at: string;
+  threshold: number;
+  total: number;
+};
+
+export function requestRecovery(username: string, password: string, publicKey: string) {
+  return request<NewRecoveryRequest>("POST", "/api/recovery/requests", {
+    body: { username, password, public_key: publicKey },
+  });
+}
+
+export type RecoveryProgress = {
+  state: "waiting" | "ready" | "cancelled" | "completed" | "expired";
+  ready_at: string;
+  expires_at: string;
+  approvals: number;
+  threshold: number | null;
+  total: number | null;
+  // Once ready: each a share sealed for the request's key.
+  shares?: { guardian_id: string; sealed: string; sealer_public: string }[];
+  encrypted_private_key?: string;
+};
+
+export function recoveryProgress(id: string, secret: string) {
+  return request<RecoveryProgress>("POST", `/api/recovery/requests/${encodeURIComponent(id)}/status`, {
+    body: { secret },
+  });
+}
+
+// A new OstrichID for the same key pair; ends the guardians' setup (its
+// shares were of the old one). `recovered`: after a recovery through
+// friends, which also ended every other session.
+export function changeOstrichId(token: string, password: string, authKey: string, keys: KeyMaterial) {
+  return request<{ keys: AccountKeys; recovered: boolean }>("POST", "/api/auth/ostrich-id", {
+    token,
+    body: { password, auth_key: authKey, keys },
+  });
+}
+
 // A drand round's signature, the key of the letters sealed to it
 // (features/chat/sealed.ts checks it); refused (425) before the round.
 export async function getDrandSignature(token: string, round: number) {

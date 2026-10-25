@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DisappearBanner } from "@/features/disappear/disappear";
+import { RecoveryBanner } from "@/features/recovery/recovery";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { usePathname, useRouter } from "expo-router";
@@ -294,6 +295,7 @@ export default function ChatList() {
         />
       )}
 
+      <RecoveryBanner />
       <DisappearBanner />
 
       <View style={[styles.searchWrap, wide && styles.searchRow]}>

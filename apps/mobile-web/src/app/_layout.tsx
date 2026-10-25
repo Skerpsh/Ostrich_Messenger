@@ -137,6 +137,7 @@ function RootNavigator() {
           <Stack.Screen name="login" />
           <Stack.Screen name="register" />
           <Stack.Screen name="link-device" />
+          <Stack.Screen name="recover" />
         </Stack.Protected>
 
         <Stack.Protected guard={mustSaveOstrichId}>

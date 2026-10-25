@@ -2,6 +2,7 @@ import { Slot, Stack } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import ChatList from "@/features/chats/chat-list";
 import { DisappearWatch } from "@/features/disappear/disappear";
+import { RecoveryWatch } from "@/features/recovery/recovery";
 import { useAppTheme } from "@/ui/theme";
 import { useIsWide, useSidebarWidth } from "@/ui/layout";
 import { useScreenAnimation } from "@/ui/motion";
@@ -19,6 +20,8 @@ export default function ChatsLayout() {
     return (
       <>
         <DisappearWatch />
+      <RecoveryWatch />
+        <RecoveryWatch />
         <Stack
           screenOptions={{
             headerShown: false,
@@ -38,6 +41,7 @@ export default function ChatsLayout() {
   return (
     <View style={[styles.split, { backgroundColor: colors.bg }]}>
       <DisappearWatch />
+      <RecoveryWatch />
       <View
         style={[
           styles.sidebar,

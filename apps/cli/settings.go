@@ -72,7 +72,7 @@ func (m *model) openSettings() tea.Cmd {
 
 	m.selectFirstSettingsRow()
 
-	return m.loadSessions()
+	return tea.Batch(m.loadSessions(), m.loadRecovery())
 }
 
 func (m *model) closeSettings() tea.Cmd {
@@ -252,6 +252,8 @@ func (m model) settingsRows() []settingsRow {
 		rows = append(rows, row)
 	}
 
+	rows = append(rows, m.recoveryRows()...)
+
 	rows = append(rows,
 		section("Security"),
 		settingsRow{kind: rowAction, id: "logoutall", icon: "⏻", label: "Log out of all devices", danger: true,
@@ -331,6 +333,8 @@ func (m *model) openForm(form string) tea.Cmd {
 			newInput("Password", 128, true, p),
 			newInput("OstrichID", 40, true, p),
 		}
+	default:
+		s.inputs = m.openRecoveryForm(form)
 	}
 
 	s.resize(m.paneWidth())
@@ -411,6 +415,10 @@ func (m *model) submitForm() tea.Cmd {
 				return done(m)
 			}
 		})
+	}
+
+	if cmd, ok := m.submitRecoveryForm(run); ok {
+		return cmd
 	}
 
 	switch s.form {
@@ -910,6 +918,8 @@ func (m model) settingsBody(w int) (lines []string, rowAt []int) {
 					label = "Press Enter again to log out on all devices"
 				case strings.HasPrefix(r.id, "session:"):
 					label = "Press Enter again to log this device out"
+				case r.id == "recovery-remove":
+					label = "Press Enter again to remove all guardians"
 				}
 			}
 
@@ -1010,7 +1020,14 @@ func (m model) formLines(cw int) []string {
 		return lines
 	}
 
-	for _, line := range wrap(intro[s.form], inner) {
+	text := intro[s.form]
+	recoveryIntro, recoveryLabel, isRecovery := m.recoveryFormText(s.form)
+
+	if isRecovery {
+		text = recoveryIntro
+	}
+
+	for _, line := range wrap(text, inner) {
 		add(seg(line, p.textSoft, bg))
 	}
 
@@ -1034,6 +1051,10 @@ func (m model) formLines(cw int) []string {
 		"photo":    "Set photo",
 		"delete":   "Delete account",
 	}[s.form]
+
+	if isRecovery {
+		label = recoveryLabel
+	}
 
 	if s.form == "delete" && s.confirmDelete {
 		label = "Delete forever? Press Enter again"

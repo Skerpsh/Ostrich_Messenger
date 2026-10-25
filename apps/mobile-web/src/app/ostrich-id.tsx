@@ -93,8 +93,9 @@ export default function OstrichIdScreen() {
             You need it to log in, together with your username and password.
           </Text>
           <Text style={[styles.warning, { color: colors.danger }]}>
-            It is shown only this once. Ostrich cannot show it again or
-            recover it: if you lose it, you lose access to your account.
+            It is shown only this once. Ostrich cannot show it again: if you
+            lose it, only friends you choose as guardians (Settings →
+            Recovery through friends) can give it back.
           </Text>
           <Text style={[styles.text, { color: colors.textSoft }]}>
             Save it somewhere safe, such as a password manager.

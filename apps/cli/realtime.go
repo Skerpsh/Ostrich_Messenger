@@ -299,6 +299,9 @@ func (m *model) handleEvent(event WSMessage) tea.Cmd {
 	case "chats_changed":
 		return m.loadChats()
 
+	case "recovery":
+		return m.loadRecovery()
+
 	case "call_incoming":
 		if call := event.Call; call != nil {
 			if i := m.findChat(call.ChatID); i >= 0 {
