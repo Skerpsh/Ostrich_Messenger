@@ -12,7 +12,6 @@ arch=('x86_64')
 url="https://ostrich-messenger.online"
 license=('MIT')
 depends=('gtk3' 'nss' 'alsa-lib' 'libxss' 'libnotify' 'xdg-utils')
-optdepends=('libappindicator-gtk3: the icon in the tray on some desktops')
 provides=('ostrich-desktop')
 conflicts=('ostrich-desktop')
 options=('!strip' '!debug')

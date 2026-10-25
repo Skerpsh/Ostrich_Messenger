@@ -62,6 +62,16 @@
       "maintainer": "Ostrich <hello@ostrich-messenger.com>",
       "syncDesktopName": true
     },
+    "pacman": {
+      "depends": [
+        "gtk3",
+        "nss",
+        "alsa-lib",
+        "libxss",
+        "libnotify",
+        "xdg-utils"
+      ]
+    },
     "flatpak": {
       "artifactName": "Ostrich-Linux.${ext}",
       "runtimeVersion": "24.08",
