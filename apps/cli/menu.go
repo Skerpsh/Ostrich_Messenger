@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
+
 	tea "github.com/charmbracelet/bubbletea"
 	zone "github.com/lrstanley/bubblezone"
 )
@@ -13,38 +15,70 @@ import (
 
 type menuItem struct {
 	icon, label string
-	danger      bool
+	// The key that does it without the menu, shown on the right.
+	key string
+	// A heading over it, where it starts a part (the palette's).
+	section string
+	danger  bool
 	// Destructive actions take a second Enter: the label shown after the
 	// first.
 	confirm string
 	action  func(*model) tea.Cmd
 }
 
+// A menu over the screen: the chat's, a message's, the commands (Ctrl+P,
+// palette.go). Typing filters it; ↑↓ choose, Enter does it.
 type menuState struct {
 	title string
 	// A message's menu starts with its reactions.
 	reactionsFor *Message
 	items        []menuItem
-	// -1: the reactions row.
+	// Index into shown(); -1: the reactions row.
 	cursor int
 	// Position in the reactions row.
-	reaction   int
+	reaction int
+	// The item (index into items) asking for its second Enter.
 	confirming int
 	// A group's info (its chat id): redrawn when the members load.
 	groupInfo string
+	filter    textinput.Model
 }
 
 func (m *model) openMenu(menu *menuState) {
+	menu.filter = newInput("Type to filter", 40, false, m.pal)
+	menu.filter.Prompt = ""
+	menu.filter.Focus()
 	m.menu = menu
+}
+
+// shown: the items whose label has the filter's words, as indexes.
+func (menu *menuState) shown() []int {
+	words := strings.Fields(strings.ToLower(menu.filter.Value()))
+	var out []int
+
+	for i, item := range menu.items {
+		label := strings.ToLower(item.label + " " + item.key)
+		all := true
+
+		for _, word := range words {
+			all = all && strings.Contains(label, word)
+		}
+
+		if all {
+			out = append(out, i)
+		}
+	}
+
+	return out
 }
 
 // focusLabel puts the cursor on an item and asks for its confirmation.
 func (menu *menuState) focusLabel(label string) {
-	for i, item := range menu.items {
-		if item.label == label {
-			menu.cursor = i
+	for pos, i := range menu.shown() {
+		if menu.items[i].label == label {
+			menu.cursor = pos
 
-			if item.confirm != "" {
+			if menu.items[i].confirm != "" {
 				menu.confirming = i
 			}
 		}
@@ -55,7 +89,7 @@ func (m *model) messageMenu(chat Chat, message Message) *menuState {
 	own := message.SenderID == m.user.User.ID
 	shown := m.show(chat, message.ID, message.SenderID, message.Content)
 	title := oneLine(sanitize(plainText(shown.text)))
-	copyItem := menuItem{icon: "⧉", label: "Copy text", action: func(m *model) tea.Cmd { return m.copyMessage(chat, message) }}
+	copyItem := menuItem{icon: "⧉", label: "Copy text", key: "c", action: func(m *model) tea.Cmd { return m.copyMessage(chat, message) }}
 
 	// Still on its way: it can only be sent again, copied or dropped.
 	if state := m.outgoingState(message.ID); state != "" {
@@ -85,7 +119,7 @@ func (m *model) messageMenu(chat Chat, message Message) *menuState {
 	}
 
 	items := []menuItem{
-		{icon: "↪", label: "Reply", action: func(m *model) tea.Cmd { return m.startReply(message) }},
+		{icon: "↪", label: "Reply", key: "r", action: func(m *model) tea.Cmd { return m.startReply(message) }},
 		{icon: "☺", label: "React with another emoji…", action: func(m *model) tea.Cmd {
 			return m.openPrompt("React with", "an emoji", "Type or paste one emoji.", "", 32, func(m *model, value string) tea.Cmd {
 				if m.chat != nil {
@@ -137,17 +171,17 @@ func (m *model) messageMenu(chat Chat, message Message) *menuState {
 		}})
 	}
 
-	items = append(items, menuItem{icon: "🗄", label: "What the server sees (s)", action: func(m *model) tea.Cmd {
+	items = append(items, menuItem{icon: "🗄", label: "What the server sees", key: "s", action: func(m *model) tea.Cmd {
 		return m.openMessageServerView(chat, message)
 	}})
 
 	if own && shown.status == decryptOK && shown.forwardedFrom == "" && shown.sealed == nil {
-		items = append(items, menuItem{icon: "✎", label: "Edit", action: func(m *model) tea.Cmd { return m.startEdit(chat, message) }})
+		items = append(items, menuItem{icon: "✎", label: "Edit", key: "e", action: func(m *model) tea.Cmd { return m.startEdit(chat, message) }})
 	}
 
 	// In a group, admins delete any message.
 	if own || chat.isAdmin() {
-		items = append(items, menuItem{icon: "🗑", label: "Delete", danger: true, confirm: "Delete for everyone?", action: func(m *model) tea.Cmd {
+		items = append(items, menuItem{icon: "🗑", label: "Delete", key: "d", danger: true, confirm: "Delete for everyone?", action: func(m *model) tea.Cmd {
 			m.chat.resetSelection()
 			return tea.Batch(m.deleteMessage(message), m.chat.composer.Focus())
 		}})
@@ -285,7 +319,7 @@ func (m *model) chatMenu(chat Chat, inChat bool) *menuState {
 	var items []menuItem
 
 	if inChat {
-		items = append(items, menuItem{icon: "🔍", label: "Search in chat", action: func(m *model) tea.Cmd {
+		items = append(items, menuItem{icon: "🔍", label: "Search in chat", key: "Ctrl+F", action: func(m *model) tea.Cmd {
 			return m.openChatSearch()
 		}})
 		items = append(items, menuItem{icon: "🗄", label: "What the server sees", action: func(m *model) tea.Cmd {
@@ -302,7 +336,7 @@ func (m *model) chatMenu(chat Chat, inChat bool) *menuState {
 		}
 
 		if chat.PublicKey != "" {
-			items = append(items, menuItem{icon: "🛡", label: "Safety code", action: func(m *model) tea.Cmd {
+			items = append(items, menuItem{icon: "🛡", label: "Safety code", key: "Ctrl+K", action: func(m *model) tea.Cmd {
 				m.openSafety(chat)
 				return nil
 			}})
@@ -349,14 +383,21 @@ func (m *model) chatMenu(chat Chat, inChat bool) *menuState {
 	return &menuState{title: "@" + chat.Username, items: items, confirming: -1}
 }
 
-// chooseItem runs an item (or asks for confirmation first).
-func (m *model) chooseItem(i int) tea.Cmd {
+// chooseItem runs the item shown at pos (or asks for confirmation first).
+func (m *model) chooseItem(pos int) tea.Cmd {
 	menu := m.menu
+	shown := menu.shown()
+
+	if pos < 0 || pos >= len(shown) {
+		return nil
+	}
+
+	i := shown[pos]
 	item := menu.items[i]
 
 	if item.confirm != "" && menu.confirming != i {
 		menu.confirming = i
-		menu.cursor = i
+		menu.cursor = pos
 
 		return nil
 	}
@@ -392,42 +433,63 @@ func (m *model) closeMenu() tea.Cmd {
 
 func (m *model) updateMenuKey(msg tea.KeyMsg) tea.Cmd {
 	menu := m.menu
+	shown := menu.shown()
 	first := 0
 
-	if menu.reactionsFor != nil {
+	if menu.reactionsFor != nil && menu.filter.Value() == "" {
 		first = -1
 	}
 
 	switch key := msg.String(); key {
-	case "esc", "q":
+	case "esc":
+		// The filter first, then the menu.
+		if menu.filter.Value() != "" {
+			menu.filter.SetValue("")
+			menu.cursor, menu.confirming = 0, -1
+
+			return nil
+		}
+
 		return m.closeMenu()
-	case "up", "k", "shift+tab":
+	case "up", "shift+tab", "ctrl+p":
 		menu.cursor = max(menu.cursor-1, first)
 		menu.confirming = -1
-	case "down", "j", "tab":
-		menu.cursor = min(menu.cursor+1, len(menu.items)-1)
+
+		return nil
+	case "down", "tab", "ctrl+n":
+		menu.cursor = min(menu.cursor+1, len(shown)-1)
 		menu.confirming = -1
-	case "left", "h":
+
+		return nil
+	case "left", "right":
 		if menu.cursor == -1 {
-			menu.reaction = max(menu.reaction-1, 0)
+			step := map[string]int{"left": -1, "right": 1}[key]
+			menu.reaction = min(max(menu.reaction+step, 0), len(reactionEmoji)-1)
+
+			return nil
 		}
-	case "right", "l":
-		if menu.cursor == -1 {
-			menu.reaction = min(menu.reaction+1, len(reactionEmoji)-1)
-		}
-	case "enter", " ":
+	case "enter":
 		if menu.cursor == -1 {
 			return m.chooseReaction(menu.reaction)
 		}
 
 		return m.chooseItem(menu.cursor)
 	default:
-		if menu.reactionsFor != nil && len(key) == 1 && key[0] >= '1' && key[0] < '1'+byte(len(reactionEmoji)) {
+		// 1–8 react while nothing is typed.
+		if menu.reactionsFor != nil && menu.filter.Value() == "" && len(key) == 1 && key[0] >= '1' && key[0] < '1'+byte(len(reactionEmoji)) {
 			return m.chooseReaction(int(key[0] - '1'))
 		}
 	}
 
-	return nil
+	var cmd tea.Cmd
+	menu.filter, cmd = menu.filter.Update(msg)
+	menu.confirming = -1
+
+	if len(menu.shown()) > 0 {
+		menu.cursor = 0
+	}
+
+	return cmd
 }
 
 func (m *model) updateMenuMouse(msg tea.MouseMsg) tea.Cmd {
@@ -441,9 +503,9 @@ func (m *model) updateMenuMouse(msg tea.MouseMsg) tea.Cmd {
 		}
 	}
 
-	for i := range m.menu.items {
-		if clicked(msg, fmt.Sprintf("menu:item:%d", i)) {
-			return m.chooseItem(i)
+	for pos := range m.menu.shown() {
+		if clicked(msg, fmt.Sprintf("menu:item:%d", pos)) {
+			return m.chooseItem(pos)
 		}
 	}
 
@@ -458,38 +520,73 @@ func (m *model) updateMenuMouse(msg tea.MouseMsg) tea.Cmd {
 func (m model) menuView() string {
 	menu := m.menu
 	p := m.pal
-	bg := p.panel
-	w := min(46, m.width-4)
+	bg := p.bg
+	w := min(56, m.width-4)
 	inner := w - 4
 	var lines []string
 
-	if menu.title != "" {
-		lines = append(lines, seg(clip(menu.title, inner), p.muted, bg), "")
-	}
+	lines = append(lines, bold("> ", p.accent, bg)+fitLine(onBackground(menu.filter.View(), bg), inner-2, bg), "")
 
-	if message := menu.reactionsFor; message != nil {
+	if message := menu.reactionsFor; message != nil && menu.filter.Value() == "" {
 		var chips []string
 
 		for i, emoji := range reactionEmoji {
-			chipBg := bg
+			label := " " + emoji + " "
 
 			for _, r := range message.Reactions {
 				if r.UserID == m.user.User.ID && r.Emoji == emoji {
-					chipBg = p.accentSoft
+					label = "(" + emoji + ")"
 				}
 			}
 
+			chip := seg(label, p.text, bg)
+
 			if menu.cursor == -1 && menu.reaction == i {
-				chipBg = p.hover
+				chip = bold("["+emoji+"]", p.accent, bg)
 			}
 
-			chips = append(chips, zone.Mark(fmt.Sprintf("menu:reaction:%d", i), seg(" "+emoji+" ", p.text, chipBg)))
+			chips = append(chips, zone.Mark(fmt.Sprintf("menu:reaction:%d", i), chip))
 		}
 
-		lines = append(lines, center(strings.Join(chips, ""), inner, bg), "")
+		lines = append(lines, strings.Join(chips, blank(1, bg)), "")
 	}
 
-	for i, item := range menu.items {
+	shown := menu.shown()
+
+	// Long lists scroll around the cursor; headings take lines too.
+	headings := map[string]bool{}
+
+	for _, i := range shown {
+		if s := menu.items[i].section; s != "" && menu.filter.Value() == "" {
+			headings[s] = true
+		}
+	}
+
+	room := max(m.height-12-len(lines)-2*len(headings), 3)
+	top := 0
+
+	if menu.cursor >= room {
+		top = menu.cursor - room + 1
+	}
+
+	if len(shown) == 0 {
+		lines = append(lines, seg("Nothing matches", p.muted, bg))
+	}
+
+	section := ""
+
+	for pos := top; pos < len(shown) && pos < top+room; pos++ {
+		item := menu.items[shown[pos]]
+
+		// Headings while nothing is typed.
+		if item.section != "" && item.section != section && menu.filter.Value() == "" {
+			if section != "" {
+				lines = append(lines, "")
+			}
+
+			lines = append(lines, seg(clip(item.section, inner), p.muted, bg))
+			section = item.section
+		}
 		fg := p.text
 
 		if item.danger {
@@ -498,29 +595,38 @@ func (m model) menuView() string {
 
 		label := item.label
 
-		if menu.confirming == i {
-			label = item.confirm
+		if menu.confirming == shown[pos] {
+			label = item.confirm + " (Enter)"
 		}
 
-		itemBg := bg
+		// Filtered, the headings are not there: the part is on the right.
+		right := item.key
 
-		if menu.cursor == i {
-			itemBg = p.hover
+		if menu.filter.Value() != "" && item.section != "" {
+			right = strings.ToLower(item.section)
+
+			if item.key != "" {
+				right += " · " + item.key
+			}
 		}
 
-		line := fitLine(seg(" "+item.icon+"  ", fg, itemBg)+bold(clip(sanitize(label), inner-6), fg, itemBg), inner, itemBg)
-		lines = append(lines, zone.Mark(fmt.Sprintf("menu:item:%d", i), line))
+		bar := blank(1, bg)
+		text := seg(clip(sanitize(label), inner-2-width(right)-2), fg, bg)
+
+		if menu.cursor == pos {
+			bar = seg("▌", p.accent, bg)
+			text = bold(clip(sanitize(label), inner-2-width(right)-2), fg, bg)
+		}
+
+		line := row(bar+blank(1, bg)+text, seg(right, p.muted, bg), inner, bg)
+		lines = append(lines, zone.Mark(fmt.Sprintf("menu:item:%d", pos), line))
 	}
 
-	hints := "↑↓ Choose  Enter Select  Esc Close"
-
-	if menu.reactionsFor != nil {
-		hints = "1–8 React  ↑↓ Choose  Enter Select  Esc Close"
+	if more := len(shown) - top - room; more > 0 {
+		lines = append(lines, seg(fmt.Sprintf("  %d more…", more), p.muted, bg))
 	}
 
-	lines = append(lines, "", seg(clip(hints, inner), p.muted, bg))
-
-	return zone.Mark("menu", m.card(lines, w))
+	return zone.Mark("menu", m.box(clip(sanitize(menu.title), w-6), lines, w))
 }
 
 // --- safety code ---
@@ -592,7 +698,7 @@ func (m *model) updateSafetyMouse(msg tea.MouseMsg) tea.Cmd {
 
 func (m model) safetyView() string {
 	p := m.pal
-	bg := p.panel
+	bg := p.bg
 	peer := m.safetyWith()
 	name := sanitize(peer.Username)
 	w := min(60, m.width-4)
@@ -606,26 +712,16 @@ func (m model) safetyView() string {
 		code, err = safetyCode(own, peer.PublicKey)
 	}
 
-	icon, iconColor := "🛡", p.accent
-
-	if changed {
-		icon, iconColor = "⚠", p.danger
-	}
-
-	lines := []string{
-		seg(icon+"  ", iconColor, bg) + bold("Safety code with @"+name, p.text, bg),
-		"",
-	}
+	var lines []string
 
 	if err != nil {
 		lines = append(lines, seg(clip(err.Error(), inner), p.danger, bg))
 	} else {
-		box := p.panelAlt
 		lines = append(lines,
-			blank(inner, box),
-			center(bold(strings.Join(code[:4], "  "), p.text, box), inner, box),
-			center(bold(strings.Join(code[4:], "  "), p.text, box), inner, box),
-			blank(inner, box),
+			"",
+			center(bold(strings.Join(code[:4], "  "), p.accent, bg), inner, bg),
+			center(bold(strings.Join(code[4:], "  "), p.accent, bg), inner, bg),
+			"",
 		)
 	}
 
@@ -647,5 +743,11 @@ func (m model) safetyView() string {
 
 	lines = append(lines, "", zone.Mark("safety:close", m.button("Close (Esc)", inner, false, true)))
 
-	return zone.Mark("safety", m.card(lines, w))
+	title := "Safety code with @" + name
+
+	if changed {
+		title = "! " + title
+	}
+
+	return zone.Mark("safety", m.box(clip(title, w-6), lines, w))
 }

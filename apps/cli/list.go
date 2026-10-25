@@ -232,7 +232,7 @@ func (m *model) updateListKey(msg tea.KeyMsg) tea.Cmd {
 	case "s":
 		return m.openSettings()
 	case "t":
-		m.toggleTheme()
+		return m.toggleTheme()
 	case "tab":
 		if m.chat != nil {
 			m.focus = paneChat
@@ -343,8 +343,7 @@ func (m *model) updateListMouse(msg tea.MouseMsg) (tea.Cmd, bool) {
 	case clicked(msg, "list:settings"):
 		return m.openSettings(), true
 	case clicked(msg, "list:theme"):
-		m.toggleTheme()
-		return nil, true
+		return m.toggleTheme(), true
 	}
 
 	for i, row := range m.listRows() {
@@ -367,7 +366,12 @@ func (m *model) updateListMouse(msg tea.MouseMsg) (tea.Cmd, bool) {
 }
 
 // toggleTheme switches between light and dark (leaving "system").
-func (m *model) toggleTheme() {
+// With the terminal's colors it has nothing to switch: it says where.
+func (m *model) toggleTheme() tea.Cmd {
+	if m.cfg.Colors != "ostrich" {
+		return m.showToast("Ostrich uses the terminal's colors: switch it in Settings → Appearance", false)
+	}
+
 	if m.pal.mode == themeDark {
 		m.cfg.Theme = "light"
 	} else {
@@ -376,6 +380,8 @@ func (m *model) toggleTheme() {
 
 	m.cfg.save()
 	m.applyTheme()
+
+	return nil
 }
 
 // --- view ---

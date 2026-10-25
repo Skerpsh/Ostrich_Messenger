@@ -134,9 +134,10 @@ func (m *model) loadMembers() tea.Cmd {
 
 				if m.menu != nil && m.menu.groupInfo == chatID {
 					if chat, ok := m.chatByID(chatID); ok {
-						cursor := m.menu.cursor
-						m.menu = m.groupInfoMenu(chat)
-						m.menu.cursor = min(cursor, len(m.menu.items)-1)
+						cursor, filter := m.menu.cursor, m.menu.filter
+						m.openMenu(m.groupInfoMenu(chat))
+						m.menu.filter = filter
+						m.menu.cursor = min(cursor, len(m.menu.shown())-1)
 					}
 				}
 			}

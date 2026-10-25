@@ -412,16 +412,8 @@ var logo = []string{
 // card draws lines (each w-4 cells wide at most) on a panel with
 // padding.
 func (m model) card(lines []string, w int) string {
-	p := m.pal
-	out := []string{blank(w, p.panel)}
-
-	for _, line := range lines {
-		out = append(out, blank(2, p.panel)+fitLine(line, w-4, p.panel)+blank(2, p.panel))
-	}
-
-	out = append(out, blank(w, p.panel))
-
-	return strings.Join(out, "\n")
+	// A frame with a line of space inside, at the top and the bottom.
+	return m.box("", append(append([]string{""}, lines...), ""), w)
 }
 
 // screen centers a block on the page background, with the hints at the
@@ -459,30 +451,33 @@ func (m model) screen(block, hints string) string {
 }
 
 // button draws a full-width button.
+// button: a centered label, the main one in the accent; no fill.
 func (m model) button(label string, w int, primary, enabled bool) string {
 	p := m.pal
-	fg, bg := p.text, p.panelAlt
+	fg := p.text
 
 	switch {
-	case primary && enabled:
-		fg, bg = p.onAccent, p.accent
 	case !enabled:
 		fg = p.muted
+	case primary:
+		fg = p.accent
+		label = "[ " + label + " ]"
 	}
 
-	return center(bold(label, fg, bg), w, bg)
+	return center(bold(label, fg, p.bg), w, p.bg)
 }
 
 // inputBox draws an input with an accent bar when focused.
+// inputBox: "> " and the field, the prompt in the accent when focused.
 func (m model) inputBox(view string, focused bool, w int) string {
 	p := m.pal
-	bar := p.panelAlt
+	fg := p.muted
 
 	if focused {
-		bar = p.accent
+		fg = p.accent
 	}
 
-	return seg("▌", bar, p.panelAlt) + blank(1, p.panelAlt) + fitLine(onBackground(view, p.panelAlt), w-2, p.panelAlt)
+	return bold("> ", fg, p.bg) + fitLine(onBackground(view, p.bg), w-2, p.bg)
 }
 
 func (m model) authView() string {

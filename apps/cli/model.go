@@ -408,6 +408,11 @@ func (m *model) updateKey(msg tea.KeyMsg) tea.Cmd {
 		return nil
 	}
 
+	// The commands, from anywhere but over another window.
+	if msg.String() == "ctrl+p" && m.prompt == nil && m.menu == nil && m.qr == nil && !m.safetyOpen && m.serverView == nil {
+		return m.openPalette()
+	}
+
 	if m.prompt != nil {
 		return m.updatePromptKey(msg)
 	}

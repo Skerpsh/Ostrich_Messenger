@@ -296,13 +296,15 @@ func TestKeys(t *testing.T) {
 		check(len(rows) == 2 && rows[0].username == "car" && rows[1].chat.Username == "carol", "search filters and offers @car")
 		m = press(m, "esc", "m")
 		check(m.menu != nil, "list menu open")
+		m.cfg.Colors = "ostrich"
+		m.applyTheme()
 		m = press(m, "esc", "t")
 		check(m.pal.mode == themeLight, "theme toggled")
 		m = press(m, "t", "s")
 		check(m.settings != nil && m.focus == paneSettings, "settings open")
 
-		// Settings: theme, accent, a form; then every row.
-		m = press(m, "down", "down", "down", "right")
+		// Settings: the colors' switch, theme, accent, a form; then every row.
+		m = press(m, "down", "down", "down", "down", "right")
 		m = press(m, "down", "right")
 		check(m.cfg.Accent != defaultAccent, "accent changed")
 		m = press(m, "down", "enter")

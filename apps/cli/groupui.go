@@ -130,17 +130,12 @@ func (m *model) updatePromptMouse(msg tea.MouseMsg) tea.Cmd {
 
 func (m model) promptView() string {
 	p := m.pal
-	bg := p.panel
+	bg := p.bg
 	w := min(56, m.width-4)
 	inner := w - 4
 	prompt := m.prompt
 
-	lines := []string{
-		bold(clip(prompt.title, inner), p.text, bg),
-		"",
-		seg("▌", p.accent, p.panelAlt) + fitLine(onBackground(prompt.input.View(), p.panelAlt), inner-1, p.panelAlt),
-		"",
-	}
+	lines := []string{"", m.inputBox(prompt.input.View(), true, inner), ""}
 
 	if prompt.hint != "" {
 		for _, line := range wrap(prompt.hint, inner) {
@@ -150,9 +145,9 @@ func (m model) promptView() string {
 		lines = append(lines, "")
 	}
 
-	lines = append(lines, seg(clip("Enter OK  Esc Cancel", inner), p.muted, bg))
+	lines = append(lines, seg(clip("Enter OK  Esc cancel", inner), p.muted, bg))
 
-	return zone.Mark("prompt", m.card(lines, w))
+	return zone.Mark("prompt", m.box(clip(prompt.title, w-6), lines, w))
 }
 
 // --- creating a group ---
@@ -283,7 +278,7 @@ func (m *model) savedMenu(chat Chat, inChat bool) *menuState {
 	var items []menuItem
 
 	if inChat {
-		items = append(items, menuItem{icon: "🔍", label: "Search in chat", action: func(m *model) tea.Cmd {
+		items = append(items, menuItem{icon: "🔍", label: "Search in chat", key: "Ctrl+F", action: func(m *model) tea.Cmd {
 			return m.openChatSearch()
 		}})
 		items = append(items, menuItem{icon: "🗄", label: "What the server sees", action: func(m *model) tea.Cmd {
@@ -318,7 +313,7 @@ func (m *model) groupMenu(chat Chat, inChat bool) *menuState {
 	}
 
 	if inChat {
-		items = append(items, menuItem{icon: "🔍", label: "Search in chat", action: func(m *model) tea.Cmd {
+		items = append(items, menuItem{icon: "🔍", label: "Search in chat", key: "Ctrl+F", action: func(m *model) tea.Cmd {
 			return m.openChatSearch()
 		}})
 		items = append(items, menuItem{icon: "🗄", label: "What the server sees", action: func(m *model) tea.Cmd {
@@ -369,12 +364,12 @@ func (m *model) groupMenu(chat Chat, inChat bool) *menuState {
 func (m *model) openGroupInfo(chat Chat) tea.Cmd {
 	if m.chat == nil || m.chat.id != chat.ID {
 		cmd := m.openChat(chat)
-		m.menu = m.groupInfoMenu(chat)
+		m.openMenu(m.groupInfoMenu(chat))
 
 		return cmd
 	}
 
-	m.menu = m.groupInfoMenu(chat)
+	m.openMenu(m.groupInfoMenu(chat))
 
 	if m.members == nil {
 		return m.loadMembers()
@@ -446,11 +441,11 @@ func (m *model) groupInfoMenu(chat Chat) *menuState {
 
 		items = append(items, menuItem{icon: icon, label: label, action: func(m *model) tea.Cmd {
 			if member.ID == m.user.User.ID {
-				m.menu = m.groupInfoMenu(chat)
+				m.openMenu(m.groupInfoMenu(chat))
 				return nil
 			}
 
-			m.menu = m.memberMenu(chat, member)
+			m.openMenu(m.memberMenu(chat, member))
 
 			return nil
 		}})
@@ -505,7 +500,7 @@ func (m *model) memberMenu(chat Chat, member groupMember) *menuState {
 	}
 
 	items = append(items, menuItem{icon: "‹", label: "Back", action: func(m *model) tea.Cmd {
-		m.menu = m.groupInfoMenu(chat)
+		m.openMenu(m.groupInfoMenu(chat))
 		return nil
 	}})
 

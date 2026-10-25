@@ -198,6 +198,8 @@ func (m model) hints() string {
 	switch {
 	case m.helpOpen:
 		return "Esc close"
+	case m.menu != nil:
+		return "Type to filter  ↑↓ choose  Enter do it  Esc close"
 	case m.settings != nil && m.settings.form != "" && (m.wide() || m.focus == paneSettings):
 		return "↑↓ Tab field  Enter next / save  Esc cancel"
 	case m.settings != nil && (m.wide() || m.focus == paneSettings):
@@ -209,7 +211,7 @@ func (m model) hints() string {
 		case len(c.picked) > 0:
 			return "Enter send with the files  Ctrl+A another  Ctrl+X remove the last  Esc back"
 		case c.selecting:
-			return "↑↓ choose  r reply  e edit  d delete  c copy  1–8 react  Enter more  Esc back"
+			return "↑↓ choose  r reply  e edit  d delete  c copy  1–8 react  Enter more  Ctrl+P commands  Esc back"
 		case c.searching:
 			return "Enter older match  ↓ newer  Esc close"
 		case c.editing != nil:
@@ -224,12 +226,12 @@ func (m model) hints() string {
 			back = "Esc chats"
 		}
 
-		return "Enter send  Alt+Enter new line  ↑ choose a message  Ctrl+O menu  " + back + "  F1 help"
+		return "Enter send  Alt+Enter new line  ↑ choose a message  Ctrl+P commands  " + back + "  F1 help"
 	case m.list.searching:
 		return "Type a name, @username or a link  Enter open  Esc cancel"
 	}
 
-	return "↑↓ move  Enter open  / search  n new chat  s settings  ? help  q quit"
+	return "↑↓ move  Enter open  / search  n new chat  Ctrl+P commands  ? help  q quit"
 }
 
 // --- help ---
@@ -239,6 +241,7 @@ var helpSections = []struct {
 	keys  [][2]string
 }{
 	{"Anywhere", [][2]string{
+		{"Ctrl+P", "everything that can be done here"},
 		{"F1, ?", "this help"},
 		{"Tab", "between the chats and the open chat"},
 		{"Esc", "back, close, cancel"},
@@ -276,7 +279,11 @@ func (m model) box(title string, lines []string, w int) string {
 	line := func(s string) string { return seg(s, p.line, p.bg) }
 	inner := w - 4
 
-	top := line("┌ ") + bold(title, p.text, p.bg) + line(" "+strings.Repeat("─", max(w-5-width(title), 0))+"┐")
+	top := line("┌ ") + bold(title, p.text, p.bg) + line(" "+strings.Repeat("─", max(w-4-width(title), 0))+"┐")
+
+	if title == "" {
+		top = line("┌" + strings.Repeat("─", w-2) + "┐")
+	}
 	out := []string{fitLine(top, w, p.bg)}
 
 	for _, l := range lines {
