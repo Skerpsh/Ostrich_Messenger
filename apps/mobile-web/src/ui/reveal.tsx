@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Platform, StyleSheet, type StyleProp, type View, type ViewStyle } from "react-native";
+import { Platform, StyleSheet, type StyleProp, type ViewStyle, type ViewInstance } from "react-native";
 import Animated, { type CSSAnimationProperties, type CSSTransitionProperties } from "react-native-reanimated";
 import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, SPRING, useMotion, type Motion } from "./motion";
 
@@ -202,7 +202,7 @@ export function Collapse({
   children: ReactNode;
 }) {
   const motion = useMotion();
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewInstance>(null);
   const [height, setHeight] = useState<number | null>(null);
   const [shut, setShut] = useState(false);
 

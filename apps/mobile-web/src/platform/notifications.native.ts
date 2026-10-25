@@ -42,6 +42,8 @@ async function registerPushToken(withToken: WithToken) {
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("messages", {
       name: "Messages",
+      // eslint-plugin-import cannot read how expo-notifications exports it.
+      // eslint-disable-next-line import/namespace
       importance: Notifications.AndroidImportance.HIGH,
     });
   }

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ViewStyle, type ViewInstance } from "react-native";
 import Animated, { cubicBezier, type CSSAnimationProperties, type CSSTransitionProperties } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AnimatedPressable from "@/ui/animated-pressable";
@@ -15,10 +15,10 @@ import type { Attachment } from "./payload";
 
 // Where each photo is in the chat (its thumbnail, while on the screen),
 // for the viewer to open out of it and close back into it.
-const places = new Map<string, { view: RefObject<View | null>; uri: string | null }>();
+const places = new Map<string, { view: RefObject<ViewInstance | null>; uri: string | null }>();
 
 export function usePhotoPlace(attachment: Attachment, uri: string | null) {
-  const view = useRef<View>(null);
+  const view = useRef<ViewInstance>(null);
 
   useEffect(() => {
     places.set(attachment.id, { view, uri });
@@ -35,7 +35,7 @@ export function usePhotoPlace(attachment: Attachment, uri: string | null) {
 
 type Rect = { x: number; y: number; width: number; height: number };
 
-const measure = (view: View | null | undefined) =>
+const measure = (view: ViewInstance | null | undefined) =>
   new Promise<Rect | null>((resolve) => {
     if (!view) {
       resolve(null);
@@ -46,7 +46,7 @@ const measure = (view: View | null | undefined) =>
   });
 
 // The web's views are elements: measured at once, without waiting a frame.
-function measureNow(view: View | null | undefined): Rect | null {
+function measureNow(view: ViewInstance | null | undefined): Rect | null {
   const rect = (view as unknown as HTMLElement | null | undefined)?.getBoundingClientRect();
 
   return rect && rect.width > 0 ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
@@ -112,7 +112,7 @@ export default function PhotoViewer({
   const [shown, setShown] = useState<{ id: string; uri: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const photo = photos[index];
-  const stageRef = useRef<View>(null);
+  const stageRef = useRef<ViewInstance>(null);
   // Opened (or on its way to being), and where from / back to.
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState<ViewStyle["transform"] | null>(null);

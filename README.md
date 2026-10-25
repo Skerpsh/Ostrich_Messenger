@@ -310,7 +310,7 @@ flowchart TB
 | Part | Stack | Directory |
 |---|---|---|
 | Backend | Node.js 22, TypeScript, Fastify 5, PostgreSQL (`pg`), WebSockets, Argon2, optional Redis | [`apps/server/`](apps/server) |
-| Web and mobile apps | Expo SDK 57, React Native 0.86, expo-router, `@noble/*` cryptography | [`apps/mobile-web/`](apps/mobile-web) |
+| Web and mobile apps | Expo SDK 58, React Native 0.88, expo-router, `@noble/*` cryptography | [`apps/mobile-web/`](apps/mobile-web) |
 | Desktop app | Electron 44 around the web build, electron-builder, electron-updater | [`apps/desktop/`](apps/desktop) |
 | Terminal client | Go, Bubble Tea | [`apps/cli/`](apps/cli) |
 | Server operations | Bash, systemd, Caddy | [`deploy/`](deploy) |

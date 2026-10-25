@@ -17,6 +17,7 @@ import {
   Text,
   TextInput,
   View,
+  type TextInputInstance,
 } from "react-native";
 import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -155,7 +156,7 @@ export default function ChatList() {
     go({ pathname: "/chats/[chatId]", params: { chatId: chat.id } });
   };
 
-  const searchRef = useRef<TextInput>(null);
+  const searchRef = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     focusSearch = () => searchRef.current?.focus();

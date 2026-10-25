@@ -1,6 +1,6 @@
 # Ostrich — web, iOS and Android client
 
-Expo (SDK 57) + expo-router app. One codebase for Ostrich Web and the
+Expo (SDK 58) + expo-router app. One codebase for Ostrich Web and the
 mobile apps; styled after the Ostrich website.
 
 ## Features

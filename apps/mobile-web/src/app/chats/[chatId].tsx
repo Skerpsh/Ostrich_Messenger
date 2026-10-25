@@ -13,8 +13,9 @@ import {
   Text,
   TextInput,
   View,
-  type NativeSyntheticEvent,
-  type TextInputKeyPressEventData,
+  type TextInputKeyPressEvent,
+  type TextInputInstance,
+  type ViewInstance,
 } from "react-native";
 import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -246,7 +247,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   // Web: files dragged over the chat.
   const [dragging, setDragging] = useState(false);
-  const screenRef = useRef<View>(null);
+  const screenRef = useRef<ViewInstance>(null);
   // The other member's key differs from the one this device saw before.
   const [keyChanged, setKeyChanged] = useState(false);
   // Search in the loaded messages.
@@ -255,7 +256,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   const [matchIndex, setMatchIndex] = useState(0);
   const lastTypingSent = useRef(0);
 
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   // Focusing the input is asked for here and done after the render.
   const [focusRequest, setFocusRequest] = useState(0);
   const requestFocus = () => setFocusRequest((n) => n + 1);
@@ -266,7 +267,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
     }
   }, [focusRequest]);
   const listRef = useRef<FlatList<Row>>(null);
-  const listWrapRef = useRef<View>(null);
+  const listWrapRef = useRef<ViewInstance>(null);
   // Web: mouse wheels and touchpads on the upside-down list.
   useInvertedWheel(
     listWrapRef,
@@ -1474,9 +1475,9 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
 
   // Web: Enter sends, Shift+Enter makes a new line (more in ui/keys.ts).
   const onKeyPress = (
-    event: NativeSyntheticEvent<TextInputKeyPressEventData>,
+    event: TextInputKeyPressEvent,
   ) => {
-    const nativeEvent = event.nativeEvent as TextInputKeyPressEventData & {
+    const nativeEvent = event.nativeEvent as TextInputKeyPressEvent["nativeEvent"] & {
       shiftKey?: boolean;
       altKey?: boolean;
       ctrlKey?: boolean;
@@ -1822,7 +1823,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
               ListFooterComponent={
                 loadingOlder ? (
                   <ActivityIndicator color={colors.muted} style={styles.older} />
-                ) : null
+                ) : undefined
               }
               // Rows have different heights: get close first, then retry.
               onScrollToIndexFailed={(info) => {

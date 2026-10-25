@@ -6,6 +6,7 @@ import {
   TextInput,
   View,
   type TextInputProps,
+  type TextInputInstance,
 } from "react-native";
 import { useAppTheme } from "./theme";
 import { radius } from "./colors";
@@ -14,7 +15,7 @@ type TextFieldProps = TextInputProps & {
   label?: string;
   // Small text under the field.
   hint?: string;
-  ref?: Ref<TextInput>;
+  ref?: Ref<TextInputInstance>;
 };
 
 // Web draws its own focus ring around inputs; the field shows focus with

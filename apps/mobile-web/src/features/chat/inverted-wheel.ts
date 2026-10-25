@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from "react";
-import { Platform, type View } from "react-native";
+import { Platform, type ViewInstance } from "react-native";
 
 // Web: scrolling an inverted list (the chat's messages) with a mouse wheel
 // or a touchpad. The list is drawn upside down, so react-native-web turns
@@ -15,7 +15,7 @@ type Scrollable = { getScrollableNode?: () => HTMLElement | null };
 
 // `shown`: whether the list is on the screen (its wrapper rendered).
 export function useInvertedWheel(
-  wrapper: RefObject<View | null>,
+  wrapper: RefObject<ViewInstance | null>,
   list: RefObject<Scrollable | null>,
   shown: boolean,
 ) {

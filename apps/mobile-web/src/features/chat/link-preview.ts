@@ -113,7 +113,7 @@ export async function linkImage(url: string): Promise<PickedFile | null> {
   let saved: string | null = null;
 
   try {
-    download.write(new Uint8Array(image.body));
+    await download.write(new Uint8Array(image.body));
 
     const original = await ImageManipulator.manipulate(download.uri).renderAsync();
     const scale = Math.min(1, IMAGE_SIDE / Math.max(original.width, original.height, 1));

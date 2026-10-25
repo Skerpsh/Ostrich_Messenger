@@ -48,7 +48,7 @@ export async function uploadSealed(
   const file = new File(Paths.cache, `upload-${id}`);
 
   try {
-    file.write(sealed);
+    await file.write(sealed);
 
     const result = await file.upload(url(id), {
       httpMethod: "PUT",
@@ -123,7 +123,7 @@ export function playableSource(bytes: Uint8Array, id: string, mime: string) {
     file.delete();
   }
 
-  file.write(bytes);
+  file.writeSync(bytes);
 
   return {
     uri: file.uri,
@@ -145,7 +145,7 @@ export async function saveFile(bytes: Uint8Array, name: string, mime: string) {
       file.delete();
     }
 
-    file.write(bytes);
+    await file.write(bytes);
     await Sharing.shareAsync(file.uri, { mimeType: mime, dialogTitle: name });
   } finally {
     if (file.exists) {

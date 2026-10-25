@@ -1,6 +1,6 @@
 // First: crypto.getRandomValues for the apps.
 import "@/crypto/crypto-polyfill";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   DarkTheme,
   DefaultTheme,
@@ -11,6 +11,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { Platform, StyleSheet, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/features/auth/auth";
 import { CallsProvider } from "@/features/calls/calls-context";
 import { ChatsProvider } from "@/features/chats/chats";
@@ -34,26 +35,32 @@ SplashScreen.preventAutoHideAsync();
 registerServiceWorker();
 preventZoom();
 
+// expo-router gives the web zero insets; the installed app (PWA) on an
+// iPhone needs the real ones, under the notch and over the home bar.
+const WebSafeArea = Platform.OS === "web" ? SafeAreaProvider : ({ children }: { children: ReactNode }) => children;
+
 export default function RootLayout() {
   return (
-    <AppThemeProvider>
-      <TooltipProvider>
-        <AuthProvider>
-          <RealtimeProvider>
-            <ChatsProvider>
-              <OutboxProvider>
-                <CallsProvider>
-                  <ChatLooksProvider>
-                    <SettingsSync />
-                    <RootNavigator />
-                  </ChatLooksProvider>
-                </CallsProvider>
-              </OutboxProvider>
-            </ChatsProvider>
-          </RealtimeProvider>
-        </AuthProvider>
-      </TooltipProvider>
-    </AppThemeProvider>
+    <WebSafeArea>
+      <AppThemeProvider>
+        <TooltipProvider>
+          <AuthProvider>
+            <RealtimeProvider>
+              <ChatsProvider>
+                <OutboxProvider>
+                  <CallsProvider>
+                    <ChatLooksProvider>
+                      <SettingsSync />
+                      <RootNavigator />
+                    </ChatLooksProvider>
+                  </CallsProvider>
+                </OutboxProvider>
+              </ChatsProvider>
+            </RealtimeProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </AppThemeProvider>
+    </WebSafeArea>
   );
 }
 

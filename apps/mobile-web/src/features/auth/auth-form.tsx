@@ -5,8 +5,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
+  type TextInputInstance,
 } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,9 +54,9 @@ export default function AuthForm({ mode }: AuthFormProps) {
     shake();
   };
 
-  const passwordRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
-  const ostrichIdRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
+  const ostrichIdRef = useRef<TextInputInstance>(null);
 
   const isRegister = mode === "register";
 

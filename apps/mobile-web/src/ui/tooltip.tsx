@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, type ViewInstance } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "./theme";
@@ -17,7 +17,7 @@ type Rect = { x: number; y: number; width: number; height: number };
 type Shown = Tip & { anchor: Rect; pinned: boolean; key: number };
 
 type TooltipValue = {
-  show: (anchor: View | null, tip: Tip, pinned: boolean) => void;
+  show: (anchor: ViewInstance | null, tip: Tip, pinned: boolean) => void;
   // Hides it; a tapped (pinned) one stays unless pinned is true too.
   hide: (pinned?: boolean) => void;
 };
@@ -172,7 +172,7 @@ export function useTooltip() {
 // moment, so that passing over does not), a tap shows it until the next.
 export function WithTooltip({ title, text, children }: Tip & { children: ReactNode }) {
   const { show, hide } = useTooltip();
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewInstance>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancel = () => {
