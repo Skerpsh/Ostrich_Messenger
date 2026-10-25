@@ -92,7 +92,8 @@ function packageType() {
     return "appimage";
   }
 
-  // electron-builder leaves it in the .deb, .rpm and .pacman.
+  // electron-builder leaves it in the .deb, .rpm and .pacman (the AUR
+  // package removes it: pacman updates that one).
   try {
     const type = readFileSync(path.join(process.resourcesPath, "package-type"), "utf8").trim();
     return ["deb", "rpm", "pacman"].includes(type) ? type : null;

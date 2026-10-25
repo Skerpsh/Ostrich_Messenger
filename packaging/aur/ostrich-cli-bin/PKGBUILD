@@ -1,0 +1,29 @@
+# Maintainer: Ostrich <hello@ostrich-messenger.com>
+#
+# Kept in https://github.com/Skerpsh/Ostrich_Messenger (packaging/aur) and
+# pushed to the AUR with each release: pkgver and the checksums are filled
+# in by update.sh.
+
+pkgname=ostrich-cli-bin
+pkgver=0.0.0
+pkgrel=1
+pkgdesc="Ostrich: an end-to-end encrypted messenger without a phone number or email (terminal client)"
+arch=('x86_64' 'aarch64')
+url="https://ostrich-messenger.online"
+license=('MIT')
+provides=('ostrich-cli')
+conflicts=('ostrich-cli')
+options=('!strip' '!debug')
+source=("LICENSE-$pkgver::https://raw.githubusercontent.com/Skerpsh/Ostrich_Messenger/v$pkgver/LICENSE")
+source_x86_64=("ostrich-$pkgver-x86_64::https://github.com/Skerpsh/Ostrich_Messenger/releases/download/v$pkgver/ostrich-linux-amd64")
+source_aarch64=("ostrich-$pkgver-aarch64::https://github.com/Skerpsh/Ostrich_Messenger/releases/download/v$pkgver/ostrich-linux-arm64")
+sha256sums=('SKIP')
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+  # /usr/bin is not the user's to write: the CLI does not replace itself,
+  # pacman updates it.
+  install -Dm755 "ostrich-$pkgver-$CARCH" "$pkgdir/usr/bin/ostrich"
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

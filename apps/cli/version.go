@@ -120,7 +120,10 @@ func checkForUpdate() tea.Cmd {
 		}
 
 		return func(m *model) tea.Cmd {
-			if err != nil {
+			switch {
+			case errors.Is(err, errNotWritable):
+				return m.showToast("Ostrich "+latest+" is out: update it with your package manager", false)
+			case err != nil:
 				return m.showToast("Ostrich "+latest+" is out: "+releasesURL, false)
 			}
 
@@ -157,8 +160,20 @@ func selfUpdate(tag string) error {
 	return replaceBinary(exe, tag)
 }
 
+// errNotWritable: the program is in a folder the user cannot write
+// (installed by a package manager, or by root), which updates it instead.
+var errNotWritable = errors.New("the program's folder is not writable")
+
 // replaceBinary puts the release's program for this system at exe.
 func replaceBinary(exe, tag string) error {
+	probe, err := os.CreateTemp(filepath.Dir(exe), ".ostrich-update-*")
+	if err != nil {
+		return errNotWritable
+	}
+
+	probe.Close()
+	os.Remove(probe.Name())
+
 	base := "https://github.com/" + repository + "/releases/download/" + url.PathEscape(tag) + "/"
 	name := releaseBinary()
 

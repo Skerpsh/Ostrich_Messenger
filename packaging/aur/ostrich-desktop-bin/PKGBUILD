@@ -1,0 +1,36 @@
+# Maintainer: Ostrich <hello@ostrich-messenger.com>
+#
+# Kept in https://github.com/Skerpsh/Ostrich_Messenger (packaging/aur) and
+# pushed to the AUR with each release: pkgver and the checksums are filled
+# in by update.sh.
+
+pkgname=ostrich-desktop-bin
+pkgver=0.0.0
+pkgrel=1
+pkgdesc="Ostrich: an end-to-end encrypted messenger without a phone number or email (desktop app)"
+arch=('x86_64')
+url="https://ostrich-messenger.online"
+license=('MIT')
+depends=('gtk3' 'nss' 'alsa-lib' 'libxss' 'libnotify' 'xdg-utils')
+optdepends=('libappindicator-gtk3: the icon in the tray on some desktops')
+provides=('ostrich-desktop')
+conflicts=('ostrich-desktop')
+options=('!strip' '!debug')
+source=("Ostrich-Linux-$pkgver.pacman::https://github.com/Skerpsh/Ostrich_Messenger/releases/download/v$pkgver/Ostrich-Linux.pacman"
+        "LICENSE-$pkgver::https://raw.githubusercontent.com/Skerpsh/Ostrich_Messenger/v$pkgver/LICENSE")
+noextract=("Ostrich-Linux-$pkgver.pacman")
+sha256sums=('SKIP'
+            'SKIP')
+
+package() {
+  # The release's own Arch package, as it is (/opt/Ostrich, the menu entry
+  # and the icon), without its metadata.
+  bsdtar -xf "Ostrich-Linux-$pkgver.pacman" -C "$pkgdir" --exclude '.PKGINFO' --exclude '.MTREE' --exclude '.INSTALL'
+
+  # Without it the app does not update itself: pacman updates it.
+  rm -f "$pkgdir/opt/Ostrich/resources/package-type"
+
+  install -d "$pkgdir/usr/bin"
+  ln -s /opt/Ostrich/ostrich-desktop "$pkgdir/usr/bin/ostrich-desktop"
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

@@ -228,7 +228,7 @@ jobs:
 
           - **Android:** open the APK on the phone and allow installing from that app when asked.
           - **Windows:** run the installer; Windows may warn about an unknown publisher: More info → Run anyway.
-          - **Linux:** the AppImage runs anywhere (\`chmod +x Ostrich-Linux.AppImage\`, then open it); the \`.deb\` is for Ubuntu and Debian, the \`.rpm\` for Fedora and openSUSE, the \`.pacman\` for Arch (\`sudo pacman -U Ostrich-Linux.pacman\`). They all update themselves (the packages ask for your password to install the new version); the Flatpak does not yet.
+          - **Linux:** the AppImage runs anywhere (\`chmod +x Ostrich-Linux.AppImage\`, then open it); the \`.deb\` is for Ubuntu and Debian, the \`.rpm\` for Fedora and openSUSE, the \`.pacman\` for Arch (\`sudo pacman -U Ostrich-Linux.pacman\`, or from the AUR: \`yay -S ostrich-desktop-bin\`, and \`ostrich-cli-bin\` for the CLI). They all update themselves (the packages ask for your password to install the new version); the Flatpak does not yet.
           - **Updates:** the Android app gets new versions over the air at its next start, and offers a new APK when one is needed; the desktop apps install them themselves; the CLI replaces itself with the new version.
 
           Check a download with \`sha256sum -c SHA256SUMS\`.
@@ -246,3 +246,57 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" release/* --title "Ostrich $GITHUB_REF_NAME" --notes-file notes.md --generate-notes
           fi
+
+  # The AUR packages (packaging/aur), set to this release and pushed:
+  # yay -S ostrich-desktop-bin / ostrich-cli-bin. Needs AUR_SSH_KEY in the
+  # repository's secrets (a private key whose public key is in the AUR
+  # account's SSH keys); without it, skipped.
+  aur:
+    needs: publish
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Check for the AUR key
+        id: key
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+        run: |
+          if [ -z "$AUR_SSH_KEY" ]; then
+            echo "::warning::AUR_SSH_KEY is not set: the AUR packages are not updated"
+            echo "set=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "set=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.set == 'true'
+      - name: Push to the AUR
+        if: steps.key.outputs.set == 'true'
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+        run: |
+          pacman -Syu --noconfirm --needed git openssh perl curl
+          # makepkg (for .SRCINFO) does not run as root.
+          useradd -m builder
+          chown -R builder .
+          su builder -c "packaging/aur/update.sh $GITHUB_REF_NAME"
+
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$AUR_SSH_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes"
+
+          for pkg in ostrich-desktop-bin ostrich-cli-bin; do
+            # A package not in the AUR yet clones empty, and is made by the push.
+            git clone "ssh://aur@aur.archlinux.org/$pkg.git" "/tmp/$pkg"
+            cp "packaging/aur/$pkg/PKGBUILD" "packaging/aur/$pkg/.SRCINFO" "/tmp/$pkg/"
+            git -C "/tmp/$pkg" add PKGBUILD .SRCINFO
+
+            if git -C "/tmp/$pkg" diff --cached --quiet; then
+              echo "$pkg: already at ${GITHUB_REF_NAME#v}"
+              continue
+            fi
+
+            git -C "/tmp/$pkg" -c user.name="Ostrich" -c user.email="hello@ostrich-messenger.com" commit -q -m "${GITHUB_REF_NAME#v}"
+            git -C "/tmp/$pkg" push origin HEAD:master
+          done
