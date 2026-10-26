@@ -6,6 +6,13 @@ node_modules/
 .env
 .env.*
 
+# Private keys and keystores (signing keys live outside the repository)
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
 # Build
 dist/
 **/dist/
@@ -13,6 +20,12 @@ dist/
 # Expo
 .expo/
 
+
+# Local knowledge graph (graphify)
+graphify-out/
+
+# Security audit register: a map of weaknesses, never in this public repo
+.security-audit/
 
 # Encrypted message attachments (apps/server/src/attachments.ts)
 apps/server/data/

@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { AppState, Linking, Platform } from "react-native";
 import Constants from "expo-constants";
-import * as Updates from "expo-updates";
 
-// The phones: a new version of the app's code comes over the air (EAS
-// Update, published with each release), downloaded in the background and
-// used from the next start, or at once with "Restart". A release that
-// changed the native part cannot come that way (its runtime differs): on
-// Android the new APK is offered from the GitHub release.
+// The phones: on Android a newer release's APK is offered from GitHub.
+// Nothing comes over the air: code the phone would run without a signed
+// build could read the keys (security audit SEC-001).
 
 const RELEASES = "https://api.github.com/repos/Skerpsh/Ostrich_Messenger/releases/latest";
 const APK = "https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Android.apk";
@@ -48,28 +45,19 @@ let checkedAt = 0;
 
 // What there is to update to, if anything (null also when asked recently).
 async function checkForUpdate(): Promise<AppUpdate | null> {
-  if (__DEV__ || !Updates.isEnabled || Date.now() - checkedAt < CHECK_EVERY_MS) {
+  if (__DEV__ || Platform.OS !== "android" || Date.now() - checkedAt < CHECK_EVERY_MS) {
     return null;
   }
 
   checkedAt = Date.now();
 
-  try {
-    const result = await Updates.checkForUpdateAsync();
-
-    if (result.isAvailable) {
-      await Updates.fetchUpdateAsync();
-      return { kind: "restart", apply: () => Updates.reloadAsync().catch(() => {}) };
-    }
-  } catch {
-    // Offline or the server did not answer: asked again later.
-    checkedAt = 0;
-    return null;
-  }
-
-  // The code running is this version's (the update's own, after one).
   const running = Constants.expoConfig?.version;
-  const latest = Platform.OS === "android" ? await latestRelease() : null;
+  const latest = await latestRelease();
+
+  // Offline or GitHub did not answer: asked again later.
+  if (!latest) {
+    checkedAt = 0;
+  }
 
   return running && latest && newerVersion(latest, running)
     ? { kind: "download", version: latest.replace(/^v/, ""), apply: () => Linking.openURL(APK) }

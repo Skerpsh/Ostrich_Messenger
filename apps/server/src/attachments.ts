@@ -1,6 +1,6 @@
 import { mkdir, readdir, stat, statfs, unlink } from "node:fs/promises";
 import path from "node:path";
-import { db } from "./database.js";
+import { db, withTransaction } from "./database.js";
 
 // Where the encrypted files of messages are kept (see
 // migrations/004_attachments.sql).
@@ -16,6 +16,30 @@ export const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 // disk for everyone. ATTACHMENT_DAILY_QUOTA_MB in .env, 2 GB by default.
 export const DAILY_UPLOAD_BYTES =
   (Number(process.env.ATTACHMENT_DAILY_QUOTA_MB) || 2048) * 1024 * 1024;
+
+// Records an attachment of `userId`, unless their uploads of the last day
+// would exceed DAILY_UPLOAD_BYTES with it (false then). One at a time per
+// user, so parallel uploads cannot all fit under the same sum.
+export async function insertWithinQuota(id: string, userId: string, size: number) {
+  return withTransaction(async (client) => {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('upload:' || $1))", [userId]);
+
+    const saved = await client.query(
+      `
+      INSERT INTO attachments (id, uploader_id, size)
+      SELECT $1, $2, $3::int
+      WHERE (
+        SELECT COALESCE(SUM(size), 0) FROM attachments
+        WHERE uploader_id = $2 AND created_at > NOW() - INTERVAL '1 day'
+      ) + $3::int <= $4::bigint
+      RETURNING id
+      `,
+      [id, userId, size, DAILY_UPLOAD_BYTES],
+    );
+
+    return saved.rows.length > 0;
+  });
+}
 
 // Uploads are refused when less disk space would be left.
 const MIN_FREE_BYTES = 1024 * 1024 * 1024;

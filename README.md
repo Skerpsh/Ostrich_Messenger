@@ -81,8 +81,8 @@
 - 📱 **iOS and Android** apps from the same code, with push notifications
 - 💻 **Desktop app** for Windows and Linux, with an icon in the tray and the unread count
 - 🖥 Full-featured **terminal client** with mouse support, QR codes and offline cache
-- 🔄 **Every app updates itself**: the Android app over the air, the desktop apps and the CLI from
-  each release; the version is at the bottom of Settings
+- 🔄 **Every app updates itself** from each release (the Android app offers the new APK, the CLI
+  checks the release's signature); the version is at the bottom of Settings
 - ⌨️ Keyboard shortcuts in the web app (Ctrl/⌘ K, Alt ↑/↓, ↑ to edit, Esc)
 
 ## Download
@@ -148,11 +148,11 @@ The version you have is at the bottom of **Settings**.
 | Client | How it updates |
 |---|---|
 | Web | With every deploy of the server, when the page is opened again |
-| Android | The new code comes **over the air** and is used from the next start (or tap the banner to restart). A version that changed the native part shows a banner to download the new APK |
+| Android | A banner offers the new release's APK. Nothing comes over the air: code a phone runs comes only in an APK |
 | Windows, AppImage | Looked for at start and every 4 hours, downloaded in the background, installed when you quit Ostrich (or *Restart to update*) |
 | .deb, .rpm, .pacman | The same, installed when you choose *Restart to update* in the notification, the tray's menu or Settings; your password is asked |
 | AUR, Flatpak | By the package manager (`yay -Syu`, `flatpak update`) |
-| CLI | Replaces itself at start with the new release (checked against `SHA256SUMS`), used from the next start; installed by a package manager, it says to update with it |
+| CLI | Replaces itself at start with the new release (checked against `SHA256SUMS` and its signature, `SHA256SUMS.sig`), used from the next start; installed by a package manager, it says to update with it |
 
 The desktop app keeps a log of its updates in its folder (`~/.config/Ostrich/updates.log` on
 Linux, `%APPDATA%\Ostrich\updates.log` on Windows).
@@ -294,8 +294,7 @@ flowchart TB
         C["Terminal client"]
     end
     W & D & M & C -->|"HTTPS /api · WSS /ws"| CADDY["Caddy<br/>TLS + static files"]
-    D & C -.->|updates| GH["GitHub releases"]
-    M -.->|"updates over the air"| EAS["Expo (EAS Update)"]
+    D & M & C -.->|updates| GH["GitHub releases"]
     CADDY --> B1["Backend<br/>Fastify, Node.js"]
     CADDY -.->|optional| B2["More backend<br/>processes"]
     B1 & B2 --> PG[(PostgreSQL)]
@@ -631,14 +630,12 @@ git tag v1.6.0 && git push origin v1.6.0   # the next version after the latest r
 The [Release](.github/workflows/release.yml) workflow publishes every app under that version:
 
 - the **CLI** for Linux, macOS and Windows on x86-64 and ARM64 (tested first)
-- the **Android app**: the code over the air to the installed apps (EAS Update), and an APK built
-  with EAS, only when the native part changed (its fingerprint, `android-runtime.txt`, differs
-  from the last release's); otherwise the last APK is kept, which gets the new code over the air
+- the **Android app**: an APK built with EAS (nothing goes over the air)
 - the **desktop app** for Linux (AppImage, .deb, .rpm, .pacman, Flatpak) and Windows (an
   installer), with `latest-linux.yml` and `latest.yml`, which the installed apps update from
 - the **AUR** packages `ostrich-desktop-bin` and `ostrich-cli-bin` ([`packaging/aur/`](packaging/aur))
 
-The release gets the files, `install.sh` and `SHA256SUMS`, a table of what to download for
+The release gets the files, `install.sh`, `SHA256SUMS` and its Ed25519 signature `SHA256SUMS.sig`, a table of what to download for
 which system, and notes generated from the commits. The [Download](#download) links always
 point at the latest release.
 
@@ -648,6 +645,7 @@ Secrets, on GitHub under the repository's **Settings → Secrets and variables �
 |---|---|---|
 | `EXPO_TOKEN` | The Android app: [expo.dev → Account settings → Access tokens](https://expo.dev/settings/access-tokens) | No Android app in the release |
 | `AUR_SSH_KEY` | The AUR packages: the private half of an SSH key whose public half is in the AUR account | The AUR is not updated |
+| `RELEASE_SIGNING_KEY` | Signing `SHA256SUMS`: an Ed25519 private key (PEM, `openssl genpkey -algorithm ed25519`) whose public half is `releasePublicKey` in [`apps/cli/version.go`](apps/cli/version.go) | The release fails: the CLI would not update to it |
 
 ## Project structure
 
@@ -728,8 +726,7 @@ person using it asks for it, except what a messenger needs to work:
 - push notifications on Android and iOS: through Expo and Google's or Apple's push service; they
   only say "New message", never its text or sender
 - link previews: made by the sender's device, which loads the linked page
-- the desktop apps and the CLI check GitHub releases for updates, and the Android app Expo's
-  update service (EAS Update) and GitHub releases
+- the apps and the CLI check GitHub releases for updates
 
 Questions: [privacy@ostrich-messenger.com](mailto:privacy@ostrich-messenger.com).
 

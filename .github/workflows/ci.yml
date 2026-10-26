@@ -6,21 +6,45 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   server:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: apps/server
+    # For the tests of the SQL itself (test/database.test.ts), on the
+    # oldest PostgreSQL the server supports.
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: ostrich
+          POSTGRES_PASSWORD: ostrich
+          POSTGRES_DB: ostrich_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DB_HOST: localhost
+      DB_NAME: ostrich_test
+      DB_USER: ostrich
+      DB_PASSWORD: ostrich
+      DB_TEST: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: apps/server/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run db:migrate
       - run: npm test
       - run: npm run build
 
@@ -30,8 +54,10 @@ jobs:
       run:
         working-directory: apps/mobile-web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -47,8 +73,10 @@ jobs:
       run:
         working-directory: apps/desktop
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -62,8 +90,10 @@ jobs:
       run:
         working-directory: apps/cli
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: apps/cli/go.mod
       - run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)

@@ -8,14 +8,20 @@
 #
 # The Android build needs EXPO_TOKEN in the repository's secrets (Settings →
 # Secrets and variables → Actions); without it the release has the CLI only.
+# RELEASE_SIGNING_KEY (an Ed25519 private key, PEM) signs SHA256SUMS: the
+# CLI installs only releases signed with it (apps/cli/version.go).
+#
+# Actions are pinned to commits, and nothing is cached: a release runs only
+# code this repository chose (security audit SEC-002).
 name: Release
 
 on:
   push:
     tags: ["v*"]
 
+# Only the publish job writes (the release itself).
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   cli:
@@ -24,10 +30,13 @@ jobs:
       run:
         working-directory: apps/cli
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: apps/cli/go.mod
+          cache: false
       - run: go vet ./... && go test ./...
       - name: Build
         run: |
@@ -41,7 +50,7 @@ jobs:
               -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" -o "dist/$name" .
           done
           cp install.sh dist/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cli
           path: apps/cli/dist/*
@@ -54,7 +63,9 @@ jobs:
     steps:
       # First: the steps run in apps/mobile-web, which only exists once
       # the code is checked out.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Check for the Expo token
         id: token
         env:
@@ -66,65 +77,45 @@ jobs:
           else
             echo "set=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: steps.token.outputs.set == 'true'
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: apps/mobile-web/package-lock.json
-      - uses: expo/expo-github-action@v8
+      - uses: expo/expo-github-action@c7b66a9c327a43a8fa7c0158e7f30d6040d2481e # v8
         if: steps.token.outputs.set == 'true'
         with:
-          eas-version: latest
+          eas-version: 26.0.0
           token: ${{ secrets.EXPO_TOKEN }}
-      - name: Build the APK with EAS, and publish the update over the air
+      # Every release is a new APK: the phones get new code only this way
+      # (nothing over the air, platform/app-update.ts).
+      - name: Build the APK with EAS
         if: steps.token.outputs.set == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           npm ci
           # The app's version is the tag's (v1.3.0 → 1.3.0); EAS counts the
           # build number up by itself (eas.json, "github" profile).
           version="${GITHUB_REF_NAME#v}"
           jq --arg v "$version" '.expo.version = $v' app.json > app.json.new && mv app.json.new app.json
-          # Not dist/: eas update exports the code there, emptying it first.
           mkdir -p apk
-          # The native part's fingerprint (fingerprint.config.js leaves the
-          # version out). The same as the last release's: its APK runs this
-          # version's code too, over the air, so it is kept instead of
-          # spending an EAS build.
-          runtime=$(npx expo-updates runtimeversion:resolve --platform android | jq -r .runtimeVersion)
-          echo "$runtime" > apk/android-runtime.txt
-          last=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
-          if [ -n "$last" ] \
-            && gh release download "$last" -p android-runtime.txt -O last-runtime.txt 2>/dev/null \
-            && [ "$(cat last-runtime.txt)" = "$runtime" ] \
-            && gh release download "$last" -p Ostrich-Android.apk -D apk; then
-            echo "The native part is as in $last: its APK is kept"
-          else
-            eas build --platform android --profile github --non-interactive --wait --json > build.json
-            url=$(jq -r '.[0].artifacts.buildUrl' build.json)
-            curl -fsSL "$url" -o apk/Ostrich-Android.apk
-          fi
-          # The installed apps of this runtime get the code at their next
-          # start (platform/app-update.ts); older ones are offered the APK.
-          eas update --channel production --platform android --message "$GITHUB_REF_NAME" --non-interactive
-      - uses: actions/upload-artifact@v4
+          eas build --platform android --profile github --non-interactive --wait --json > build.json
+          url=$(jq -r '.[0].artifacts.buildUrl' build.json)
+          curl -fsSL "$url" -o apk/Ostrich-Android.apk
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: steps.token.outputs.set == 'true'
         with:
           name: android
           if-no-files-found: error
-          path: |
-            apps/mobile-web/apk/Ostrich-Android.apk
-            apps/mobile-web/apk/android-runtime.txt
+          path: apps/mobile-web/apk/Ostrich-Android.apk
 
   # The desktop app: the web app built into it (apps/desktop/scripts/
   # build-web.mjs), packed by electron-builder. Its version is the tag's.
   desktop-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - name: Build
@@ -136,7 +127,7 @@ jobs:
           npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
           npm run web
           npx electron-builder --linux AppImage deb rpm pacman --publish never
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-linux
           path: |
@@ -149,8 +140,10 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - name: Build
@@ -163,7 +156,7 @@ jobs:
           npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
           npm run web
           npx electron-builder --linux flatpak --publish never
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-flatpak
           path: apps/desktop/dist/Ostrich-Linux.flatpak
@@ -174,8 +167,10 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - name: Build
@@ -186,7 +181,7 @@ jobs:
           npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
           npm run web
           npx electron-builder --win nsis --publish never
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-windows
           path: |
@@ -199,9 +194,13 @@ jobs:
     # The CLI is enough to publish; the apps join when they were built.
     if: ${{ !cancelled() && needs.cli.result == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: release
           merge-multiple: true
@@ -229,7 +228,7 @@ jobs:
           - **Android:** open the APK on the phone and allow installing from that app when asked.
           - **Windows:** run the installer; Windows may warn about an unknown publisher: More info → Run anyway.
           - **Linux:** the AppImage runs anywhere (\`chmod +x Ostrich-Linux.AppImage\`, then open it); the \`.deb\` is for Ubuntu and Debian, the \`.rpm\` for Fedora and openSUSE, the \`.pacman\` for Arch (\`sudo pacman -U Ostrich-Linux.pacman\`, or from the AUR: \`yay -S ostrich-desktop-bin\`, and \`ostrich-cli-bin\` for the CLI). They all update themselves (the packages ask for your password to install the new version); the Flatpak does not yet.
-          - **Updates:** the Android app gets new versions over the air at its next start, and offers a new APK when one is needed; the desktop apps install them themselves; the CLI replaces itself with the new version.
+          - **Updates:** the Android app offers each new APK itself; the desktop apps install new versions themselves; the CLI replaces itself with the new version once its signature checks out.
 
           Check a download with \`sha256sum -c SHA256SUMS\`.
 
@@ -237,10 +236,20 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
         # A release made by hand on GitHub (which also makes the tag) gets
         # the files added to it instead.
         run: |
           (cd release && sha256sum * > SHA256SUMS)
+          # Without the signature the CLI would not update to this release.
+          if [ -z "$RELEASE_SIGNING_KEY" ]; then
+            echo "::error::RELEASE_SIGNING_KEY is not set: SHA256SUMS cannot be signed"
+            exit 1
+          fi
+          key=$(mktemp)
+          printf '%s\n' "$RELEASE_SIGNING_KEY" > "$key"
+          openssl pkeyutl -sign -rawin -inkey "$key" -in release/SHA256SUMS -out release/SHA256SUMS.sig
+          rm -f "$key"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" release/* --clobber
           else
@@ -267,8 +276,10 @@ jobs:
           else
             echo "set=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: steps.key.outputs.set == 'true'
+        with:
+          persist-credentials: false
       - name: Push to the AUR
         if: steps.key.outputs.set == 'true'
         env:

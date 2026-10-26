@@ -16,8 +16,7 @@ const viewRateLimit = {
 
 const UUID = { type: "string", format: "uuid" } as const;
 
-// The member's row, or null; in a group, members see only the messages
-// since they joined, here too.
+// The member's row, or null.
 async function membership(chatId: string, userId: string) {
   const result = await db.query(
     `
@@ -65,9 +64,9 @@ export default async function serverViewRoutes(server: FastifyInstance) {
         FROM messages m
         JOIN users sender ON sender.id = m.sender_id
         WHERE m.id = $1 AND m.chat_id = $2
-          AND ${deliveredTo("m", "$5")}
+          AND ${deliveredTo("m", "$3")}
         `,
-        [messageId, chatId, member.type, member.joined_at, request.user.id],
+        [messageId, chatId, request.user.id],
       );
 
       if (message.rows.length === 0) {

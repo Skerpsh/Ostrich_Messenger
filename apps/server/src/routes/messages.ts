@@ -210,10 +210,8 @@ export default async function messagesRoutes(server: FastifyInstance) {
       // passed on to them by the others, routes/groups.ts).
       const member = await db.query(
         `
-        SELECT chat_members.cleared_at,
-               NULL::timestamptz AS joined_at
+        SELECT chat_members.cleared_at
         FROM chat_members
-        JOIN chats ON chats.id = chat_members.chat_id
         WHERE chat_members.chat_id = $1 AND chat_members.user_id = $2
         `,
         [chatId, request.user.id],
@@ -233,9 +231,8 @@ export default async function messagesRoutes(server: FastifyInstance) {
         FROM (
           ${MESSAGE_SELECT}
           WHERE m.chat_id = $1
-            AND ${deliveredTo("m", "$6")}
+            AND ${deliveredTo("m", "$5")}
             AND ($4::timestamptz IS NULL OR m.created_at > $4)
-            AND ($5::timestamptz IS NULL OR m.created_at >= $5)
             AND (
               $3::uuid IS NULL
               OR (m.created_at, m.id) < (
@@ -247,7 +244,7 @@ export default async function messagesRoutes(server: FastifyInstance) {
         ) latest
         ORDER BY created_at ASC, id ASC
         `,
-        [chatId, limit, before ?? null, member.rows[0].cleared_at, member.rows[0].joined_at, request.user.id],
+        [chatId, limit, before ?? null, member.rows[0].cleared_at, request.user.id],
       );
 
       const hasMore = result.rows.length > limit;

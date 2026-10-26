@@ -6,8 +6,8 @@ import { pipeline } from "node:stream/promises";
 import { FastifyInstance } from "fastify";
 import {
   attachmentPath,
-  DAILY_UPLOAD_BYTES,
   hasRoomFor,
+  insertWithinQuota,
   MAX_ATTACHMENT_BYTES,
   PART_SUFFIX,
 } from "../attachments.js";
@@ -40,8 +40,8 @@ const idParams = {
 } as const;
 
 // SQL: whether user $2 may read attachment $1: they uploaded it, it is in
-// a message of a chat they are in (and have not cleared; in a group, sent
-// since they joined), or it is the photo of a group they are in.
+// a message of a chat they are in (and have not cleared), or it is the
+// photo of a group they are in.
 const CAN_READ = `
   SELECT a.size
   FROM attachments a
@@ -51,7 +51,6 @@ const CAN_READ = `
       a.uploader_id = $2
       OR EXISTS (
         SELECT 1 FROM chat_members cm
-        JOIN chats c ON c.id = cm.chat_id
         WHERE cm.chat_id = m.chat_id
           AND cm.user_id = $2
           AND (cm.cleared_at IS NULL OR m.created_at > cm.cleared_at)
@@ -62,18 +61,6 @@ const CAN_READ = `
           AND cm.user_id = $2
       )
     )
-`;
-
-// Records an attachment of user $2, unless their uploads of the last day
-// would exceed DAILY_UPLOAD_BYTES ($4) with it; returns no row then.
-const INSERT_WITHIN_QUOTA = `
-  INSERT INTO attachments (id, uploader_id, size)
-  SELECT $1, $2, $3::int
-  WHERE (
-    SELECT COALESCE(SUM(size), 0) FROM attachments
-    WHERE uploader_id = $2 AND created_at > NOW() - INTERVAL '1 day'
-  ) + $3::int <= $4::bigint
-  RETURNING id
 `;
 
 const ID_TAKEN = "An attachment with this id already exists";
@@ -161,7 +148,7 @@ export default async function attachmentsRoutes(server: FastifyInstance) {
           return reply.status(415).send({ error: "Send the file as application/octet-stream" });
         }
 
-        saved = await db.query(INSERT_WITHIN_QUOTA, [id, request.user.id, size, DAILY_UPLOAD_BYTES]);
+        saved = await insertWithinQuota(id, request.user.id, size);
       } catch (error) {
         await unlink(part).catch(() => {});
 
@@ -172,7 +159,7 @@ export default async function attachmentsRoutes(server: FastifyInstance) {
         throw error;
       }
 
-      if (saved.rows.length === 0) {
+      if (!saved) {
         await unlink(part).catch(() => {});
         return reply.status(429).send({ error: OVER_QUOTA });
       }
@@ -224,9 +211,7 @@ export default async function attachmentsRoutes(server: FastifyInstance) {
 
       try {
         // Copies count towards the quota too: each is a file on disk.
-        const saved = await db.query(INSERT_WITHIN_QUOTA, [target, request.user.id, size, DAILY_UPLOAD_BYTES]);
-
-        if (saved.rows.length === 0) {
+        if (!(await insertWithinQuota(target, request.user.id, size))) {
           return reply.status(429).send({ error: OVER_QUOTA });
         }
       } catch (error) {

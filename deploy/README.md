@@ -33,7 +33,7 @@ The desktop app, the Android app and the CLI carry their own copy of the code,
 so a deploy alone does not change them. At its end the script tags the
 deployed commit with the next version (v1.5.1 → v1.5.2), which starts
 [`release.yml`](../.github/workflows/release.yml); the apps update themselves
-from that release (the Android app over the air). Nothing is tagged if the
+from that release. Nothing is tagged if the
 commit has a version already.
 
 It tags through GitHub's API with a token, so the server needs no key to push.

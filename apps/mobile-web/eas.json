@@ -22,12 +22,10 @@
       "autoIncrement": true,
       "android": {
         "buildType": "apk"
-      },
-      "channel": "production"
+      }
     },
     "production": {
-      "autoIncrement": true,
-      "channel": "production"
+      "autoIncrement": true
     }
   },
   "submit": {

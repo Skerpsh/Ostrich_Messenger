@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -182,6 +184,15 @@ func replaceBinary(exe, tag string) error {
 		return err
 	}
 
+	signature, err := download(base+"SHA256SUMS.sig", 1<<10)
+	if err != nil {
+		return err
+	}
+
+	if !verifyRelease(sums, signature) {
+		return errors.New("SHA256SUMS is not signed by Ostrich's release key")
+	}
+
 	want := ""
 
 	for _, line := range strings.Split(string(sums), "\n") {
@@ -225,6 +236,17 @@ func replaceBinary(exe, tag string) error {
 	}
 
 	return nil
+}
+
+// The public half of the key release.yml signs SHA256SUMS with (Ed25519,
+// the RELEASE_SIGNING_KEY secret), so a release changed by anyone else is
+// not installed.
+const releasePublicKey = "Zn7AoRPQh0TtFNiJOCnLELZeCeqp74kjK7pdEST9+Wk="
+
+func verifyRelease(sums, signature []byte) bool {
+	key, err := base64.StdEncoding.DecodeString(releasePublicKey)
+
+	return err == nil && len(key) == ed25519.PublicKeySize && ed25519.Verify(key, sums, signature)
 }
 
 // cleanOldBinary removes what a self-update left on Windows.

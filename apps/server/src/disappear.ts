@@ -51,6 +51,12 @@ async function goOff(userId: string, days: number) {
   for (const row of messages.rows) {
     const result = await createMessage(row.chat_id, userId, row.content, null, row.id, row.attachments, [], null, days);
 
+    // Sent by an earlier try that was cut off before removing it.
+    if ("error" in result && result.error === "duplicate_id") {
+      await db.query("DELETE FROM disappear_messages WHERE id = $1", [row.id]);
+      continue;
+    }
+
     // Not sendable (left the chat, blocked, a new group key): kept, for
     // the user to see if they come back.
     if ("error" in result) {
@@ -120,5 +126,23 @@ export async function checkSwitches(now = new Date()) {
         sendToUserSockets(row.user_id, { type: "disappear" });
       }
     }
+  }
+
+  // Gone off, but the sending was cut short (an error, a restart): the
+  // messages left are tried again for a day, while the user stays away.
+  // A message already sent is not sent twice (its id, goOff).
+  const unfinished = await db.query(
+    `
+    SELECT s.user_id, s.days
+    FROM disappear_switches s
+    WHERE s.triggered_at > $1::timestamptz - INTERVAL '1 day'
+      AND EXISTS (SELECT 1 FROM disappear_messages d WHERE d.user_id = s.user_id)
+      AND NOT EXISTS (SELECT 1 FROM sessions WHERE sessions.user_id = s.user_id AND sessions.last_used_at > s.triggered_at)
+    `,
+    [now],
+  );
+
+  for (const row of unfinished.rows) {
+    await goOff(row.user_id, row.days);
   }
 }
