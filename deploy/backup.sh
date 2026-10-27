@@ -19,6 +19,12 @@ MIN_FREE_MB="${MIN_FREE_MB:-500}"
 # Optional: a Healthchecks.io ping URL (see deploy/README.md). A backup pings
 # it, a failure pings its /fail, and no ping for a day raises an alarm.
 HEALTHCHECK_URL="${HEALTHCHECK_URL:-}"
+# Optional: a copy off the server (see deploy/README.md, "Off-site
+# backups"). OFFSITE_REMOTE is an rclone path such as b2:my-bucket, and
+# AGE_RECIPIENT the age public key the dump is encrypted for.
+OFFSITE_REMOTE="${OFFSITE_REMOTE:-}"
+AGE_RECIPIENT="${AGE_RECIPIENT:-}"
+OFFSITE_KEEP_DAYS="${OFFSITE_KEEP_DAYS:-30}"
 
 ping_healthcheck() {
   if [ -n "$HEALTHCHECK_URL" ]; then
@@ -60,6 +66,8 @@ DB_PORT="$(env_value DB_PORT)"
 DB_NAME="$(env_value DB_NAME)"
 DB_USER="$(env_value DB_USER)"
 DB_PASSWORD="$(env_value DB_PASSWORD)"
+ATTACHMENTS_DIR="$(env_value ATTACHMENTS_DIR)"
+ATTACHMENTS_DIR="${ATTACHMENTS_DIR:-/opt/ostrich/apps/server/data/attachments}"
 
 export PGHOST="${DB_HOST:-localhost}"
 export PGPORT="${DB_PORT:-5432}"
@@ -94,6 +102,21 @@ find "$BACKUP_DIR" -maxdepth 1 -name 'ostrich-*.dump' -printf '%T@ %p\n' \
   | tail -n +"$((KEEP + 1))" \
   | cut -d' ' -f2- \
   | xargs -r rm --
+
+# The dump leaves encrypted for the key whose private half is not on this
+# server; the attachments as they are, since only the chats' members have
+# their keys.
+if [ -n "$OFFSITE_REMOTE" ]; then
+  if [ -z "$AGE_RECIPIENT" ]; then
+    fail "OFFSITE_REMOTE is set but AGE_RECIPIENT is not"
+  fi
+  age -r "$AGE_RECIPIENT" "$file" | rclone rcat "$OFFSITE_REMOTE/db/$(basename "$file").age"
+  rclone delete --min-age "${OFFSITE_KEEP_DAYS}d" "$OFFSITE_REMOTE/db"
+  if [ -d "$ATTACHMENTS_DIR" ]; then
+    rclone sync "$ATTACHMENTS_DIR" "$OFFSITE_REMOTE/attachments"
+  fi
+  echo "backup: copied to $OFFSITE_REMOTE"
+fi
 
 count="$(find "$BACKUP_DIR" -maxdepth 1 -name 'ostrich-*.dump' | wc -l)"
 echo "backup: $file ($(du -h "$file" | cut -f1)), $count kept in $BACKUP_DIR"

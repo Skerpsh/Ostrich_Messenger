@@ -379,5 +379,46 @@ systemctl start ostrich
 ```
 
 These backups are on the same disk as the database: they protect against
-mistakes, not against losing the server. Copy them elsewhere from time to time
-(e.g. `scp` to your computer) for that.
+mistakes, not against losing the server. For that, turn on the off-site copy.
+
+### Off-site backups
+
+With it on, every backup also goes to a bucket elsewhere (Backblaze B2 here;
+any [rclone](https://rclone.org) remote works): the dump encrypted with
+[age](https://age-encryption.org) for a key whose private half never touches
+the server, and the attachments folder as it is (their keys are only on the
+chats' devices). Dumps older than 30 days are deleted (`OFFSITE_KEEP_DAYS`).
+
+1. In Backblaze: *Create a Bucket* (private, default encryption on), then in
+   its *Lifecycle Settings* keep prior versions for 30 days. *Application
+   Keys* → *Add a New Application Key* for that bucket only, read and write.
+   Note the keyID and applicationKey (shown once).
+2. On your computer (not the server), make the key and keep the file in your
+   password manager; it prints the public key, `age1…`:
+
+```bash
+age-keygen -o ostrich-backup.key
+```
+
+3. On the server (put your values in):
+
+```bash
+apt-get install -y rclone age && mkdir -p /etc/ostrich && printf 'RCLONE_CONFIG_B2_TYPE=b2\nRCLONE_CONFIG_B2_ACCOUNT=KEY_ID\nRCLONE_CONFIG_B2_KEY=APPLICATION_KEY\nOFFSITE_REMOTE=b2:BUCKET\nAGE_RECIPIENT=age1...\n' > /etc/ostrich/backup.env && chmod 600 /etc/ostrich/backup.env
+```
+
+```bash
+cp /opt/ostrich/deploy/ostrich-backup.service /etc/systemd/system/ && systemctl daemon-reload && systemctl start ostrich-backup.service && journalctl -u ostrich-backup -n 20 --no-pager
+```
+
+The log ends with `copied to b2:BUCKET`. Backups run by `deploy.sh` stay on
+the server; the daily one goes off-site.
+
+Restore from the bucket, on any machine with rclone, age and the key:
+
+```bash
+rclone copy b2:BUCKET/db/ostrich-YYYYMMDD-HHMMSS.dump.age . && age -d -i ostrich-backup.key ostrich-YYYYMMDD-HHMMSS.dump.age > ostrich.dump
+rclone copy b2:BUCKET/attachments /opt/ostrich/apps/server/data/attachments
+```
+
+Then restore `ostrich.dump` as above. Try it once on another machine or
+database: a backup nobody has restored is not yet a backup.
