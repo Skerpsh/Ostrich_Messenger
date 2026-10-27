@@ -27,6 +27,8 @@ import {
 } from "@/features/disappear/disappear";
 import { formatDate } from "@/ui/format";
 import { useAppTheme } from "@/ui/theme";
+import Reveal, { Overlay } from "@/ui/reveal";
+import PressScale from "@/ui/press-scale";
 
 const PRESETS = [7, 30, 90, 180, 365];
 const MIN_DAYS = 2;
@@ -178,13 +180,15 @@ export default function DisappearSettings() {
               hint={days && daysProblem ? daysProblem : undefined}
             />
 
-            {error ? (
+            <Reveal>
+              {error ? (
               <Text
                 style={[settingsStyles.formMessage, { color: colors.danger }]}
               >
                 {error}
               </Text>
             ) : null}
+            </Reveal>
 
             <Button
               title={on ? "Save the days" : "Turn on"}
@@ -196,7 +200,8 @@ export default function DisappearSettings() {
               }
               onPress={() => run((token) => disappearApi.set(token, chosenDays))}
             />
-            {on || status?.switch?.triggered_at ? (
+            <Reveal>
+              {on || status?.switch?.triggered_at ? (
               <Button
                 title={
                   confirmOff
@@ -215,10 +220,12 @@ export default function DisappearSettings() {
                 }}
               />
             ) : null}
+            </Reveal>
           </View>
         </Section>
 
-        {on ? (
+        <Reveal>
+          {on ? (
           <Section
             title="Messages"
             footer="Each goes to one chat or group. A group's message must be written again when its key changes (someone left)."
@@ -285,7 +292,7 @@ export default function DisappearSettings() {
                             : "…"}
                       </Text>
                     </View>
-                    <Pressable
+                    <PressScale scale={0.88}
                       onPress={() =>
                         run((token) =>
                           disappearApi.deleteMessage(token, message.id),
@@ -300,7 +307,7 @@ export default function DisappearSettings() {
                         size={18}
                         color={colors.muted}
                       />
-                    </Pressable>
+                    </PressScale>
                   </Pressable>
                 </View>
               );
@@ -313,10 +320,13 @@ export default function DisappearSettings() {
             />
           </Section>
         ) : null}
+        </Reveal>
       </SettingsPage>
-      {editing ? (
+      <Overlay>
+        {editing ? (
         <DisappearEditor draft={editing} onClose={() => setEditing(null)} />
       ) : null}
+      </Overlay>
     </View>
   );
 }

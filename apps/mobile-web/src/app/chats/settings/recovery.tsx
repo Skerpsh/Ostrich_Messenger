@@ -82,7 +82,8 @@ export default function RecoverySettings() {
         {status ? (
           <Swap id={editing || !status.setup ? "form" : "list"}>
             <View style={styles.sections}>
-              {editing || !status.setup ? (
+              <Swap id={editing || !status.setup ? "form" : "status"}>
+                {editing || !status.setup ? (
                 <GuardiansForm onDone={() => setEditing(false)} canCancel={Boolean(status.setup)} />
               ) : (
                 <GuardiansList
@@ -91,6 +92,7 @@ export default function RecoverySettings() {
                   onChange={() => setEditing(true)}
                 />
               )}
+              </Swap>
             </View>
           </Swap>
         ) : null}
@@ -440,7 +442,8 @@ function GuardedFriend({ friend }: { friend: Guarding }) {
         {request ? (
           <Swap id={request.approved ? "approved" : "asking"}>
             <View style={settingsStyles.form}>
-              {request.approved ? (
+              <Swap id={request.approved ? "approved" : "asking"}>
+                {request.approved ? (
                 <Text style={[settingsStyles.formText, { color: colors.accent }]}>
                   You approved their request of {formatWhen(request.created_at)}. They can get in after{" "}
                   {formatWhen(request.ready_at)}, once enough guardians have approved.
@@ -473,6 +476,7 @@ function GuardedFriend({ friend }: { friend: Guarding }) {
                   />
                 </>
               )}
+              </Swap>
             </View>
           </Swap>
         ) : null}

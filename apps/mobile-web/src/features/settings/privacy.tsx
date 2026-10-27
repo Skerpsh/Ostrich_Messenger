@@ -4,6 +4,7 @@ import { useAuth, useCurrentUser } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
 import { setPrivacy } from "@/api/api";
 import { Divider, Section, styles, ToggleRow } from "./ui";
+import Reveal from "@/ui/reveal";
 
 export function PrivacySection() {
   const { withToken, updateUser } = useAuth();
@@ -45,9 +46,11 @@ export function PrivacySection() {
         value={user.read_receipts}
         onChange={(value) => change({ read_receipts: value })}
       />
-      {error ? (
+      <Reveal>
+        {error ? (
         <Text style={[styles.formMessage, styles.inset, { color: colors.danger }]}>{error}</Text>
       ) : null}
+      </Reveal>
     </Section>
   );
 }

@@ -5,7 +5,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSh
 import AppHeader from "@/ui/app-header";
 import Button from "@/ui/button";
 import IconButton from "@/ui/icon-button";
-import Reveal from "@/ui/reveal";
+import Reveal, { Swap } from "@/ui/reveal";
 import ScreenEnter, { useLeaveScreen } from "@/ui/screen-enter";
 import TextField from "@/ui/text-field";
 import { useAuth } from "@/features/auth/auth";
@@ -17,6 +17,7 @@ import { useEscape } from "@/ui/keys";
 import { useIsWide } from "@/ui/layout";
 import { USERNAME_RE, USERNAME_RULES } from "@/features/auth/validation";
 import { radius } from "@/ui/colors";
+import PressScale from "@/ui/press-scale";
 
 // Anonymous rooms (the server's rooms.ts): public chats of up to 50
 // people, entered under a name chosen at every entry. The server can read
@@ -105,7 +106,8 @@ function Rooms() {
     const name = choice === "random" ? randomName : choice === "last" ? (lastName ?? "") : ownName.trim();
 
     if (!USERNAME_RE.test(name)) {
-      setError(USERNAME_RULES);
+      // The rules are under the field already (when the name is one's own).
+      setError(choice === "own" ? "This name does not fit the rules above" : USERNAME_RULES);
       return;
     }
 
@@ -125,7 +127,7 @@ function Rooms() {
   };
 
   const option = (value: NameChoice, label: string, extra?: ReactNode) => (
-    <Pressable
+    <PressScale scale={0.98}
       key={value}
       onPress={() => {
         setChoice(value);
@@ -144,7 +146,7 @@ function Rooms() {
         {label}
       </Text>
       {extra}
-    </Pressable>
+    </PressScale>
   );
 
   return (
@@ -171,7 +173,8 @@ function Rooms() {
             </Text>
           </View>
 
-          {entering ? (
+          <Swap id={entering ? "name" : "list"} step={entering ? 1 : -1}>
+            {entering ? (
             <View style={[styles.card, { backgroundColor: colors.panel }]}>
               <Text style={[styles.title, { color: colors.text }]}>What should we call you in {entering.name}?</Text>
 
@@ -205,14 +208,18 @@ function Rooms() {
                 ) : null}
               </Reveal>
 
-              {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+              <Reveal>
+                {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+              </Reveal>
 
               <Button title={`Enter ${entering.name}`} loading={joining} onPress={enter} />
               <Button title="Back to the rooms" variant="secondary" onPress={() => setEntering(null)} />
             </View>
           ) : (
             <View style={[styles.card, styles.list, { backgroundColor: colors.panel }]}>
-              {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+              <Reveal>
+                {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+              </Reveal>
               {rooms === null ? (
                 <ActivityIndicator color={colors.accent} style={styles.loading} />
               ) : (
@@ -263,6 +270,7 @@ function Rooms() {
               )}
             </View>
           )}
+          </Swap>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

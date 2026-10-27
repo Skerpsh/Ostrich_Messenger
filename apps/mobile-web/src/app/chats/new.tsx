@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import Animated from "react-native-reanimated";
 import {
   KeyboardAvoidingView,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,7 +13,7 @@ import AppHeader from "@/ui/app-header";
 import Avatar from "@/ui/avatar";
 import Button from "@/ui/button";
 import QrScanner from "@/features/devices/qr-scanner";
-import Reveal, { Swap, useSlider } from "@/ui/reveal";
+import Reveal, { Overlay, Swap, useSlider } from "@/ui/reveal";
 import ScreenEnter, { useLeaveScreen } from "@/ui/screen-enter";
 import TextField from "@/ui/text-field";
 import { useAuth, useCurrentUser } from "@/features/auth/auth";
@@ -30,6 +29,7 @@ import { TOUCH_UI } from "@/platform/touch";
 import { useStartChat } from "@/features/chats/use-start-chat";
 import { cleanUsername, USERNAME_RE, USERNAME_RULES } from "@/features/auth/validation";
 import { radius } from "@/ui/colors";
+import PressScale from "@/ui/press-scale";
 
 export default function NewChatScreen() {
   return (
@@ -110,7 +110,7 @@ function NewChat() {
               <Animated.View style={[styles.tabSlider, { backgroundColor: colors.panel }, slider.style]} />
             ) : null}
             {(["chat", "group"] as const).map((tab, index) => (
-              <Pressable
+              <PressScale scale={0.96}
                 key={tab}
                 onPress={() => {
                   setMode(tab);
@@ -124,7 +124,7 @@ function NewChat() {
                 <Text style={[styles.tabText, { color: mode === tab ? colors.text : colors.muted }]}>
                   {tab === "chat" ? "Chat" : "Group"}
                 </Text>
-              </Pressable>
+              </PressScale>
             ))}
           </View>
 
@@ -184,7 +184,8 @@ function NewChat() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {scanning ? (
+      <Overlay>
+        {scanning ? (
         <QrScanner
           title="Scan a QR code"
           onClose={() => setScanning(false)}
@@ -215,6 +216,7 @@ function NewChat() {
           }}
         />
       ) : null}
+      </Overlay>
     </View>
   );
 }
@@ -359,14 +361,14 @@ function NewGroup({ onCreated }: { onCreated: (chatId: string) => void }) {
               <View key={member.id} style={[styles.member, { backgroundColor: colors.panelAlt }]}>
                 <Avatar name={member.username} avatarId={member.avatar_id} size={24} />
                 <Text style={[styles.memberName, { color: colors.text }]}>@{member.username}</Text>
-                <Pressable
+                <PressScale
                   onPress={() => setMembers((current) => current.filter((m) => m.id !== member.id))}
                   accessibilityRole="button"
                   accessibilityLabel={`Remove @${member.username}`}
                   hitSlop={8}
                 >
                   <Ionicons name="close" size={16} color={colors.muted} />
-                </Pressable>
+                </PressScale>
               </View>
             ))}
           </View>

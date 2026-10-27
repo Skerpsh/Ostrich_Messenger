@@ -49,6 +49,7 @@ import { useMinuteTick } from "@/ui/use-minute-tick";
 import { useStartChat } from "./use-start-chat";
 import { cleanUsername, USERNAME_RE } from "@/features/auth/validation";
 import { radius } from "@/ui/colors";
+import PressScale from "@/ui/press-scale";
 
 // Focuses the search of the chats list on screen (the welcome screen on the
 // right of a wide screen asks for it).
@@ -76,6 +77,12 @@ export default function ChatList() {
   const startChatWith = useStartChat();
   // The chat whose actions are shown (long press / right click).
   const [menuFor, setMenuFor] = useState<Chat | null>(null);
+  // The chat the menu was for: still shown while the modal fades out.
+  const [menuShown, setMenuShown] = useState<Chat | null>(null);
+
+  if (menuFor && menuFor !== menuShown) {
+    setMenuShown(menuFor);
+  }
   // A failed pin, mute or delete from that menu.
   const [actionError, setActionError] = useState<string | null>(null);
   const { status, presence } = useRealtime();
@@ -449,7 +456,7 @@ export default function ChatList() {
             </Reveal>
             <Reveal>
               {error || actionError ? (
-                <Pressable
+                <PressScale scale={0.98}
                   onPress={() => setActionError(null)}
                   disabled={!actionError}
                   accessibilityRole={actionError ? "button" : undefined}
@@ -457,7 +464,7 @@ export default function ChatList() {
                   <Text style={[styles.notice, { color: colors.danger }]}>
                     {actionError ?? error}
                   </Text>
-                </Pressable>
+                </PressScale>
               ) : null}
             </Reveal>
           </>
@@ -485,7 +492,7 @@ export default function ChatList() {
                 <Text style={[styles.emptyText, { color: colors.muted }]}>
                   Search for a friend by their @username above, or share yours:
                 </Text>
-                <Pressable
+                <PressScale scale={0.96}
                   onPress={copyUsername}
                   accessibilityRole="button"
                   style={[styles.chip, { backgroundColor: colors.accentSoft }]}
@@ -500,7 +507,7 @@ export default function ChatList() {
                       )}
                     </View>
                   </Swap>
-                </Pressable>
+                </PressScale>
               </View>
             )}
           </Swap>
@@ -543,14 +550,14 @@ export default function ChatList() {
         </View>
       ) : (
         // Phones: "new chat" within reach of the thumb.
-        <Pressable
+        <PressScale scale={0.9}
           onPress={() => go("/chats/new")}
           accessibilityRole="button"
           accessibilityLabel="New chat or group"
           style={[styles.fab, { backgroundColor: colors.accent, bottom: insets.bottom + 20, boxShadow: `0 4px 12px ${colors.shadow}` }]}
         >
           <Ionicons name="create-outline" size={24} color={colors.onAccent} />
-        </Pressable>
+        </PressScale>
       )}
 
       <Modal
@@ -559,69 +566,69 @@ export default function ChatList() {
         animationType="fade"
         onRequestClose={() => setMenuFor(null)}
       >
-        {menuFor ? (
+        {menuShown ? (
           <ActionMenu
-            title={chatTitle(menuFor)}
+            title={chatTitle(menuShown)}
             onClose={() => setMenuFor(null)}
             items={[
               {
-                icon: menuFor.pinned ? "pin" : "pin-outline",
-                label: menuFor.pinned ? "Unpin" : "Pin to top",
+                icon: menuShown.pinned ? "pin" : "pin-outline",
+                label: menuShown.pinned ? "Unpin" : "Pin to top",
                 onPress: () => runAction(() =>
-                  updateChatSettings(menuFor.id, { pinned: !menuFor.pinned }),
+                  updateChatSettings(menuShown.id, { pinned: !menuShown.pinned }),
                 ),
               },
               {
-                icon: menuFor.muted ? "notifications-outline" : "notifications-off-outline",
-                label: menuFor.muted ? "Unmute" : "Mute",
+                icon: menuShown.muted ? "notifications-outline" : "notifications-off-outline",
+                label: menuShown.muted ? "Unmute" : "Mute",
                 onPress: () => runAction(() =>
-                  updateChatSettings(menuFor.id, { muted: !menuFor.muted }),
+                  updateChatSettings(menuShown.id, { muted: !menuShown.muted }),
                 ),
               },
-              ...(menuFor.type === "saved" || menuFor.type === "room" ? [] : [{
+              ...(menuShown.type === "saved" || menuShown.type === "room" ? [] : [{
                 icon: "eye-off-outline" as const,
                 label: "Clear history for me",
                 confirmLabel:
-                  menuFor.type === "group"
+                  menuShown.type === "group"
                     ? "Clear? The others keep the messages"
-                    : `Clear? @${menuFor.username} keeps the messages`,
+                    : `Clear? @${menuShown.username} keeps the messages`,
                 danger: true,
-                onPress: () => deleteChat(menuFor.id, "me"),
+                onPress: () => deleteChat(menuShown.id, "me"),
               }]),
-              ...(menuFor.type === "saved"
+              ...(menuShown.type === "saved"
                 ? [
                     {
                       icon: "trash-outline" as const,
                       label: "Delete Saved messages",
                       confirmLabel: "Delete all saved messages?",
                       danger: true,
-                      onPress: () => deleteChat(menuFor.id, "everyone"),
+                      onPress: () => deleteChat(menuShown.id, "everyone"),
                     },
                   ]
-                : menuFor.type === "group" || menuFor.type === "room"
+                : menuShown.type === "group" || menuShown.type === "room"
                 ? [
                     {
                       icon: "exit-outline" as const,
-                      label: menuFor.type === "room" ? "Leave room" : "Leave group",
-                      confirmLabel: menuFor.type === "room" ? "Leave? What you wrote stays" : "Leave the group?",
+                      label: menuShown.type === "room" ? "Leave room" : "Leave group",
+                      confirmLabel: menuShown.type === "room" ? "Leave? What you wrote stays" : "Leave the group?",
                       danger: true,
                       onPress: () =>
                         runAction(async () => {
-                          await leaveGroup(menuFor.id);
+                          await leaveGroup(menuShown.id);
 
-                          if (selectedId === menuFor.id) {
+                          if (selectedId === menuShown.id) {
                             router.replace("/chats");
                           }
                         }),
                     },
-                    ...(menuFor.role === "owner"
+                    ...(menuShown.role === "owner"
                       ? [
                           {
                             icon: "trash-outline" as const,
                             label: "Delete group",
                             confirmLabel: "Delete the group for everyone?",
                             danger: true,
-                            onPress: () => deleteChat(menuFor.id, "everyone"),
+                            onPress: () => deleteChat(menuShown.id, "everyone"),
                           },
                         ]
                       : []),
@@ -632,7 +639,7 @@ export default function ChatList() {
                       label: "Delete for both",
                       confirmLabel: "Delete the chat for both of you?",
                       danger: true,
-                      onPress: () => deleteChat(menuFor.id, "everyone"),
+                      onPress: () => deleteChat(menuShown.id, "everyone"),
                     },
                   ]),
             ]}
@@ -682,10 +689,13 @@ function ChatRow({
 
   const badges = (
     <>
-      {chat.pinned && chat.unread_count === 0 ? (
+      <Reveal kind="pop" collapse={false}>
+        {chat.pinned && chat.unread_count === 0 ? (
         <Ionicons name="pin" size={14} color={colors.muted} accessibilityLabel="pinned" />
       ) : null}
-      {chat.unread_mentions ? (
+      </Reveal>
+      <Reveal kind="pop" collapse={false}>
+        {chat.unread_mentions ? (
         <View
           accessibilityLabel="you were mentioned"
           style={[styles.badge, { backgroundColor: colors.accent }]}
@@ -693,7 +703,9 @@ function ChatRow({
           <Text style={[styles.badgeText, { color: colors.onAccent }]}>@</Text>
         </View>
       ) : null}
-      {chat.join_requests ? (
+      </Reveal>
+      <Reveal kind="pop" collapse={false}>
+        {chat.join_requests ? (
         <View
           accessibilityLabel={`${chat.join_requests} asking to join`}
           style={[styles.badge, { backgroundColor: colors.accentSoft }]}
@@ -702,7 +714,9 @@ function ChatRow({
           <Text style={[styles.badgeText, { color: colors.accent }]}>{chat.join_requests}</Text>
         </View>
       ) : null}
-      {chat.unread_count > 0 ? (
+      </Reveal>
+      <Reveal kind="pop" collapse={false}>
+        {chat.unread_count > 0 ? (
         <Reanimated.View
           // A new count pops in.
           key={chat.unread_count}
@@ -723,6 +737,7 @@ function ChatRow({
           </Text>
         </Reanimated.View>
       ) : null}
+      </Reveal>
     </>
   );
 

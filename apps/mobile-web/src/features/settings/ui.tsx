@@ -3,7 +3,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import type { IconName } from "@/ui/icon-button";
-import { useSlider } from "@/ui/reveal";
+import { Swap, useSlider } from "@/ui/reveal";
+import PressScale from "@/ui/press-scale";
+import { SPRING, useMotion } from "@/ui/motion";
 import { useAppTheme } from "@/ui/theme";
 import { radius } from "@/ui/colors";
 
@@ -116,6 +118,7 @@ export function Row({
   onPress: () => void;
 }) {
   const { colors } = useAppTheme();
+  const motion = useMotion();
   const color = danger ? colors.danger : colors.text;
 
   return (
@@ -136,17 +139,25 @@ export function Row({
           {value}
         </Text>
       ) : null}
-      {loading ? (
-        <ActivityIndicator color={color} />
-      ) : expanded !== undefined ? (
-        <Ionicons
-          name={expanded ? "chevron-up" : "chevron-down"}
-          size={18}
-          color={colors.muted}
-        />
-      ) : opens ? (
-        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-      ) : null}
+      <Swap id={loading ? "loading" : "idle"} resize={false}>
+        {loading ? (
+          <ActivityIndicator color={color} />
+        ) : expanded !== undefined ? (
+          // Turns over as the form opens and closes.
+          <Animated.View
+            style={{
+              transform: [{ rotate: expanded ? "180deg" : "0deg" }],
+              ...(motion === "full"
+                ? { transitionProperty: "transform", transitionDuration: 320, transitionTimingFunction: SPRING }
+                : {}),
+            }}
+          >
+            <Ionicons name="chevron-down" size={18} color={colors.muted} />
+          </Animated.View>
+        ) : opens ? (
+          <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+        ) : null}
+      </Swap>
     </Pressable>
   );
 }
@@ -173,12 +184,13 @@ export function Segmented<T extends string | number>({
         const selected = value === option.value;
 
         return (
-          <Pressable
+          <PressScale
             key={String(option.value)}
             onPress={() => onChange(option.value)}
             onLayout={slider.onLayout(index)}
             accessibilityRole="radio"
             accessibilityState={{ checked: selected }}
+            scale={0.96}
             style={[styles.segment, selected && !slider.style && raised]}
           >
             {option.icon ? (
@@ -190,7 +202,7 @@ export function Segmented<T extends string | number>({
             >
               {option.label}
             </Text>
-          </Pressable>
+          </PressScale>
         );
       })}
     </View>

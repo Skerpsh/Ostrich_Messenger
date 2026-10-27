@@ -1,10 +1,11 @@
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import Animated from "react-native-reanimated";
 import { useAppUpdate } from "@/platform/app-update";
 import { useAppTheme } from "@/ui/theme";
 import { enterStyle, useMotion } from "@/ui/motion";
+import PressScale from "@/ui/press-scale";
 
 // Over the chats list: a new version is ready (restart), or a new app to
 // download (platform/app-update.ts).
@@ -27,16 +28,16 @@ export function UpdateBanner() {
         size={18}
         color={colors.accent}
       />
-      <Pressable style={styles.text} onPress={update.apply} accessibilityRole="button">
+      <PressScale scale={0.98} style={styles.text} onPress={update.apply} accessibilityRole="button">
         <Text style={[styles.label, { color: colors.text }]}>
           {update.kind === "restart"
             ? "A new version of Ostrich is ready. Tap to restart, or it starts next time."
             : `Ostrich ${update.version} needs the new app: tap to download it, then open it to install.`}
         </Text>
-      </Pressable>
-      <Pressable onPress={() => setDismissed(key)} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
+      </PressScale>
+      <PressScale scale={0.85} onPress={() => setDismissed(key)} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
         <Ionicons name="close" size={18} color={colors.muted} />
-      </Pressable>
+      </PressScale>
     </Animated.View>
   );
 }

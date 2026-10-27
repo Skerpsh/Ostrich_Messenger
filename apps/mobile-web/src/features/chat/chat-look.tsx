@@ -10,6 +10,7 @@ import { useEscape } from "@/ui/keys";
 import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
 import type { ChatLook, Wallpaper } from "@/features/settings/personalization";
 import { radius, type AccentChoice } from "@/ui/colors";
+import Reveal from "@/ui/reveal";
 
 type Audience = "me" | "everyone";
 
@@ -124,7 +125,9 @@ export default function ChatLookSheet({
             onError={setError}
           />
 
-          {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+          <Reveal>
+            {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
+          </Reveal>
 
           <View style={styles.buttons}>
             <Button

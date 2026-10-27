@@ -67,9 +67,12 @@ export default function JoinScreen() {
             <Ionicons name="people-outline" size={28} color={colors.accent} />
           </View>
 
-          {!info && !error ? <ActivityIndicator color={colors.muted} /> : null}
+          <Reveal>
+            {!info && !error ? <ActivityIndicator color={colors.muted} /> : null}
+          </Reveal>
 
-          {info ? (
+          <Reveal>
+            {info ? (
             <>
               <Text style={[styles.title, { color: colors.text }]}>
                 {info.invited_by ? `@${info.invited_by} invites you to a group` : "An invite to a group"}
@@ -105,6 +108,7 @@ export default function JoinScreen() {
               </Swap>
             </>
           ) : null}
+          </Reveal>
 
           <Reveal>
             {error ? <Text style={[styles.text, { color: colors.danger }]}>{error}</Text> : null}

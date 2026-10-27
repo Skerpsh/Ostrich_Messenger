@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
 import { usePhotoPlace } from "./photo-viewer";
@@ -10,6 +10,8 @@ import { formatSize, isImage, isVoice, loadAttachment } from "./attachments";
 import { imageSource, saveFile } from "@/platform/files";
 import { IMAGE_FADE_MS, useMotion } from "@/ui/motion";
 import type { Attachment } from "./payload";
+import Reveal, { Swap } from "@/ui/reveal";
+import PressScale from "@/ui/press-scale";
 
 const MAX_WIDTH = 240;
 const MAX_HEIGHT = 320;
@@ -116,7 +118,7 @@ function AttachmentImage({
   const size = { width, height: width / ratio };
 
   return (
-    <Pressable
+    <PressScale scale={0.97}
       ref={place}
       onPress={onOpen ?? save}
       accessibilityRole="button"
@@ -136,8 +138,10 @@ function AttachmentImage({
       ) : (
         <ActivityIndicator color={colors.muted} />
       )}
-      {saving ? <ActivityIndicator style={styles.saving} color="#ffffff" /> : null}
-    </Pressable>
+      <Reveal kind="fade" collapse={false} style={styles.saving}>
+        {saving ? <ActivityIndicator color="#ffffff" /> : null}
+      </Reveal>
+    </PressScale>
   );
 }
 
@@ -155,18 +159,20 @@ function AttachmentFile({
   const fg = own ? colors.onAccent : colors.text;
 
   return (
-    <Pressable
+    <PressScale scale={0.97}
       onPress={save}
       accessibilityRole="button"
       accessibilityLabel={`File ${attachment.name}, ${formatSize(attachment.size)}, tap to save`}
       style={[styles.file, { backgroundColor: own ? "rgba(0, 0, 0, 0.12)" : colors.panelAlt }]}
     >
       <View style={[styles.fileIcon, { backgroundColor: own ? colors.onAccent : colors.accent }]}>
-        {saving ? (
+        <Swap id={saving ? "saving" : "idle"} resize={false}>
+          {saving ? (
           <ActivityIndicator size="small" color={own ? colors.accent : colors.onAccent} />
         ) : (
           <Ionicons name="document-outline" size={18} color={own ? colors.accent : colors.onAccent} />
         )}
+        </Swap>
       </View>
       <View style={styles.fileText}>
         <Text numberOfLines={1} style={[styles.fileName, { color: fg }]}>
@@ -174,7 +180,7 @@ function AttachmentFile({
         </Text>
         <Text style={[styles.fileSize, { color: fg }]}>{formatSize(attachment.size)}</Text>
       </View>
-    </Pressable>
+    </PressScale>
   );
 }
 

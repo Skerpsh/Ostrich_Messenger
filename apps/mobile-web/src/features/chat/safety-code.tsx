@@ -5,7 +5,7 @@ import AnimatedPressable from "@/ui/animated-pressable";
 import Button from "@/ui/button";
 import QrCode from "@/ui/qr-code";
 import QrScanner from "@/features/devices/qr-scanner";
-import { Swap } from "@/ui/reveal";
+import { Overlay, Swap } from "@/ui/reveal";
 import { parseLink, safetyQr } from "@/api/links";
 import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
@@ -143,9 +143,11 @@ export default function SafetyCode({
         <Button title="Close" variant="secondary" onPress={close} />
       </AnimatedPressable>
 
-      {scanning ? (
+      <Overlay>
+        {scanning ? (
         <QrScanner title={`Scan @${username}'s safety code`} onScan={onScan} onClose={() => setScanning(false)} />
       ) : null}
+      </Overlay>
     </AnimatedPressable>
   );
 }

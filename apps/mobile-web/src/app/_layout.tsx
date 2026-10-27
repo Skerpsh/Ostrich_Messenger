@@ -29,6 +29,7 @@ import { nearestAccent } from "@/ui/colors";
 import { loadLock, useLock } from "@/features/lock/lock";
 import { loadDuress } from "@/features/lock/duress";
 import { LockScreen, LockWatch } from "@/features/lock/lock-screen";
+import { Overlay } from "@/ui/reveal";
 
 // Keep the splash screen until the saved session has been checked.
 SplashScreen.preventAutoHideAsync();
@@ -148,7 +149,9 @@ function RootNavigator() {
     >
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
       {signedIn ? <LockWatch /> : null}
-      {locked ? <LockScreen /> : null}
+      <Overlay>
+        {locked ? <LockScreen /> : null}
+      </Overlay>
 
       <View style={[styles.screens, locked && styles.hidden]}>
         <Stack

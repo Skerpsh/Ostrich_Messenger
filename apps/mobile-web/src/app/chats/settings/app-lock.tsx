@@ -4,7 +4,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Chat } from "@/api/api";
 import Avatar from "@/ui/avatar";
 import Button from "@/ui/button";
-import { Swap } from "@/ui/reveal";
+import Reveal, { Swap } from "@/ui/reveal";
 import TextField from "@/ui/text-field";
 import { MOD_KEY } from "@/ui/keys";
 import { useAppTheme } from "@/ui/theme";
@@ -186,7 +186,8 @@ export default function AppLockSettings() {
               />
             </Section>
 
-            {duress ? null : (
+            <Reveal>
+              {duress ? null : (
               <HeadInTheSand
                 on={Boolean(config.duress)}
                 onSetUp={() => setFlow(flows.duressOn)}
@@ -196,6 +197,7 @@ export default function AppLockSettings() {
                 onTurnOff={() => setFlow(flows.duressOff)}
               />
             )}
+            </Reveal>
 
             <Section>
               <Row icon="lock-open-outline" label="Turn off app lock" danger onPress={() => setFlow(flows.off)} />
@@ -483,9 +485,11 @@ function AlertEditor({ onDone }: { onDone: () => void }) {
           disabled={!chatId || !text.trim()}
           onPress={() => save({ chatId: chatId!, text: text.trim() })}
         />
-        {config?.alert ? (
+        <Reveal>
+          {config?.alert ? (
           <Button title="Turn off the silent alert" variant="danger" disabled={busy} onPress={() => save(null)} />
         ) : null}
+        </Reveal>
         <Button title="Cancel" variant="secondary" disabled={busy} onPress={onDone} />
       </View>
     </View>

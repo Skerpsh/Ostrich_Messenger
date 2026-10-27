@@ -12,6 +12,7 @@ import { useAppTheme } from "@/ui/theme";
 import { useIsWide } from "@/ui/layout";
 import { enterStyle, useMotion } from "@/ui/motion";
 import { radius } from "@/ui/colors";
+import { Swap } from "@/ui/reveal";
 
 export default function ChatsScreen() {
   const wide = useIsWide();
@@ -78,18 +79,28 @@ function NoChatSelected() {
           hovered && styles.chipHover,
         ]}
       >
-        <Text style={[styles.chipText, { color: colors.accent }]}>
-          {copied ? "Copied!" : `@${user.username}`}
-        </Text>
-        {copied ? null : (
-          <Ionicons name="copy-outline" size={15} color={colors.accent} />
-        )}
+        <Swap id={copied ? "copied" : "name"} resize={false}>
+          <View style={styles.chipContent}>
+            <Text style={[styles.chipText, { color: colors.accent }]}>
+              {copied ? "Copied!" : `@${user.username}`}
+            </Text>
+            {copied ? null : (
+              <Ionicons name="copy-outline" size={15} color={colors.accent} />
+            )}
+          </View>
+        </Swap>
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  chipContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
   pane: {
     flex: 1,
   },
@@ -126,7 +137,6 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: radius.pill,

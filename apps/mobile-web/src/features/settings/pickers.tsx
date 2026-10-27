@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import ChatWallpaper from "@/features/chat/chat-wallpaper";
 import { Segmented, styles as settingsStyles } from "./ui";
 import { noWebOutline } from "@/ui/text-field";
@@ -17,6 +17,8 @@ import {
   radius,
   type AccentChoice,
 } from "@/ui/colors";
+import Reveal from "@/ui/reveal";
+import PressScale from "@/ui/press-scale";
 
 // The pickers of Settings → Personalization, also used by a chat's
 // "Wallpaper & color" screen.
@@ -41,7 +43,7 @@ export function AccentPicker({
           const variant = accent[mode];
 
           return (
-            <Pressable
+            <PressScale scale={0.88}
               key={accent.id}
               onPress={() => {
                 setShowCustom(false);
@@ -54,12 +56,14 @@ export function AccentPicker({
               style={[settingsStyles.swatchRing, { borderColor: selected ? variant.accent : "transparent" }]}
             >
               <View style={[settingsStyles.swatch, { backgroundColor: variant.accent }]}>
-                {selected ? <Ionicons name="checkmark" size={18} color={variant.onAccent} /> : null}
+                <Reveal kind="pop" collapse={false}>
+                  {selected ? <Ionicons name="checkmark" size={18} color={variant.onAccent} /> : null}
+                </Reveal>
               </View>
-            </Pressable>
+            </PressScale>
           );
         })}
-        <Pressable
+        <PressScale scale={0.88}
           onPress={() => setShowCustom((shown) => !shown)}
           accessibilityRole="radio"
           accessibilityLabel="Your own color"
@@ -78,11 +82,13 @@ export function AccentPicker({
           >
             <Ionicons name={custom ? "checkmark" : "add"} size={18} color="#111113" />
           </LinearGradient>
-        </Pressable>
+        </PressScale>
       </View>
-      {showCustom ? (
+      <Reveal>
+        {showCustom ? (
         <CustomColor value={custom ? value : null} onChange={onChange} colors={colors} />
       ) : null}
+      </Reveal>
     </View>
   );
 }
@@ -210,7 +216,7 @@ export function WallpaperPicker({
           const selected = value.pattern === option.value;
 
           return (
-            <Pressable
+            <PressScale scale={0.92}
               key={option.value}
               onPress={() => choose(option.value)}
               accessibilityRole="radio"
@@ -239,17 +245,19 @@ export function WallpaperPicker({
               <Text style={[styles.patternLabel, { color: selected ? colors.text : colors.muted }]}>
                 {option.label}
               </Text>
-            </Pressable>
+            </PressScale>
           );
         })}
       </View>
-      {value.pattern !== "none" ? (
+      <Reveal>
+        {value.pattern !== "none" ? (
         <Segmented
           options={BRIGHTNESS}
           value={value.brightness}
           onChange={(brightness) => onChange({ ...value, brightness })}
         />
       ) : null}
+      </Reveal>
     </View>
   );
 }

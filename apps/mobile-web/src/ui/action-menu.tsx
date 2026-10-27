@@ -7,6 +7,7 @@ import { useEscape } from "./keys";
 import { enterStyle, leaveStyle, useLeave } from "./motion";
 import { radius } from "./colors";
 import type { IconName } from "./icon-button";
+import { Swap } from "./reveal";
 
 export type ActionMenuItem = {
   icon: IconName;
@@ -78,9 +79,12 @@ export default function ActionMenu({
               ]}
             >
               <Ionicons name={item.icon} size={20} color={color} />
-              <Text style={[styles.label, { color }]}>
-                {asking ? item.confirmLabel : item.label}
-              </Text>
+              {/* The question comes in place of the label. */}
+              <Swap id={asking ? "ask" : "label"} resize={false} style={styles.flex}>
+                <Text style={[styles.label, { color }]}>
+                  {asking ? item.confirmLabel : item.label}
+                </Text>
+              </Swap>
             </Pressable>
           );
         })}
@@ -90,6 +94,10 @@ export default function ActionMenu({
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+
   backdrop: {
     position: "absolute",
     top: 0,

@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import Animated from "react-native-reanimated";
 import { approveRecovery, getGuarding, getRecovery, setRecovery, type Guarding, type RecoveryPerson, type RecoveryStatus } from "@/api/api";
 import { useRealtime } from "@/api/realtime-context";
@@ -26,6 +26,7 @@ import { withAlpha } from "@/ui/colors";
 import { RECOVERED_KEY } from "./saved";
 import { changeFake, fakeRecovery } from "@/features/lock/duress";
 import { inDuress, useLock } from "@/features/lock/lock";
+import PressScale from "@/ui/press-scale";
 
 // Recovery through friends (backend recovery.ts): the user's OstrichID
 // split on this device among friends ("guardians"), any `threshold` of
@@ -238,17 +239,17 @@ export function RecoveryBanner() {
       ]}
     >
       <Ionicons name={shown.icon} size={18} color={shown.danger ? colors.danger : colors.accent} />
-      <Pressable style={styles.text} onPress={() => router.push("/chats/settings/recovery")} accessibilityRole="button">
+      <PressScale scale={0.98} style={styles.text} onPress={() => router.push("/chats/settings/recovery")} accessibilityRole="button">
         <Text style={[styles.label, { color: colors.text }]}>{shown.text}</Text>
-      </Pressable>
-      <Pressable
+      </PressScale>
+      <PressScale scale={0.85}
         onPress={() => setDismissed(shown.key)}
         accessibilityRole="button"
         accessibilityLabel="Close"
         hitSlop={8}
       >
         <Ionicons name="close" size={18} color={colors.muted} />
-      </Pressable>
+      </PressScale>
     </Animated.View>
   );
 }

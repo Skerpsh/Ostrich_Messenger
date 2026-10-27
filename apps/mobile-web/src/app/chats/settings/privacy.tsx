@@ -5,6 +5,7 @@ import { PrivacySection } from "@/features/settings/privacy";
 import { Row, Section, styles } from "@/features/settings/ui";
 import { useAuth } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
+import Reveal from "@/ui/reveal";
 
 export default function PrivacySettings() {
   const { colors } = useAppTheme();
@@ -48,9 +49,11 @@ export default function PrivacySettings() {
           loading={signingOut}
           onPress={signOutAll}
         />
-        {error ? (
+        <Reveal>
+          {error ? (
           <Text style={[styles.formMessage, styles.inset, { color: colors.danger }]}>{error}</Text>
         ) : null}
+        </Reveal>
       </Section>
     </SettingsPage>
   );

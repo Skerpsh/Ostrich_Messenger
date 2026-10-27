@@ -3,6 +3,7 @@ import { DeleteAccountForm, PasswordForm, UsernameForm } from "@/features/settin
 import { SettingsPage } from "@/features/settings/page";
 import { Divider, Row, Section } from "@/features/settings/ui";
 import { useCurrentUser } from "@/features/auth/auth";
+import Reveal from "@/ui/reveal";
 
 type Form = "username" | "password" | "delete";
 
@@ -26,7 +27,7 @@ export default function AccountSettings() {
           expanded={open === "username"}
           onPress={() => toggle("username")}
         />
-        {open === "username" ? <UsernameForm /> : null}
+        <Reveal>{open === "username" ? <UsernameForm /> : null}</Reveal>
         <Divider />
         <Row
           icon="key-outline"
@@ -34,7 +35,7 @@ export default function AccountSettings() {
           expanded={open === "password"}
           onPress={() => toggle("password")}
         />
-        {open === "password" ? <PasswordForm /> : null}
+        <Reveal>{open === "password" ? <PasswordForm /> : null}</Reveal>
       </Section>
 
       <Section title="Danger zone">
@@ -45,7 +46,7 @@ export default function AccountSettings() {
           expanded={open === "delete"}
           onPress={() => toggle("delete")}
         />
-        {open === "delete" ? <DeleteAccountForm /> : null}
+        <Reveal>{open === "delete" ? <DeleteAccountForm /> : null}</Reveal>
       </Section>
     </SettingsPage>
   );

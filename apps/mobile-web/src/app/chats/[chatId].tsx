@@ -33,7 +33,7 @@ import GroupInfo from "@/features/groups/group-info";
 import IconButton from "@/ui/icon-button";
 import MessageBubble from "@/features/chat/message-bubble";
 import PhotoViewer from "@/features/chat/photo-viewer";
-import Reveal, { Collapse, Swap } from "@/ui/reveal";
+import Reveal, { Collapse, Overlay, Swap } from "@/ui/reveal";
 import SafetyCode from "@/features/chat/safety-code";
 import ServerView, { type ServerViewTarget } from "@/features/chat/server-view";
 import SealSheet, { type Sealing } from "@/features/chat/seal-sheet";
@@ -109,6 +109,7 @@ import { useStartChat } from "@/features/chats/use-start-chat";
 import { useMinuteTick } from "@/ui/use-minute-tick";
 import { TOUCH_UI } from "@/platform/touch";
 import { radius } from "@/ui/colors";
+import PressScale from "@/ui/press-scale";
 
 const MAX_MESSAGE_LENGTH = 4096;
 
@@ -1670,11 +1671,11 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
             {canDeleteChosen ? (
               <Swap id={confirmingDelete ? "confirm" : "delete"} step={confirmingDelete ? 1 : -1}>
                 {confirmingDelete ? (
-                  <Pressable onPress={deleteChosen} accessibilityRole="button" style={styles.confirmDelete}>
+                  <PressScale scale={0.96} onPress={deleteChosen} accessibilityRole="button" style={styles.confirmDelete}>
                     <Text style={[styles.confirmDeleteText, { color: colors.danger }]}>
                       Delete {chosen.length} for everyone?
                     </Text>
-                  </Pressable>
+                  </PressScale>
                 ) : (
                   <IconButton icon="trash-outline" label="Delete" color={colors.danger} onPress={deleteChosen} />
                 )}
@@ -1688,14 +1689,14 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         onBack={wide ? undefined : goBack}
         left={
           chat ? (
-            <Pressable
+            <PressScale
               onPress={() => (group ? (room ? setShowRoomMembers(true) : setShowGroupInfo(true)) : undefined)}
               disabled={!group}
               accessibilityRole={group ? "button" : undefined}
               accessibilityLabel={group ? (room ? "Who is in the room" : "Group info") : undefined}
             >
               <ChatAvatar chat={chat} size={38} online={peerOnline} />
-            </Pressable>
+            </PressScale>
           ) : null
         }
         title={chat ? (chat.type === "direct" ? (chat.username ?? "…") : chatTitle(chat)) : "…"}
@@ -1740,7 +1741,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
       <Reveal kind="drop">
         {chat?.pinned_message ? (
           <View style={[styles.pinnedBar, { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
-            <Pressable
+            <PressScale scale={1} highlight={colors.hover}
               onPress={() => {
                 const id = chat.pinned_message!.id;
 
@@ -1758,7 +1759,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
               <Text numberOfLines={1} style={[styles.pinnedPreview, { color: colors.textSoft }]}>
                 {previewText(messagePreview(crypto.decrypt(chat.pinned_message)))}
               </Text>
-            </Pressable>
+            </PressScale>
             {!group || groupAdmin ? (
               <IconButton
                 icon="close"
@@ -1816,10 +1817,11 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                 onPress={() => setSearching(false)}
               />
             </View>
-            {hasMore ? (
+            <Reveal>
+              {hasMore ? (
               // Messages are decrypted on this device, so only loaded ones
               // can be searched.
-              <Pressable
+              <PressScale scale={0.96}
                 onPress={loadOlder}
                 disabled={loadingOlder}
                 accessibilityRole="button"
@@ -1831,8 +1833,9 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                     {loadingOlder ? "Loading…" : "Load older"}
                   </Text>
                 </Text>
-              </Pressable>
+              </PressScale>
             ) : null}
+            </Reveal>
           </View>
         ) : null}
       </Reveal>
@@ -1989,7 +1992,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
 
             <Reveal collapse={false} kind="pop" style={styles.unreadJumpPlace}>
               {unreadCount >= UNREAD_JUMP_FROM && !unreadJumped ? (
-                <Pressable
+                <PressScale
                   onPress={jumpToUnread}
                   accessibilityRole="button"
                   accessibilityLabel={`To the first of ${unreadCount} unread messages`}
@@ -2002,7 +2005,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                   <Text style={[styles.unreadJumpText, { color: colors.onAccent }]}>
                     {unreadCount} unread
                   </Text>
-                </Pressable>
+                </PressScale>
               ) : null}
             </Reveal>
 
@@ -2042,7 +2045,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
 
         <Reveal>
           {chat && keyChanged ? (
-            <Pressable
+            <PressScale scale={0.98}
               onPress={() => setShowSafetyCode(true)}
               accessibilityRole="button"
               style={[styles.keyWarning, { backgroundColor: colors.panel }]}
@@ -2052,13 +2055,13 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                 The security key of @{chat.username} has changed.{" "}
                 <Text style={{ color: colors.accent }}>Compare the safety code</Text>
               </Text>
-            </Pressable>
+            </PressScale>
           ) : null}
         </Reveal>
 
         <Reveal>
           {error ? (
-            <Pressable
+            <PressScale scale={0.98}
               onPress={() => setError(null)}
               accessibilityRole="button"
               accessibilityHint="Dismisses the error"
@@ -2066,7 +2069,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
             >
               <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
               <Ionicons name="close" size={16} color={colors.danger} />
-            </Pressable>
+            </PressScale>
           ) : null}
         </Reveal>
 
@@ -2088,9 +2091,11 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                   ? `You blocked @${chat.username}`
                   : `You can't message @${chat.username}`}
               </Text>
-              {composerBlocked === "byMe" ? (
+              <Reveal>
+                {composerBlocked === "byMe" ? (
                 <Button title="Unblock" variant="secondary" onPress={toggleBlocked} />
               ) : null}
+              </Reveal>
             </View>
           ) : (
             <View
@@ -2152,7 +2157,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                 {sealing && !editing ? (
                   <View style={styles.replyBar}>
                     <Ionicons name={sealing.surprise ? "gift" : "lock-closed"} size={18} color={colors.accent} />
-                    <Pressable
+                    <PressScale scale={0.98}
                       onPress={() => setShowSeal(true)}
                       accessibilityRole="button"
                       accessibilityLabel="Change when the letter opens"
@@ -2164,7 +2169,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                       <Text numberOfLines={1} style={[styles.replyBarContent, { color: colors.muted }]}>
                         Opens {formatOpening(sealing.opensAt)}
                       </Text>
-                    </Pressable>
+                    </PressScale>
                     <IconButton
                       icon="close"
                       label="Send without sealing"
@@ -2284,7 +2289,8 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                       color={emojiOpen ? colors.accent : colors.muted}
                       onPress={() => setEmojiOpen((open) => !open)}
                     />
-                    {editing ? null : (
+                    <Reveal kind="pop" collapse={false}>
+                      {editing ? null : (
                       <IconButton
                         icon="attach"
                         label="Attach a photo or file"
@@ -2294,6 +2300,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                         onPress={() => setAttachMenu(true)}
                       />
                     )}
+                    </Reveal>
                     {/* Back after a recording: it fades in. */}
                     <Reanimated.View style={[styles.inputBox, { backgroundColor: colors.panelAlt }, enterStyle("fade", motion)]}>
                       <TextInput
@@ -2362,7 +2369,8 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
 
       {/* Plain overlays rather than Modals: on web a Modal hands the focus
           back to the message when it closes, away from the input. */}
-      {menuFor ? (
+      <Overlay>
+        {menuFor ? (
         <ActionMenu
           title={previewText(messagePreview(textOf(menuFor)))}
           onClose={() => setMenuFor(null)}
@@ -2409,8 +2417,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           items={messageMenuItems(menuFor)}
         />
       ) : null}
+      </Overlay>
 
-      {viewing && photos.some((p) => p.id === viewing) ? (
+      <Overlay>
+        {viewing && photos.some((p) => p.id === viewing) ? (
         <PhotoViewer
           photos={photos}
           start={photos.findIndex((p) => p.id === viewing)}
@@ -2418,6 +2428,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           onError={setError}
         />
       ) : null}
+      </Overlay>
 
       <Reveal collapse={false} kind="fade" style={styles.layer}>
         {reactingTo ? (
@@ -2437,7 +2448,8 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         ) : null}
       </Reveal>
 
-      {attachMenu ? (
+      <Overlay>
+        {attachMenu ? (
         <ActionMenu
           title="Attach"
           onClose={() => setAttachMenu(false)}
@@ -2455,12 +2467,16 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           ]}
         />
       ) : null}
+      </Overlay>
 
-      {forwarding ? (
+      <Overlay>
+        {forwarding ? (
         <ForwardPicker onPick={(target) => forward(forwarding, target)} onClose={() => setForwarding(null)} />
       ) : null}
+      </Overlay>
 
-      {chatMenu && chat && room ? (
+      <Overlay>
+        {chatMenu && chat && room ? (
         <ActionMenu
           title={`${chatTitle(chat)} · you are ${chat.self_username ?? "…"}`}
           onClose={() => setChatMenu(false)}
@@ -2496,8 +2512,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           ]}
         />
       ) : null}
+      </Overlay>
 
-      {showRoomMembers && chat && room ? (
+      <Overlay>
+        {showRoomMembers && chat && room ? (
         <ActionMenu
           title={`${chat.member_count} of ${MAX_GROUP_MEMBERS} in ${chatTitle(chat)}`}
           onClose={() => setShowRoomMembers(false)}
@@ -2508,8 +2526,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           }))}
         />
       ) : null}
+      </Overlay>
 
-      {chatMenu && chat && group && !room ? (
+      <Overlay>
+        {chatMenu && chat && group && !room ? (
         <ActionMenu
           title={chatTitle(chat)}
           onClose={() => setChatMenu(false)}
@@ -2564,8 +2584,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           ]}
         />
       ) : null}
+      </Overlay>
 
-      {showGroupInfo && chat && group && !room ? (
+      <Overlay>
+        {showGroupInfo && chat && group && !room ? (
         <GroupInfo
           chat={chat}
           members={members}
@@ -2585,8 +2607,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           onClose={() => setShowGroupInfo(false)}
         />
       ) : null}
+      </Overlay>
 
-      {chatMenu && chat && saved ? (
+      <Overlay>
+        {chatMenu && chat && saved ? (
         <ActionMenu
           title={chatTitle(chat)}
           onClose={() => setChatMenu(false)}
@@ -2612,8 +2636,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           ]}
         />
       ) : null}
+      </Overlay>
 
-      {chatMenu && chat && chat.type === "direct" ? (
+      <Overlay>
+        {chatMenu && chat && chat.type === "direct" ? (
         <ActionMenu
           title={`@${chat.username}`}
           onClose={() => setChatMenu(false)}
@@ -2670,8 +2696,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           ]}
         />
       ) : null}
+      </Overlay>
 
-      {showLook && chat ? (
+      <Overlay>
+        {showLook && chat ? (
         <ChatLookSheet
           chatId={chatId}
           everyoneLabel={group ? "For everyone" : "For both"}
@@ -2679,10 +2707,14 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           onClose={() => setShowLook(false)}
         />
       ) : null}
+      </Overlay>
 
-      {serverView ? <ServerView target={serverView} room={room} onClose={() => setServerView(null)} /> : null}
+      <Overlay>
+        {serverView ? <ServerView target={serverView} room={room} onClose={() => setServerView(null)} /> : null}
+      </Overlay>
 
-      {showSeal ? (
+      <Overlay>
+        {showSeal ? (
         <SealSheet
           initial={sealing}
           onSeal={(chosen) => {
@@ -2693,8 +2725,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           onClose={() => setShowSeal(false)}
         />
       ) : null}
+      </Overlay>
 
-      {showSafetyCode && chat && crypto.safetyCode ? (
+      <Overlay>
+        {showSafetyCode && chat && crypto.safetyCode ? (
         <SafetyCode
           username={chat.username ?? ""}
           code={crypto.safetyCode}
@@ -2703,6 +2737,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           onClose={() => setShowSafetyCode(false)}
         />
       ) : null}
+      </Overlay>
     </View>
   );
 }

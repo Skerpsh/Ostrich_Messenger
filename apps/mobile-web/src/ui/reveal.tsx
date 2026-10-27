@@ -66,18 +66,21 @@ function transition(
 // and goes smoothly. collapse: it also grows from no height and shrinks
 // back to none, moving what is around it smoothly (bars, panels, errors);
 // without, it takes no part in the layout change (style places it).
-// appear: animates in when it is there from the start too.
+// appear: animates in when it is there from the start too. enter: false
+// for what animates itself in (only going is animated here).
 export default function Reveal({
   children,
   kind = "rise",
   collapse = true,
   appear = false,
+  enter = true,
   style,
 }: {
   children: ReactNode;
   kind?: RevealKind;
   collapse?: boolean;
   appear?: boolean;
+  enter?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const motion = useMotion();
@@ -109,7 +112,7 @@ export default function Reveal({
     setOpen(false);
   }
 
-  if (motion === "off" && shown && !open) {
+  if ((motion === "off" || !enter) && shown && !open) {
     setOpen(true);
   }
 
@@ -148,7 +151,7 @@ export default function Reveal({
     return (
       <Animated.View
         pointerEvents={pointerEvents}
-        style={[style, shown ? (quiet ? null : keyframes(kind, motion, true)) : keyframes(kind, motion, false)]}
+        style={[style, shown ? (quiet || !enter ? null : keyframes(kind, motion, true)) : keyframes(kind, motion, false)]}
       >
         {shown ? children : kept}
       </Animated.View>
@@ -187,6 +190,18 @@ export default function Reveal({
         {shown ? children : kept}
       </Animated.View>
     </Animated.View>
+  );
+}
+
+// An overlay (menu, sheet, viewer: {open ? <ActionMenu … /> : null}): it
+// animates itself in as before, and goes on fading for a moment once it is gone, so
+// that closing it from outside (an item chosen, which closes it at once)
+// is not abrupt either. Covers the screen like the overlays do.
+export function Overlay({ children }: { children: ReactNode }) {
+  return (
+    <Reveal kind="fade" collapse={false} enter={false} style={styles.overlay}>
+      {children}
+    </Reveal>
   );
 }
 
@@ -413,6 +428,15 @@ export function Swap({
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 10,
+  },
+
   fill: {
     flex: 1,
   },

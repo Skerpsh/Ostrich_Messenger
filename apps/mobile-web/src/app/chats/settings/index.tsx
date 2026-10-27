@@ -19,6 +19,7 @@ import { useIsWide } from "@/ui/layout";
 import { profileLink } from "@/api/links";
 import { notificationsSupported } from "@/platform/notifications";
 import { installApp, useCanInstall } from "@/platform/pwa";
+import Reveal from "@/ui/reveal";
 
 // The settings' sections, each on a screen of its own.
 const SECTIONS: { path: Href; label: string; icon: IconName; shown?: () => boolean }[] = [
@@ -141,7 +142,8 @@ function Settings() {
               {showQr ? "Hide QR code" : "My QR code"}
             </Text>
           </Pressable>
-          {showQr ? (
+          <Reveal>
+            {showQr ? (
             <>
               <QrCode value={profileLink(user.username)} />
               <Text selectable style={[styles.hint, { color: colors.muted }]}>
@@ -149,6 +151,7 @@ function Settings() {
               </Text>
             </>
           ) : null}
+          </Reveal>
           <Text style={[styles.hint, { color: colors.muted }]}>
             Friends start chats with you by your username, or by scanning
             your QR code.

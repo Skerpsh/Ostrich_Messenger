@@ -8,6 +8,7 @@ import { useAppTheme } from "@/ui/theme";
 import { removeAvatar, uploadAvatar } from "@/api/api";
 import { pickAvatar } from "./avatar-picker";
 import { styles } from "./ui";
+import PressScale from "@/ui/press-scale";
 
 // The profile picture, with upload and removal.
 export function ProfilePhoto() {
@@ -79,13 +80,15 @@ export function ProfilePhoto() {
         </View>
       </Pressable>
 
-      {user.avatar_id && !busy ? (
-        <Pressable onPress={remove} accessibilityRole="button" hitSlop={6}>
+      <Reveal kind="fade" collapse={false}>
+        {user.avatar_id && !busy ? (
+        <PressScale scale={0.96} onPress={remove} accessibilityRole="button" hitSlop={6}>
           <Text style={[styles.photoAction, { color: colors.muted }]}>
             Remove photo
           </Text>
-        </Pressable>
+        </PressScale>
       ) : null}
+      </Reveal>
 
       <Reveal>
         {error ? (

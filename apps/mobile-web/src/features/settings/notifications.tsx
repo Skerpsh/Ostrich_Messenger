@@ -12,6 +12,7 @@ import {
   setNotificationPreviews,
 } from "@/platform/notifications";
 import { Divider, Section, styles, ToggleRow } from "./ui";
+import Reveal from "@/ui/reveal";
 
 export function NotificationsSection() {
   const { withToken } = useAuth();
@@ -74,7 +75,8 @@ export function NotificationsSection() {
         disabled={enabled === null}
         onChange={change}
       />
-      {enabled && notificationPreviewsSupported() ? (
+      <Reveal>
+        {enabled && notificationPreviewsSupported() ? (
         <>
           <Divider />
           <ToggleRow
@@ -86,9 +88,12 @@ export function NotificationsSection() {
           />
         </>
       ) : null}
-      {error ? (
+      </Reveal>
+      <Reveal>
+        {error ? (
         <Text style={[styles.formMessage, styles.inset, { color: colors.danger }]}>{error}</Text>
       ) : null}
+      </Reveal>
     </Section>
   );
 }

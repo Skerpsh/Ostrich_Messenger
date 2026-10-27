@@ -23,6 +23,8 @@ import { TOUCH_UI } from "@/platform/touch";
 import type { Shown } from "./use-chat-crypto";
 import { personaColor, personaTag } from "@/features/rooms/persona";
 import { accentVariant, isAccentChoice, radius, type AccentChoice } from "@/ui/colors";
+import PressScale from "@/ui/press-scale";
+import Reveal from "@/ui/reveal";
 
 // Touch screens (platform/touch.ts): swipe left to reply, long press for the
 // menu. Mouse users get a reply button on hover instead, and can select
@@ -144,7 +146,7 @@ export default function MessageBubble({
       ]}
     >
       {selecting ? (
-        <Pressable
+        <PressScale scale={0.88}
           onPress={onToggle}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: selected }}
@@ -156,7 +158,7 @@ export default function MessageBubble({
             size={22}
             color={selected ? colors.accent : colors.muted}
           />
-        </Pressable>
+        </PressScale>
       ) : null}
 
       {own && !selecting ? replyButton : null}
@@ -193,7 +195,7 @@ export default function MessageBubble({
             )
           ) : null}
           {quote && quoteText ? (
-            <Pressable
+            <PressScale scale={0.98}
               onPress={() => onQuotePress(quote.id)}
               accessibilityRole="button"
               accessibilityLabel={`Reply to ${quote.sender_username}: ${quoteText.text}`}
@@ -225,7 +227,7 @@ export default function MessageBubble({
               >
                 {previewText(messagePreview(quoteText))}
               </Text>
-            </Pressable>
+            </PressScale>
           ) : null}
 
           {message.sent_after_days ? (
@@ -284,10 +286,11 @@ export default function MessageBubble({
               </Text>
             </View>
           ) : null}
-          {message.reactions.length > 0 ? (
+          <Reveal>
+            {message.reactions.length > 0 ? (
             <View style={styles.reactions}>
               {groupReactions(message.reactions, ownId).map(({ emoji, count, mine }) => (
-                <Pressable
+                <PressScale scale={0.88}
                   key={emoji}
                   onPress={() => onReact(emoji)}
                   accessibilityRole="button"
@@ -308,10 +311,11 @@ export default function MessageBubble({
                   {count > 1 ? (
                     <Text style={[styles.reactionCount, { color: textColor }]}>{count}</Text>
                   ) : null}
-                </Pressable>
+                </PressScale>
               ))}
             </View>
           ) : null}
+          </Reveal>
           <View style={styles.bubbleMeta}>
             {text.status === "plain" ? (
               // Not end-to-end encrypted: from before encryption, or not
@@ -388,7 +392,7 @@ function CallEntryView({ entry, own, onCall }: { entry: CallEntry; own: boolean;
     entry.outcome === "answered" && entry.duration ? formatDuration(entry.duration) : onCall ? "Tap to call back" : "";
 
   return (
-    <Pressable
+    <PressScale scale={0.97}
       onPress={() => onCall?.(entry.video === true)}
       disabled={!onCall}
       accessibilityRole={onCall ? "button" : undefined}
@@ -413,7 +417,7 @@ function CallEntryView({ entry, own, onCall }: { entry: CallEntry; own: boolean;
           <Text style={[styles.callDetail, { color: own ? colors.onAccent : colors.muted }]}>{detail}</Text>
         ) : null}
       </View>
-    </Pressable>
+    </PressScale>
   );
 }
 
@@ -434,7 +438,7 @@ function LookEntryView({
   const color = own ? colors.onAccent : colors.text;
 
   return (
-    <Pressable
+    <PressScale scale={0.97}
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : undefined}
@@ -456,7 +460,7 @@ function LookEntryView({
           </Text>
         ) : null}
       </View>
-    </Pressable>
+    </PressScale>
   );
 }
 

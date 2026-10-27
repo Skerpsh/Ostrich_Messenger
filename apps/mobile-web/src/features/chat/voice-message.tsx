@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAudioPlayer, useAudioPlayerStatus, type AudioPlayer } from "expo-audio";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
-import { Swap } from "@/ui/reveal";
+import Reveal, { Swap } from "@/ui/reveal";
 import { useAuth } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
 import { formatDuration, loadAttachment } from "./attachments";
 import { playableSource } from "@/platform/files";
 import type { Attachment } from "./payload";
 import { decodeWaveform } from "./voice";
+import PressScale from "@/ui/press-scale";
 
 // One voice message plays at a time: starting one pauses the other.
 let current: AudioPlayer | null = null;
@@ -116,7 +117,7 @@ export default function VoiceMessage({
 
   return (
     <View style={styles.voice}>
-      <Pressable
+      <PressScale scale={0.88}
         onPress={toggle}
         accessibilityRole="button"
         accessibilityLabel={status.playing ? "Pause the voice message" : "Play the voice message"}
@@ -134,7 +135,7 @@ export default function VoiceMessage({
             />
           )}
         </Swap>
-      </Pressable>
+      </PressScale>
       <View style={styles.body}>
         <Pressable
           onPress={(event) => seek(event.nativeEvent.locationX)}
@@ -159,16 +160,18 @@ export default function VoiceMessage({
           <Text style={[styles.time, { color: own ? colors.onAccent : colors.muted }]}>
             {started ? formatDuration(status.currentTime * 1000) : formatDuration(total * 1000)}
           </Text>
-          {started ? (
-            <Pressable
+          <Reveal kind="pop" collapse={false}>
+            {started ? (
+            <PressScale scale={0.9}
               onPress={changeSpeed}
               accessibilityRole="button"
               accessibilityLabel={`Speed ${speed}×`}
               style={[styles.speed, { backgroundColor: own ? "rgba(0, 0, 0, 0.15)" : colors.panelAlt }]}
             >
               <Text style={[styles.speedText, { color: own ? colors.onAccent : colors.textSoft }]}>{speed}×</Text>
-            </Pressable>
+            </PressScale>
           ) : null}
+          </Reveal>
         </View>
       </View>
     </View>

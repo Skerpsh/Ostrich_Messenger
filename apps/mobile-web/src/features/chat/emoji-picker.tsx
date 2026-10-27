@@ -6,6 +6,7 @@ import { useAppTheme } from "@/ui/theme";
 import { EMOJI_CATEGORIES, recentEmoji, rememberEmoji } from "./emoji";
 import { enterStyle, useMotion } from "@/ui/motion";
 import { radius } from "@/ui/colors";
+import PressScale from "@/ui/press-scale";
 
 // Emoji to pick, by category, with the recently used first: for the
 // message being written and for reactions.
@@ -49,7 +50,7 @@ export default function EmojiPicker({ onPick }: { onPick: (emoji: string) => voi
           <Animated.View style={[styles.tabSlider, { backgroundColor: colors.accentSoft }, slider.style]} />
         ) : null}
         {[{ name: "Recent", icon: "🕘" }, ...EMOJI_CATEGORIES].map((tab, i) => (
-          <Pressable
+          <PressScale scale={0.9}
             key={tab.name}
             onPress={() => setCategory(i - 1)}
             onLayout={slider.onLayout(i)}
@@ -59,7 +60,7 @@ export default function EmojiPicker({ onPick }: { onPick: (emoji: string) => voi
             style={[styles.tab, category === i - 1 && !slider.style && { backgroundColor: colors.accentSoft }]}
           >
             <Text style={styles.tabIcon}>{tab.icon}</Text>
-          </Pressable>
+          </PressScale>
         ))}
       </ScrollView>
       <ScrollView style={styles.grid} keyboardShouldPersistTaps="always">

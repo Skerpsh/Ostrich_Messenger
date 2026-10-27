@@ -4,7 +4,6 @@ import { Image } from "expo-image";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ViewStyle, type ViewInstance } from "react-native";
 import Animated, { cubicBezier, type CSSAnimationProperties, type CSSTransitionProperties } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import AnimatedPressable from "@/ui/animated-pressable";
 import { Swap } from "@/ui/reveal";
 import { useAuth } from "@/features/auth/auth";
 import { loadAttachment } from "./attachments";
@@ -12,6 +11,7 @@ import { imageSource, saveFile } from "@/platform/files";
 import { useEscape } from "@/ui/keys";
 import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, useMotion } from "@/ui/motion";
 import type { Attachment } from "./payload";
+import PressScale from "@/ui/press-scale";
 
 // Where each photo is in the chat (its thumbnail, while on the screen),
 // for the viewer to open out of it and close back into it.
@@ -308,14 +308,14 @@ export default function PhotoViewer({
           {index + 1} / {photos.length}
         </Text>
         <View style={styles.actions}>
-          <Pressable onPress={save} disabled={saving} accessibilityRole="button" accessibilityLabel="Save the photo" style={styles.button}>
+          <PressScale scale={0.9} onPress={save} disabled={saving} accessibilityRole="button" accessibilityLabel="Save the photo" style={styles.button}>
             <Swap id={saving ? "saving" : "save"} resize={false}>
               {saving ? <ActivityIndicator color="#ffffff" /> : <Ionicons name="download-outline" size={24} color="#ffffff" />}
             </Swap>
-          </Pressable>
-          <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Close" style={styles.button}>
+          </PressScale>
+          <PressScale scale={0.88} onPress={close} accessibilityRole="button" accessibilityLabel="Close" style={styles.button}>
             <Ionicons name="close" size={26} color="#ffffff" />
-          </Pressable>
+          </PressScale>
         </View>
       </Animated.View>
 
@@ -326,16 +326,27 @@ export default function PhotoViewer({
         </Animated.View>
       </Pressable>
 
-      {index > 0 ? (
-        <AnimatedPressable onPress={() => go(-1)} accessibilityRole="button" accessibilityLabel="Previous photo" style={[styles.arrow, styles.left, chrome]}>
-          <Ionicons name="chevron-back" size={30} color="#ffffff" />
-        </AnimatedPressable>
-      ) : null}
-      {index < photos.length - 1 ? (
-        <AnimatedPressable onPress={() => go(1)} accessibilityRole="button" accessibilityLabel="Next photo" style={[styles.arrow, styles.right, chrome]}>
-          <Ionicons name="chevron-forward" size={30} color="#ffffff" />
-        </AnimatedPressable>
-      ) : null}
+      {/* Always there: the one with nowhere to go fades out. */}
+      <PressScale scale={0.88}
+        onPress={() => go(-1)}
+        disabled={index === 0}
+        accessibilityRole="button"
+        accessibilityLabel="Previous photo"
+        accessibilityElementsHidden={index === 0}
+        style={[styles.arrow, styles.left, { opacity: open && index > 0 ? 1 : 0, ...timing(["opacity"]) }]}
+      >
+        <Ionicons name="chevron-back" size={30} color="#ffffff" />
+      </PressScale>
+      <PressScale scale={0.88}
+        onPress={() => go(1)}
+        disabled={index === photos.length - 1}
+        accessibilityRole="button"
+        accessibilityLabel="Next photo"
+        accessibilityElementsHidden={index === photos.length - 1}
+        style={[styles.arrow, styles.right, { opacity: open && index < photos.length - 1 ? 1 : 0, ...timing(["opacity"]) }]}
+      >
+        <Ionicons name="chevron-forward" size={30} color="#ffffff" />
+      </PressScale>
 
       <Animated.Text numberOfLines={1} style={[styles.name, chrome]}>
         {photo.name}

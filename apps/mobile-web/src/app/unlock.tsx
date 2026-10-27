@@ -2,7 +2,6 @@ import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   KeyboardAvoidingView,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +20,7 @@ import { KEYBOARD_BEHAVIOR } from "@/ui/keyboard";
 import { useShake } from "@/ui/motion";
 import { TOUCH_UI } from "@/platform/touch";
 import { radius } from "@/ui/colors";
+import PressScale from "@/ui/press-scale";
 
 // A device logged in without the account's keys (e.g. from before
 // end-to-end encryption): the OstrichID unlocks them, once per device.
@@ -97,11 +97,11 @@ export default function UnlockScreen() {
 
             <Button title="Unlock" loading={loading} onPress={submit} />
 
-            <Pressable onPress={signOut} accessibilityRole="button" style={styles.logout}>
+            <PressScale scale={0.96} onPress={signOut} accessibilityRole="button" style={styles.logout}>
               <Text style={[styles.logoutText, { color: colors.muted }]}>
                 Log out instead
               </Text>
-            </Pressable>
+            </PressScale>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import AnimatedPressable from "@/ui/animated-pressable";
 import Button from "@/ui/button";
 import { useAuth } from "@/features/auth/auth";
@@ -16,6 +16,8 @@ import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
 import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
 import { radius } from "@/ui/colors";
+import Reveal from "@/ui/reveal";
+import PressScale from "@/ui/press-scale";
 
 // "What the server sees" of a message or a chat: the rows the server keeps,
 // fetched when opened (not made up from what the app knows), next to what
@@ -260,11 +262,11 @@ export default function ServerView({
               </View>
 
               {target.kind === "message" && "message" in view && view.message.content.length > CIPHERTEXT_PREVIEW ? (
-                <Pressable onPress={() => setFull((shown) => !shown)} accessibilityRole="button">
+                <PressScale scale={0.96} onPress={() => setFull((shown) => !shown)} accessibilityRole="button">
                   <Text style={[styles.link, { color: colors.accent }]}>
                     {full ? "Show less of the ciphertext" : "Show the whole ciphertext"}
                   </Text>
-                </Pressable>
+                </PressScale>
               ) : null}
 
               {hidden.length ? (
@@ -304,7 +306,8 @@ export default function ServerView({
           )}
 
           <View style={styles.buttons}>
-            {view ? (
+            <Reveal kind="fade" collapse={false}>
+              {view ? (
               <Button
                 title={raw ? "Show as a list" : "Show as JSON"}
                 icon="code-slash-outline"
@@ -313,6 +316,7 @@ export default function ServerView({
                 onPress={() => setRaw((shown) => !shown)}
               />
             ) : null}
+            </Reveal>
             <Button title="Close" variant="secondary" style={styles.flex} onPress={close} />
           </View>
         </ScrollView>

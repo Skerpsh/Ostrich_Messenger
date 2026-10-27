@@ -2,7 +2,6 @@ import { useState } from "react";
 import * as Clipboard from "expo-clipboard";
 import {
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +13,8 @@ import Button from "@/ui/button";
 import { useAuth } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
 import { radius } from "@/ui/colors";
+import Reveal from "@/ui/reveal";
+import PressScale from "@/ui/press-scale";
 
 // Shown once after registration: the OstrichID is generated on this device
 // and never sent to the server, so this is the only chance to save it.
@@ -72,7 +73,7 @@ export default function OstrichIdScreen() {
             Your OstrichID
           </Text>
 
-          <Pressable
+          <PressScale scale={0.97}
             onPress={copy}
             accessibilityRole="button"
             accessibilityLabel="Copy your OstrichID"
@@ -87,7 +88,7 @@ export default function OstrichIdScreen() {
             <Text style={[styles.hint, { color: colors.muted }]}>
               {copied ? "Copied!" : "Tap to copy"}
             </Text>
-          </Pressable>
+          </PressScale>
 
           <Text style={[styles.text, { color: colors.textSoft }]}>
             You need it to log in, together with your username and password.
@@ -101,7 +102,7 @@ export default function OstrichIdScreen() {
             Save it somewhere safe, such as a password manager.
           </Text>
 
-          <Pressable
+          <PressScale scale={0.97}
             onPress={() => setSaved((value) => !value)}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: saved }}
@@ -116,14 +117,16 @@ export default function OstrichIdScreen() {
                 },
               ]}
             >
-              {saved ? (
+              <Reveal kind="pop" collapse={false}>
+                {saved ? (
                 <Text style={[styles.checkMark, { color: colors.onAccent }]}>✓</Text>
               ) : null}
+              </Reveal>
             </View>
             <Text style={[styles.checkLabel, { color: colors.text }]}>
               I have saved my OstrichID
             </Text>
-          </Pressable>
+          </PressScale>
 
           <Button
             title="Continue"

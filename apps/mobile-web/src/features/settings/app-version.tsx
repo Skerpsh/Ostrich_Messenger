@@ -1,5 +1,5 @@
 import { Platform, StyleSheet, Text, View } from "react-native";
-import { Swap } from "@/ui/reveal";
+import Reveal, { Swap } from "@/ui/reveal";
 import { desktop, useDesktopUpdate, type DesktopUpdateState } from "@/platform/desktop";
 import { APP_VERSION } from "@/platform/version";
 import { useAppTheme } from "@/ui/theme";
@@ -25,7 +25,8 @@ export function AppVersion() {
       <Text selectable style={[styles.text, { color: colors.muted }]}>
         Ostrich {update?.current ?? APP_VERSION} · {client}
       </Text>
-      {update ? (
+      <Reveal>
+        {update ? (
         // The state changes in place: the old line goes as the new comes.
         <Swap id={update.state}>
           <Text style={[styles.text, { color: update.state === "error" ? colors.danger : colors.muted }]}>
@@ -41,6 +42,7 @@ export function AppVersion() {
           </Text>
         </Swap>
       ) : null}
+      </Reveal>
     </View>
   );
 }

@@ -3,7 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import AnimatedPressable from "@/ui/animated-pressable";
-import Reveal from "@/ui/reveal";
+import Reveal, { Swap } from "@/ui/reveal";
 import { useKeydown } from "@/ui/keys";
 import { pressStyle, useMotion, usePressed, useShake } from "@/ui/motion";
 import { useAppTheme } from "@/ui/theme";
@@ -102,7 +102,8 @@ export default function PinPad({
       </Animated.View>
 
       <View style={styles.message}>
-        {checking ? (
+        <Swap id={checking ? "checking" : "idle"}>
+          {checking ? (
           <ActivityIndicator color={colors.muted} />
         ) : (
           <Reveal>
@@ -113,6 +114,7 @@ export default function PinPad({
             ) : null}
           </Reveal>
         )}
+        </Swap>
       </View>
 
       <View style={styles.keys}>

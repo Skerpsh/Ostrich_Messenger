@@ -11,6 +11,7 @@ import { useEscape } from "@/ui/keys";
 import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
 import { radius } from "@/ui/colors";
 import { MAX_SEAL_YEARS, MIN_SEAL_MS } from "./sealed";
+import Reveal from "@/ui/reveal";
 
 // How the next message is sealed: until when (ms), and whether the server
 // keeps it from the others until then.
@@ -182,7 +183,9 @@ export default function SealSheet({
               : "It arrives now as a sealed envelope that shows when it opens, and opens by itself then."}
           </Text>
 
-          {problem ? <Text style={[styles.text, { color: colors.danger }]}>{problem}</Text> : null}
+          <Reveal>
+            {problem ? <Text style={[styles.text, { color: colors.danger }]}>{problem}</Text> : null}
+          </Reveal>
 
           <View style={styles.buttons}>
             <Button title="Cancel" variant="secondary" style={styles.flex} onPress={close} />

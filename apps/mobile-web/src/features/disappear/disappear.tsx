@@ -7,7 +7,7 @@ import {
 } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { AppState, Platform, Pressable, StyleSheet, Text } from "react-native";
+import { AppState, Platform, StyleSheet, Text } from "react-native";
 import Animated from "react-native-reanimated";
 import {
   deleteDisappearMessage,
@@ -25,6 +25,7 @@ import { useAuth } from "@/features/auth/auth";
 import { formatDate } from "@/ui/format";
 import { useAppTheme } from "@/ui/theme";
 import { enterStyle, useMotion } from "@/ui/motion";
+import PressScale from "@/ui/press-scale";
 
 // "If I disappear": messages written ahead, sent for the user by the
 // server when they have not opened Ostrich for the days they chose
@@ -235,21 +236,21 @@ export function DisappearBanner() {
         size={18}
         color={colors.accent}
       />
-      <Pressable
+      <PressScale scale={0.98}
         style={styles.text}
         onPress={() => router.push("/chats/settings/disappear")}
         accessibilityRole="button"
       >
         <Text style={[styles.label, { color: colors.text }]}>{text}</Text>
-      </Pressable>
-      <Pressable
+      </PressScale>
+      <PressScale scale={0.85}
         onPress={dismiss}
         accessibilityRole="button"
         accessibilityLabel="Close"
         hitSlop={8}
       >
         <Ionicons name="close" size={18} color={colors.muted} />
-      </Pressable>
+      </PressScale>
     </Animated.View>
   );
 }

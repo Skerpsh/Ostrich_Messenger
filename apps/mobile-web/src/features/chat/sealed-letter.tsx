@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { getDrandSignature } from "@/api/api";
 import { serverNow } from "@/api/server-clock";
 import { useAuth } from "@/features/auth/auth";
@@ -9,6 +9,8 @@ import { enterStyle, useMotion } from "@/ui/motion";
 import Animated from "react-native-reanimated";
 import { decodePayload, type Payload } from "./payload";
 import { openingTime, openLetter, type SealedLetter } from "./sealed";
+import { Swap } from "@/ui/reveal";
+import PressScale from "@/ui/press-scale";
 
 // Sealed letters in a chat: they open by themselves when their round
 // comes (the server's clock says when), and stay open for the session.
@@ -192,11 +194,13 @@ export function SealedEnvelope({
   return (
     <View style={styles.envelope} accessibilityLabel={`Sealed letter, opens ${formatOpening(at)}`}>
       <View style={[styles.icon, { backgroundColor: own ? "rgba(0, 0, 0, 0.14)" : colors.accentSoft }]}>
-        {left <= 0 && state?.status !== "failed" ? (
+        <Swap id={left <= 0 && state?.status !== "failed" ? "opening" : "waiting"} resize={false}>
+          {left <= 0 && state?.status !== "failed" ? (
           <ActivityIndicator size="small" color={own ? colors.onAccent : colors.accent} />
         ) : (
           <Ionicons name={letter.surprise ? "gift" : "mail"} size={20} color={own ? colors.onAccent : colors.accent} />
         )}
+        </Swap>
       </View>
       <View style={styles.texts}>
         <Text style={[styles.title, { color }]}>{letter.surprise ? "Surprise letter" : "Sealed letter"}</Text>
@@ -220,12 +224,12 @@ export function OpenedNote({ letter, own, onPress }: { letter: SealedLetter; own
 
   return (
     <Animated.View style={enterStyle("pop", motion)}>
-      <Pressable onPress={onPress} disabled={!onPress} style={styles.opened}>
+      <PressScale scale={0.97} onPress={onPress} disabled={!onPress} style={styles.opened}>
         <Ionicons name="lock-open" size={12} color={color} />
         <Text style={[styles.openedText, { color }]}>
           {letter.surprise ? "Surprise letter" : "Sealed letter"}, opened {formatOpening(openingTime(letter.round))}
         </Text>
-      </Pressable>
+      </PressScale>
     </Animated.View>
   );
 }

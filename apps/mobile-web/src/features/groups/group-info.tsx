@@ -8,7 +8,7 @@ import Button from "@/ui/button";
 import ChatAvatar from "@/features/chats/chat-avatar";
 import DevBadge from "@/ui/dev-badge";
 import QrCode from "@/ui/qr-code";
-import Reveal, { Swap } from "@/ui/reveal";
+import Reveal, { Overlay, Swap } from "@/ui/reveal";
 import SafetyCode from "@/features/chat/safety-code";
 import TextField from "@/ui/text-field";
 import { useAuth } from "@/features/auth/auth";
@@ -44,6 +44,7 @@ import { acceptPeerKey, checkPeerKey } from "@/crypto/known-keys";
 import { pickPhoto } from "@/features/chat/pick-attachment";
 import { cleanUsername, USERNAME_RE, USERNAME_RULES } from "@/features/auth/validation";
 import { radius } from "@/ui/colors";
+import PressScale from "@/ui/press-scale";
 
 const ROLE_LABEL = { owner: "owner", admin: "admin", member: "" } as const;
 
@@ -209,15 +210,15 @@ export default function GroupInfo({
             <ChatAvatar chat={chat} size={72} />
             {admin ? (
               <View style={styles.photoActions}>
-                <Pressable onPress={changePhoto} disabled={busy} accessibilityRole="button">
+                <PressScale scale={0.96} onPress={changePhoto} disabled={busy} accessibilityRole="button">
                   <Text style={[styles.link, { color: colors.accent }]}>
                     {info?.photo ? "Change photo" : "Add photo"}
                   </Text>
-                </Pressable>
+                </PressScale>
                 {info?.photo ? (
-                  <Pressable onPress={removePhoto} disabled={busy} accessibilityRole="button">
+                  <PressScale scale={0.96} onPress={removePhoto} disabled={busy} accessibilityRole="button">
                     <Text style={[styles.link, { color: colors.danger }]}>Remove</Text>
-                  </Pressable>
+                  </PressScale>
                 ) : null}
               </View>
             ) : null}
@@ -449,7 +450,8 @@ export default function GroupInfo({
         </ScrollView>
       </AnimatedPressable>
 
-      {codeFor && me && codeFor.member.public_key ? (
+      <Overlay>
+        {codeFor && me && codeFor.member.public_key ? (
         <SafetyCode
           username={codeFor.member.username}
           code={safetyCode(publicKeyOf(me.privateKey), codeFor.member.public_key)}
@@ -461,6 +463,7 @@ export default function GroupInfo({
           onClose={() => setCodeFor(null)}
         />
       ) : null}
+      </Overlay>
     </AnimatedPressable>
   );
 }
@@ -470,9 +473,9 @@ function IconButtonLike({ label, onPress }: { label: string; onPress: () => void
   const { colors } = useAppTheme();
 
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={styles.decline}>
+    <PressScale scale={1} highlight={colors.hover} onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={styles.decline}>
       <Ionicons name="close" size={20} color={colors.muted} />
-    </Pressable>
+    </PressScale>
   );
 }
 

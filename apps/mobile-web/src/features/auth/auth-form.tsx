@@ -183,7 +183,8 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 }
               />
 
-              {isRegister ? null : (
+              <Reveal>
+                {isRegister ? null : (
                 <View style={styles.idField}>
                   <TextField
                     ref={ostrichIdRef}
@@ -200,8 +201,10 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
                 </View>
               )}
+              </Reveal>
 
-              {isRegister ? (
+              <Reveal>
+                {isRegister ? (
                 <TextField
                   ref={confirmRef}
                   label="Confirm password"
@@ -216,15 +219,18 @@ export default function AuthForm({ mode }: AuthFormProps) {
                   onSubmitEditing={submit}
                 />
               ) : null}
+              </Reveal>
             </Animated.View>
 
-            {isRegister ? (
+            <Reveal>
+              {isRegister ? (
               <Text style={[styles.note, { color: colors.textSoft }]}>
                 After you create the account, you get an OstrichID. You need it
                 to log in, and it is the key to your end-to-end encrypted
                 messages: it is shown only once and never sent to the server.
               </Text>
             ) : null}
+            </Reveal>
 
             <Reveal>
               {shownError ? (
@@ -241,7 +247,8 @@ export default function AuthForm({ mode }: AuthFormProps) {
               style={styles.submit}
             />
 
-            {isRegister ? null : (
+            <Reveal>
+              {isRegister ? null : (
               <>
                 <Button
                   title="Log in with a QR code"
@@ -259,6 +266,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 />
               </>
             )}
+            </Reveal>
 
             <Button
               title={isRegister ? "I have an account" : "Create account"}

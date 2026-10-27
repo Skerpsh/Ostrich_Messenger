@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AppHeader from "@/ui/app-header";
@@ -12,6 +12,7 @@ import { enterPin, lockNow, useLock, WIPE_AFTER } from "./lock";
 import { lockSeemsOff, setLockSeemsOff } from "./duress";
 import { pausePushNotifications, syncPushToken } from "@/platform/notifications";
 import PinPad from "./pin-pad";
+import PressScale from "@/ui/press-scale";
 
 // In front of everything while the app is locked (app/_layout.tsx).
 export function LockScreen() {
@@ -110,9 +111,9 @@ export function LockScreen() {
               error={shown && countdown ? `${shown} ${countdown}` : shown}
               onComplete={submit}
             >
-              <Pressable onPress={() => setForgot(true)} accessibilityRole="button" hitSlop={8}>
+              <PressScale scale={0.96} onPress={() => setForgot(true)} accessibilityRole="button" hitSlop={8}>
                 <Text style={[styles.link, { color: colors.muted }]}>Forgot your PIN?</Text>
-              </Pressable>
+              </PressScale>
             </PinPad>
           )}
         </Swap>

@@ -6,6 +6,7 @@ import { SettingsPage } from "@/features/settings/page";
 import { Block, Divider, Section, Segmented, styles, ToggleRow } from "@/features/settings/ui";
 import { useAppTheme, type ThemePreference } from "@/ui/theme";
 import { LIST_DENSITIES, TEXT_SIZES } from "@/features/settings/personalization";
+import Reveal from "@/ui/reveal";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: IconName }[] = [
   { value: "system", label: "System", icon: "phone-portrait-outline" },
@@ -65,7 +66,9 @@ export default function PersonalizationSettings() {
             onPhoto={theme.setWallpaperPhoto}
             onError={setError}
           />
-          {error ? <Text style={[styles.formMessage, { color: colors.danger }]}>{error}</Text> : null}
+          <Reveal>
+            {error ? <Text style={[styles.formMessage, { color: colors.danger }]}>{error}</Text> : null}
+          </Reveal>
         </View>
       </Section>
 

@@ -36,6 +36,8 @@ import { useEscape } from "@/ui/keys";
 import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
 import { radius } from "@/ui/colors";
 import { disappearApi, setDisappearStatus } from "./disappear";
+import Reveal, { Overlay } from "@/ui/reveal";
+import PressScale from "@/ui/press-scale";
 
 // Writing a message of "If I disappear" (or changing one): to a chat or a
 // group, with files, and the user's OstrichID if they choose. Encrypted
@@ -279,7 +281,7 @@ export default function DisappearEditor({
               <Text style={[styles.fileSize, { color: colors.muted }]}>
                 {formatSize(file.size)}
               </Text>
-              <Pressable
+              <PressScale scale={0.9}
                 onPress={() =>
                   i < kept.length
                     ? setKept((current) => current.filter((_, j) => j !== i))
@@ -292,11 +294,12 @@ export default function DisappearEditor({
                 hitSlop={8}
               >
                 <Ionicons name="close" size={16} color={colors.muted} />
-              </Pressable>
+              </PressScale>
             </View>
           ))}
 
-          {files < MAX_ATTACHMENTS ? (
+          <Reveal>
+            {files < MAX_ATTACHMENTS ? (
             <View style={styles.row}>
               <Button
                 title="Photo"
@@ -314,6 +317,7 @@ export default function DisappearEditor({
               />
             </View>
           ) : null}
+          </Reveal>
 
           <View style={styles.heirRow}>
             <View style={styles.flex}>
@@ -327,7 +331,8 @@ export default function DisappearEditor({
             <Switch value={heir} onValueChange={setHeir} />
           </View>
 
-          {heir ? (
+          <Reveal>
+            {heir ? (
             <>
               <Text style={[styles.text, { color: colors.danger }]}>
                 Whoever reads this message gets your OstrichID. With your
@@ -350,10 +355,13 @@ export default function DisappearEditor({
               />
             </>
           ) : null}
+          </Reveal>
 
-          {error ? (
+          <Reveal>
+            {error ? (
             <Text style={[styles.text, { color: colors.danger }]}>{error}</Text>
           ) : null}
+          </Reveal>
 
           <View style={styles.row}>
             <Button
@@ -373,7 +381,8 @@ export default function DisappearEditor({
         </ScrollView>
       </AnimatedPressable>
 
-      {picking ? (
+      <Overlay>
+        {picking ? (
         <ForwardPicker
           title="Send it to…"
           allow={notSaved}
@@ -384,6 +393,7 @@ export default function DisappearEditor({
           onClose={() => setPicking(false)}
         />
       ) : null}
+      </Overlay>
     </AnimatedPressable>
   );
 }

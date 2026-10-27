@@ -20,6 +20,7 @@ import { useIsWide } from "@/ui/layout";
 import { getItem, setItem } from "@/platform/storage";
 import { callSounds } from "./webrtc";
 import { radius } from "@/ui/colors";
+import PressScale from "@/ui/press-scale";
 
 type Drawn = "screen" | "bar" | null;
 
@@ -87,7 +88,7 @@ export default function CallScreen() {
   if (drawn === "bar") {
     return (
       <Reanimated.View pointerEvents="box-none" style={[styles.barWrap, { top: insets.top + 8 }, enterStyle("drop", motion)]}>
-        <Pressable
+        <PressScale scale={0.98}
           onPress={() => setMinimized(false)}
           accessibilityRole="button"
           accessibilityLabel={`Back to the call with @${call.chat.username}`}
@@ -97,10 +98,10 @@ export default function CallScreen() {
           <Text numberOfLines={1} style={styles.barText}>
             @{call.chat.username} · {status}
           </Text>
-          <Pressable onPress={hangUp} accessibilityRole="button" accessibilityLabel="Hang up" hitSlop={8}>
+          <PressScale scale={0.88} onPress={hangUp} accessibilityRole="button" accessibilityLabel="Hang up" hitSlop={8}>
             <Ionicons name="close-circle" size={20} color="#08240f" />
-          </Pressable>
-        </Pressable>
+          </PressScale>
+        </PressScale>
       </Reanimated.View>
     );
   }
@@ -119,11 +120,13 @@ export default function CallScreen() {
       ]}
     >
       <View style={styles.top}>
-        {call.phase !== "incoming" && call.phase !== "ended" ? (
+        <Swap id={call.phase !== "incoming" && call.phase !== "ended" ? "minimize" : "none"} resize={false}>
+          {call.phase !== "incoming" && call.phase !== "ended" ? (
           <IconButton icon="chevron-down" label="Minimize the call" onPress={() => setMinimized(true)} />
         ) : (
           <View style={styles.topSpacer} />
         )}
+        </Swap>
         <View style={styles.secure}>
           <Ionicons name="lock-closed" size={12} color={colors.muted} />
           <Text style={[styles.secureText, { color: colors.muted }]}>End-to-end encrypted</Text>
@@ -294,16 +297,19 @@ function VideoScreen({ call, status, wide }: { call: CallView; status: string; w
           <>
             <View pointerEvents="box-none" style={[styles.videoTop, { paddingTop: (wide ? 0 : insets.top) + 12 }]}>
               <View style={styles.top}>
-                {call.phase !== "incoming" ? (
+                <Swap id={call.phase !== "incoming" ? "minimize" : "none"} resize={false}>
+                  {call.phase !== "incoming" ? (
                   <OverlayButton icon="chevron-down" label="Minimize the call" onPress={() => setMinimized(true)} />
                 ) : (
                   <View style={styles.topSpacer} />
                 )}
+                </Swap>
                 <View style={[styles.secure, styles.videoPill]}>
                   <Ionicons name="lock-closed" size={12} color="#ffffff" />
                   <Text style={[styles.secureText, styles.videoText]}>End-to-end encrypted</Text>
                 </View>
-                {both ? (
+                <Swap id={both ? "layout" : "none"} resize={false}>
+                  {both ? (
                   <OverlayButton
                     icon={layout === "pip" ? "grid-outline" : "albums-outline"}
                     label={layout === "pip" ? "Side by side" : "Picture in picture"}
@@ -312,6 +318,7 @@ function VideoScreen({ call, status, wide }: { call: CallView; status: string; w
                 ) : (
                   <View style={styles.topSpacer} />
                 )}
+                </Swap>
               </View>
               <View pointerEvents="none" style={styles.videoTitle}>
                 <Text numberOfLines={1} style={[styles.videoName, styles.videoText]}>
@@ -480,7 +487,7 @@ function FlipButton() {
   const { switchCamera } = useCalls();
 
   return (
-    <Pressable
+    <PressScale scale={0.88}
       onPress={switchCamera}
       accessibilityRole="button"
       accessibilityLabel="Switch camera"
@@ -488,7 +495,7 @@ function FlipButton() {
       style={styles.flip}
     >
       <Ionicons name="camera-reverse-outline" size={20} color="#ffffff" />
-    </Pressable>
+    </PressScale>
   );
 }
 
@@ -761,7 +768,7 @@ function Handshake({
 
   if (!open) {
     return (
-      <Pressable
+      <PressScale scale={0.98}
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         style={[styles.handshake, styles.handshakeRow, { backgroundColor: colors.panel, borderColor: colors.line }]}
@@ -776,7 +783,7 @@ function Handshake({
           </Text>
         </View>
         <Ionicons name={both ? "shield-checkmark" : "chevron-forward"} size={20} color={both ? colors.online : colors.muted} />
-      </Pressable>
+      </PressScale>
     );
   }
 
@@ -804,9 +811,9 @@ function Handshake({
             {handshake.choices.map((choice) => (
               <Choice key={choice.join("-")} phrase={choice} onPress={() => pickPhrase(choice)} />
             ))}
-            <Pressable onPress={() => pickPhrase(null)} accessibilityRole="button" style={styles.none}>
+            <PressScale scale={0.96} onPress={() => pickPhrase(null)} accessibilityRole="button" style={styles.none}>
               <Text style={[styles.noneText, { color: colors.muted }]}>None of these</Text>
-            </Pressable>
+            </PressScale>
           </>
         ) : handshake.heard === "right" ? (
           <Text style={[styles.verdict, { color: colors.online }]}>
