@@ -57,6 +57,7 @@ import {
   getMessages,
   type GroupMember,
   REACTIONS,
+  reportRoomMessage,
   type Chat,
   type ChatHistory,
   setBlocked,
@@ -85,7 +86,8 @@ import {
 } from "@/features/chat/attachments";
 import { saveFile } from "@/platform/files";
 import { formatPresence, previewText } from "@/ui/format";
-import { chatTitle, isGroupDistrusted } from "@/features/groups/groups";
+import { chatTitle, isGroupDistrusted, MAX_GROUP_MEMBERS } from "@/features/groups/groups";
+import { personaTag } from "@/features/rooms/persona";
 import { KEYBOARD_BEHAVIOR, useKeyboardShown } from "@/ui/keyboard";
 import { loadCachedMessages, saveCachedMessages } from "@/api/local-cache";
 import { mentionedUsernames, plainText } from "@/features/chat/markup";
@@ -153,7 +155,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   const insets = useSafeAreaInsets();
   const wide = useIsWide();
   const { withToken } = useAuth();
-  const user = useCurrentUser();
+  const account = useCurrentUser();
   const { status, presence, subscribeChat, subscribeEvents, sendTyping } = useRealtime();
   const {
     chats,
@@ -179,7 +181,19 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   // Who the chat is with comes from the server's chats list, never from the
   // URL: anyone can craft a link with a misleading name.
   const chat = chats?.find((c) => c.id === chatId) ?? null;
-  const group = chat?.type === "group";
+  // Anonymous rooms work like a group without admins, where the user is
+  // their persona: its id and name, no avatar.
+  const room = chat?.type === "room";
+  const selfId = chat?.self_id;
+  const selfName = chat?.self_username;
+  const user = useMemo(
+    () =>
+      account && room && selfId
+        ? { ...account, id: selfId, username: selfName ?? "…", avatar_id: null, is_developer: false }
+        : account,
+    [account, room, selfId, selfName],
+  );
+  const group = chat?.type === "group" || room;
   const saved = chat?.type === "saved";
   // Groups: admins pin and delete others' messages.
   const groupAdmin = group && (chat?.role === "owner" || chat?.role === "admin");
@@ -226,6 +240,8 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   // Groups: the members (for names, presence and the group's screen).
   const [members, setMembers] = useState<GroupMember[] | null>(null);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  // Rooms: the names of who is in it.
+  const [showRoomMembers, setShowRoomMembers] = useState(false);
   // The chat's "Wallpaper & color".
   const [showLook, setShowLook] = useState(false);
   // The messages being forwarded (choosing the chat).
@@ -453,15 +469,18 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   );
 
   // The history saved on the device shows until the server answers (and
-  // when offline); what the server sends is saved again.
+  // when offline); what the server sends is saved again. Not a room's:
+  // public, and the server keeps it.
+  const cacheOwner = chat && !room ? account?.id : undefined;
+
   useEffect(() => {
-    if (!ownId) {
+    if (!cacheOwner) {
       return;
     }
 
     let current = true;
 
-    loadCachedMessages(ownId, chatId).then((cached) => {
+    loadCachedMessages(cacheOwner, chatId).then((cached) => {
       if (current && cached?.length) {
         setMessages((loaded) => loaded ?? cached);
       }
@@ -470,17 +489,17 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
     return () => {
       current = false;
     };
-  }, [ownId, chatId]);
+  }, [cacheOwner, chatId]);
 
   useEffect(() => {
-    if (!ownId || messages === null) {
+    if (!cacheOwner || messages === null) {
       return;
     }
 
-    const timer = setTimeout(() => saveCachedMessages(ownId, chatId, messages), 1000);
+    const timer = setTimeout(() => saveCachedMessages(cacheOwner, chatId, messages), 1000);
 
     return () => clearTimeout(timer);
-  }, [ownId, chatId, messages]);
+  }, [cacheOwner, chatId, messages]);
 
   // Initial history, also when the realtime connection is down. History
   // is reloaded after every join as well, so nothing sent while
@@ -1308,7 +1327,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
       await leaveGroup(chatId);
       router.replace("/chats");
     } catch (e) {
-      showError(e, "Failed to leave the group");
+      showError(e, room ? "Failed to leave the room" : "Failed to leave the group");
     }
   };
 
@@ -1442,7 +1461,28 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
             onPress: () => removeMessage(message),
           }]
         : []),
+      ...(room && !own && message.kind !== "system"
+        ? [{
+            icon: "flag-outline" as const,
+            label: "Report",
+            confirmLabel: "Report? Reports from three people remove it",
+            danger: true,
+            onPress: () => report(message),
+          }]
+        : []),
     ];
+  };
+
+  // Rooms: three reports remove a message (the server tells everyone) and
+  // mute whoever gets them.
+  const report = async (message: Message) => {
+    setMenuFor(null);
+
+    try {
+      await withToken((t) => reportRoomMessage(t, chatId, message.id));
+    } catch (e) {
+      showError(e, "Failed to report the message");
+    }
   };
 
   const openChatServerView = () => {
@@ -1649,10 +1689,10 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         left={
           chat ? (
             <Pressable
-              onPress={() => (group ? setShowGroupInfo(true) : undefined)}
+              onPress={() => (group ? (room ? setShowRoomMembers(true) : setShowGroupInfo(true)) : undefined)}
               disabled={!group}
               accessibilityRole={group ? "button" : undefined}
-              accessibilityLabel={group ? "Group info" : undefined}
+              accessibilityLabel={group ? (room ? "Who is in the room" : "Group info") : undefined}
             >
               <ChatAvatar chat={chat} size={38} online={peerOnline} />
             </Pressable>
@@ -1914,6 +1954,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                           ? (memberNames.get(item.message.sender_id) ?? item.message.sender_username)
                           : undefined
                       }
+                      persona={room}
                       read={
                         item.own &&
                         peerReadAt !== null &&
@@ -2419,7 +2460,56 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         <ForwardPicker onPick={(target) => forward(forwarding, target)} onClose={() => setForwarding(null)} />
       ) : null}
 
-      {chatMenu && chat && group ? (
+      {chatMenu && chat && room ? (
+        <ActionMenu
+          title={`${chatTitle(chat)} · you are ${chat.self_username ?? "…"}`}
+          onClose={() => setChatMenu(false)}
+          items={[
+            {
+              icon: "people-outline",
+              label: "Who is in the room",
+              onPress: () => {
+                setChatMenu(false);
+                setShowRoomMembers(true);
+              },
+            },
+            { icon: "search", label: "Search in chat", onPress: openSearch },
+            { icon: "color-palette-outline", label: "Wallpaper & color", onPress: () => setShowLook(true) },
+            { icon: "server-outline", label: "What the server sees", onPress: openChatServerView },
+            {
+              icon: chat.pinned ? "pin" : "pin-outline",
+              label: chat.pinned ? "Unpin" : "Pin to top",
+              onPress: () => changeSettings({ pinned: !chat.pinned }),
+            },
+            {
+              icon: chat.muted ? "notifications-outline" : "notifications-off-outline",
+              label: chat.muted ? "Unmute mentions" : "Mute mentions",
+              onPress: () => changeSettings({ muted: !chat.muted }),
+            },
+            {
+              icon: "exit-outline",
+              label: "Leave room",
+              confirmLabel: "Leave? What you wrote stays",
+              danger: true,
+              onPress: leave,
+            },
+          ]}
+        />
+      ) : null}
+
+      {showRoomMembers && chat && room ? (
+        <ActionMenu
+          title={`${chat.member_count} of ${MAX_GROUP_MEMBERS} in ${chatTitle(chat)}`}
+          onClose={() => setShowRoomMembers(false)}
+          items={(members ?? []).map((member) => ({
+            icon: "person-outline" as const,
+            label: `${member.username} #${personaTag(member.id)}${member.id === user?.id ? " (you)" : ""}`,
+            onPress: () => setShowRoomMembers(false),
+          }))}
+        />
+      ) : null}
+
+      {chatMenu && chat && group && !room ? (
         <ActionMenu
           title={chatTitle(chat)}
           onClose={() => setChatMenu(false)}
@@ -2475,7 +2565,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         />
       ) : null}
 
-      {showGroupInfo && chat && group ? (
+      {showGroupInfo && chat && group && !room ? (
         <GroupInfo
           chat={chat}
           members={members}
@@ -2590,7 +2680,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         />
       ) : null}
 
-      {serverView ? <ServerView target={serverView} onClose={() => setServerView(null)} /> : null}
+      {serverView ? <ServerView target={serverView} room={room} onClose={() => setServerView(null)} /> : null}
 
       {showSeal ? (
         <SealSheet

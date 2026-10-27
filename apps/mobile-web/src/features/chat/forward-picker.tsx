@@ -44,7 +44,7 @@ export default function ForwardPicker({
       (chat) =>
         !chat.blocked &&
         allow(chat) &&
-        (chat.type === "group" ? groupKeyOf(chat.id, chat.key_epoch) : chat.public_key) &&
+        (chat.type === "group" || chat.type === "room" ? groupKeyOf(chat.id, chat.key_epoch) : chat.public_key) &&
         chatTitle(chat).toLowerCase().includes(needle),
     );
   }, [chats, query, allow]);
@@ -91,7 +91,7 @@ export default function ForwardPicker({
             >
               <ChatAvatar chat={item} size={34} />
               <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>
-                {item.type === "group" ? chatTitle(item) : item.username}
+                {item.type === "group" || item.type === "room" ? chatTitle(item) : item.username}
               </Text>
               {item.is_developer ? <DevBadge /> : null}
             </Pressable>

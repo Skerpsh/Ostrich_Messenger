@@ -32,6 +32,7 @@ export default function ChatsLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="[chatId]" />
           <Stack.Screen name="new" options={{ presentation: "modal" }} />
+          <Stack.Screen name="rooms" />
           <Stack.Screen name="settings" />
         </Stack>
       </>

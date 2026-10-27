@@ -380,7 +380,7 @@ function SafeChatsPicker({
                 <Avatar
                   name={nameOf(chat)}
                   avatarId={chat.avatar_id}
-                  icon={chat.type === "group" ? "people" : chat.type === "saved" ? "bookmark" : undefined}
+                  icon={chat.type === "group" ? "people" : chat.type === "saved" ? "bookmark" : chat.type === "room" ? "glasses" : undefined}
                   size={36}
                 />
                 <Text numberOfLines={1} style={[styles.pickName, { color: colors.text }]}>
@@ -452,7 +452,7 @@ function AlertEditor({ onDone }: { onDone: () => void }) {
                 <Avatar
                   name={nameOf(chat)}
                   avatarId={chat.avatar_id}
-                  icon={chat.type === "group" ? "people" : undefined}
+                  icon={chat.type === "group" ? "people" : chat.type === "room" ? "glasses" : undefined}
                   size={36}
                 />
                 <Text numberOfLines={1} style={[styles.pickName, { color: colors.text }]}>

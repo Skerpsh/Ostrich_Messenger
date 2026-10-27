@@ -22,7 +22,7 @@ export default function ChatAvatar({
       name={chatName(chat)}
       avatarId={chat.type === "direct" ? chat.avatar_id : null}
       uri={uri}
-      icon={group ? "people" : chat.type === "saved" ? "bookmark" : undefined}
+      icon={group ? "people" : chat.type === "saved" ? "bookmark" : chat.type === "room" ? "glasses" : undefined}
       size={size}
       online={online}
       ringColor={ringColor}

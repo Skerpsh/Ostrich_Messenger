@@ -1,4 +1,5 @@
 import { db, isPgError, PG_UNIQUE_VIOLATION } from "./database.js";
+import { roomSendBlock } from "./rooms.js";
 import { blockedEitherWay } from "./visibility.js";
 
 // Messages are end-to-end encrypted, see apps/mobile-web/src/crypto/crypto.ts:
@@ -195,7 +196,10 @@ export type CreateMessageError =
   // Groups: the message is not encrypted with the current group key, or
   // the group needs a new key first (someone left).
   | "group_key_changed"
-  | "group_key_rotation_needed";
+  | "group_key_rotation_needed"
+  // Rooms: the account is muted after reports, or sends too fast.
+  | "room_muted"
+  | "room_too_fast";
 
 export type CreateMessageResult =
   | {
@@ -204,14 +208,18 @@ export type CreateMessageResult =
       // member may see their presence (see presenceVisible()).
       firstFromSender: boolean;
     }
-  | { error: CreateMessageError };
+  | { error: CreateMessageError; until?: Date };
+
+// SQL: who uploads the files of sender $2: their account if it is a
+// room's persona (rooms.ts), else themselves.
+const UPLOADER = "COALESCE((SELECT persona_of FROM users WHERE id = $2::uuid), $2::uuid)";
 
 // SQL: whether the attachments in parameter `ids` are uploads of the
 // sender ($2) not yet sent in a message nor used as a group's photo.
 const attachmentsFree = (ids: string) => `(
   SELECT COUNT(*) FROM attachments
   WHERE id = ANY(${ids}::uuid[])
-    AND uploader_id = $2
+    AND uploader_id = ${UPLOADER}
     AND message_id IS NULL
     AND chat_id IS NULL
 ) = cardinality(${ids}::uuid[])`;
@@ -228,12 +236,12 @@ const BLOCKED_IN_CHAT = `EXISTS (
     AND ${blockedEitherWay("$2::uuid", "other.user_id")}
 )`;
 
-// SQL: whether the message's encryption fits the chat: in a group, the
-// current key epoch ($7) and no new key pending; in a direct chat, no
-// epoch.
+// SQL: whether the message's encryption fits the chat: in a group (or a
+// room, whose key never changes), the current key epoch ($7) and no new
+// key pending; in a direct chat, no epoch.
 const ENCRYPTION_FITS = `(
   SELECT CASE
-    WHEN c.type = 'group' THEN $7::int = c.key_epoch AND NOT c.rotation_needed
+    WHEN c.type IN ('group', 'room') THEN $7::int = c.key_epoch AND NOT c.rotation_needed
     ELSE $7::int IS NULL
   END
   FROM chats c
@@ -259,6 +267,12 @@ export async function createMessage(
   // Sent by "If I disappear" (disappear.ts): the days the sender was away.
   sentAfterDays: number | null = null,
 ): Promise<CreateMessageResult> {
+  const roomBlock = await roomSendBlock(chatId, senderId);
+
+  if (roomBlock) {
+    return roomBlock.error === "muted" ? { error: "room_muted", until: roomBlock.until } : { error: "room_too_fast" };
+  }
+
   let result;
 
   try {
@@ -301,7 +315,7 @@ export async function createMessage(
         UPDATE attachments
         SET message_id = (SELECT id FROM inserted)
         WHERE id = ANY($6::uuid[])
-          AND uploader_id = $2
+          AND uploader_id = ${UPLOADER}
           AND message_id IS NULL
           AND chat_id IS NULL
           AND EXISTS (SELECT 1 FROM inserted)
@@ -316,7 +330,7 @@ export async function createMessage(
         INSERT INTO message_mentions (message_id, user_id)
         SELECT inserted.id, member.user_id
         FROM inserted
-        JOIN chats ON chats.id = inserted.chat_id AND chats.type = 'group'
+        JOIN chats ON chats.id = inserted.chat_id AND chats.type IN ('group', 'room')
         JOIN chat_members member ON member.chat_id = inserted.chat_id
         WHERE member.user_id = ANY($8::uuid[])
           AND member.user_id <> $2
@@ -404,7 +418,7 @@ export async function createMessage(
       ${BLOCKED_IN_CHAT} AS blocked,
       ${attachmentsFree("$3")} AS attachments_free,
       chats.type = 'group' AND chats.rotation_needed AS rotation_needed,
-      CASE WHEN chats.type = 'group'
+      CASE WHEN chats.type IN ('group', 'room')
         THEN $4::int IS DISTINCT FROM chats.key_epoch
         ELSE $4::int IS NOT NULL
       END AS wrong_epoch
@@ -455,6 +469,8 @@ export const CREATE_MESSAGE_ERRORS: Record<CreateMessageError, string> = {
   attachment_invalid: "An attachment is missing or was already sent",
   group_key_changed: "The group key has changed: load it and try again",
   group_key_rotation_needed: "The group needs a new key first (someone left)",
+  room_muted: "You are muted in rooms for a while: others reported your messages",
+  room_too_fast: "You are sending too fast: wait a few seconds",
 };
 
 export const CREATE_MESSAGE_STATUS: Record<CreateMessageError, number> = {
@@ -465,4 +481,6 @@ export const CREATE_MESSAGE_STATUS: Record<CreateMessageError, number> = {
   attachment_invalid: 400,
   group_key_changed: 409,
   group_key_rotation_needed: 409,
+  room_muted: 403,
+  room_too_fast: 429,
 };

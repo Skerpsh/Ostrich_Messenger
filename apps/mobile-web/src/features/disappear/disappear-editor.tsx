@@ -60,7 +60,8 @@ export function newDraft(): DisappearDraft {
   };
 }
 
-const notSaved = (chat: Chat) => chat.type !== "saved";
+// Not rooms either: their member is a persona, made at each entry.
+const notSaved = (chat: Chat) => chat.type !== "saved" && chat.type !== "room";
 
 export default function DisappearEditor({
   draft,

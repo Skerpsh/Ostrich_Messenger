@@ -150,7 +150,7 @@ export default async function messagesRoutes(server: FastifyInstance) {
       if ("error" in result) {
         return reply
           .status(CREATE_MESSAGE_STATUS[result.error])
-          .send({ error: CREATE_MESSAGE_ERRORS[result.error], code: result.error });
+          .send({ error: CREATE_MESSAGE_ERRORS[result.error], code: result.error, until: result.until });
       }
 
       const { message } = result;
@@ -307,8 +307,8 @@ export default async function messagesRoutes(server: FastifyInstance) {
         return reply.status(403).send({ error: CREATE_MESSAGE_ERRORS.blocked });
       }
 
-      // In a group the new text is encrypted with the current key.
-      const group = await groupMembership(chatId, request.user.id);
+      // In a group (or room) the new text is encrypted with the current key.
+      const group = await groupMembership(chatId, request.user.id, db, true);
       const epoch = groupEpochOf(request.body.content);
 
       if (group ? epoch !== group.key_epoch || group.rotation_needed : epoch !== null) {

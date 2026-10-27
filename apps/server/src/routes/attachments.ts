@@ -52,7 +52,8 @@ const CAN_READ = `
       OR EXISTS (
         SELECT 1 FROM chat_members cm
         WHERE cm.chat_id = m.chat_id
-          AND cm.user_id = $2
+          -- Or a room's persona of theirs (rooms.ts).
+          AND cm.user_id IN (SELECT id FROM users WHERE id = $2 OR persona_of = $2)
           AND (cm.cleared_at IS NULL OR m.created_at > cm.cleared_at)
       )
       OR EXISTS (

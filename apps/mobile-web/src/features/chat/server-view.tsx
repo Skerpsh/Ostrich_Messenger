@@ -100,7 +100,16 @@ function chatRows(view: ChatServerView): Row[] {
   const group = chat.type === "group";
 
   return [
-    { label: "Kind", value: group ? "Group" : chat.type === "saved" ? "Saved messages" : "Direct chat" },
+    {
+      label: "Kind",
+      value: group
+        ? "Group"
+        : chat.type === "saved"
+          ? "Saved messages"
+          : chat.type === "room"
+            ? "Anonymous room"
+            : "Direct chat",
+    },
     { label: "Created", value: when(chat.created_at) },
     { label: "Last activity", value: when(chat.updated_at) },
     {
@@ -150,9 +159,12 @@ function hiddenOfChat(view: ChatServerView): string[] {
 
 export default function ServerView({
   target,
+  room = false,
   onClose,
 }: {
   target: ServerViewTarget;
+  // An anonymous room: the server has its key, so nothing is hidden.
+  room?: boolean;
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
@@ -192,7 +204,7 @@ export default function ServerView({
     : "message" in view
       ? messageRows(view, full)
       : chatRows(view);
-  const hidden = !view
+  const hidden = !view || room
     ? []
     : "message" in view
       ? target.kind === "message" ? hiddenOfMessage(target.shown, view) : []
@@ -267,6 +279,14 @@ export default function ServerView({
                     ))}
                   </View>
                 </>
+              ) : null}
+
+              {room ? (
+                <Text style={[styles.text, { color: colors.danger }]}>
+                  Anonymous rooms are not end-to-end encrypted: the server keeps the room&apos;s key and
+                  can read everything in it. It also knows which account is behind each name; the
+                  others in the room do not.
+                </Text>
               ) : null}
 
               {readable ? (

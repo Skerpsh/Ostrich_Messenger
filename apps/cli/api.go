@@ -420,7 +420,16 @@ func getChats(token string) ([]Chat, error) {
 		return nil, fmt.Errorf("failed to get chats: %w", err)
 	}
 
-	return result.Chats, nil
+	// Anonymous rooms are not in the CLI yet: the apps have them.
+	chats := result.Chats[:0]
+
+	for _, chat := range result.Chats {
+		if chat.Type != "room" {
+			chats = append(chats, chat)
+		}
+	}
+
+	return chats, nil
 }
 
 type createChatResponse struct {

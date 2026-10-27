@@ -21,8 +21,8 @@ export default function Avatar({
   // A picture already on the device (a group's decrypted photo).
   uri?: string | null;
   // Shown instead of the first letter: a group without a photo, Saved
-  // messages.
-  icon?: "people" | "bookmark";
+  // messages, an anonymous room.
+  icon?: "people" | "bookmark" | "glasses";
   size?: number;
   // Shows the green "online" dot.
   online?: boolean;

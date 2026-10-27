@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from "fastify";
 import crypto from "node:crypto";
 import { PROFILE_COLUMNS } from "../accounts.js";
 import { db } from "../database.js";
+import { chatActor } from "../rooms.js";
 
 export type AuthUser = FastifyRequest["user"];
 
@@ -108,4 +109,40 @@ export async function authenticate(
 
   request.user = user;
   request.token = token;
+
+  // In an anonymous room the user acts as their persona (rooms.ts), and
+  // only on the routes that make sense there.
+  const chatId = (request.params as { chatId?: string } | undefined)?.chatId;
+
+  if (chatId) {
+    const actor = await chatActor(chatId, user.id);
+
+    if (actor.room) {
+      if (!ROOM_ROUTES.has(`${request.method} ${request.routeOptions.url}`)) {
+        return reply.status(403).send({ error: "This can't be done in an anonymous room" });
+      }
+
+      if (!actor.persona) {
+        return reply.status(403).send({ error: "You are not in this room" });
+      }
+
+      request.user = { ...user, id: actor.persona.id, username: actor.persona.username, avatar_id: null, is_developer: false };
+    }
+  }
 }
+
+// The chat routes a room's persona may use: like a group's member without
+// admin rights. Group management, keys and calls do not apply; deleting
+// the room or pinning in it nobody may; leaving is POST /api/rooms/:id/leave.
+const ROOM_ROUTES = new Set([
+  "GET /api/chats/:chatId/messages",
+  "POST /api/chats/:chatId/messages",
+  "PATCH /api/chats/:chatId/messages/:messageId",
+  "DELETE /api/chats/:chatId/messages/:messageId",
+  "PUT /api/chats/:chatId/messages/:messageId/reaction",
+  "POST /api/chats/:chatId/read",
+  "PUT /api/chats/:chatId/settings",
+  "GET /api/chats/:chatId/members",
+  "GET /api/chats/:chatId/messages/:messageId/server-view",
+  "GET /api/chats/:chatId/server-view",
+]);

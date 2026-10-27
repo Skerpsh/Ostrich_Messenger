@@ -21,6 +21,7 @@ import { enterStyle, useMotion } from "@/ui/motion";
 import { messagePreview } from "@/features/chats/preview";
 import { TOUCH_UI } from "@/platform/touch";
 import type { Shown } from "./use-chat-crypto";
+import { personaColor, personaTag } from "@/features/rooms/persona";
 import { accentVariant, isAccentChoice, radius, type AccentChoice } from "@/ui/colors";
 
 // Touch screens (platform/touch.ts): swipe left to reply, long press for the
@@ -36,6 +37,7 @@ export default function MessageBubble({
   read,
   ownId,
   senderName,
+  persona = false,
   text,
   quoteText,
   sending,
@@ -58,6 +60,8 @@ export default function MessageBubble({
   ownId: string | undefined;
   // Groups: who wrote it, over the first of their bubbles in a row.
   senderName?: string;
+  // Rooms: the sender is a persona, shown by its own color and tag.
+  persona?: boolean;
   // The decrypted message and the message it replies to.
   text: Shown;
   quoteText: Shown | null;
@@ -178,9 +182,15 @@ export default function MessageBubble({
           ]}
         >
           {senderName && !own && !joinedAbove ? (
-            <Text numberOfLines={1} style={[styles.sender, { color: colors.accent }]}>
-              @{senderName}
-            </Text>
+            persona ? (
+              <Text numberOfLines={1} style={[styles.sender, { color: personaColor(message.sender_id) }]}>
+                {senderName} <Text style={{ color: colors.muted, fontWeight: "400" }}>#{personaTag(message.sender_id)}</Text>
+              </Text>
+            ) : (
+              <Text numberOfLines={1} style={[styles.sender, { color: colors.accent }]}>
+                @{senderName}
+              </Text>
+            )
           ) : null}
           {quote && quoteText ? (
             <Pressable

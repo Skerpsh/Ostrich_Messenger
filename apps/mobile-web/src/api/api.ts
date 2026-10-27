@@ -36,8 +36,9 @@ export type LastMessage = {
 
 export type Chat = {
   id: string;
-  // "saved": the user's chat with themselves (Saved messages).
-  type: "direct" | "group" | "saved";
+  // "saved": the user's chat with themselves (Saved messages). "room": an
+  // anonymous room (features/rooms), where the user is a persona.
+  type: "direct" | "group" | "saved" | "room";
   created_at: string;
   updated_at: string;
   // Direct chats: the other user (null in groups).
@@ -57,6 +58,14 @@ export type Chat = {
   rotation_needed: boolean;
   role: "owner" | "admin" | "member";
   member_count: number;
+  // Rooms: their number ("room_03"), their key (kept by the server, so
+  // not end-to-end), and the persona the user is there: its messages are
+  // the user's. self_id is the user's own id in other chats.
+  room_number?: number | null;
+  room_key?: string | null;
+  self_id?: string;
+  // Rooms: the persona's name.
+  self_username?: string;
   // Groups: unread messages mentioning the user; for admins, people
   // asking to join through the invite link.
   unread_mentions?: number;
@@ -703,7 +712,7 @@ export function getMessageServerView(token: string, chatId: string, messageId: s
 export type ChatServerView = {
   chat: {
     id: string;
-    type: "direct" | "group" | "saved";
+    type: "direct" | "group" | "saved" | "room";
     created_at: string;
     updated_at: string;
     encrypted_info: string | null;
@@ -1177,4 +1186,43 @@ export async function removeAvatar(token: string) {
   );
 
   return user;
+}
+
+// --- anonymous rooms ---
+
+export type Room = {
+  id: string;
+  room_number: number;
+  name: string;
+  member_count: number;
+  capacity: number;
+  // The user is in it.
+  joined: boolean;
+};
+
+export function getRooms(token: string) {
+  return request<{ rooms: Room[]; last_nickname: string | null; random_nickname: string }>("GET", "/api/rooms", { token });
+}
+
+export async function getRandomNickname(token: string) {
+  return (await request<{ nickname: string }>("GET", "/api/rooms/nickname", { token })).nickname;
+}
+
+export function joinRoom(token: string, roomId: string, nickname: string) {
+  return request<{ chat_id: string; persona_id: string }>("POST", `/api/rooms/${encodeURIComponent(roomId)}/join`, {
+    token,
+    body: { nickname },
+  });
+}
+
+export function leaveRoom(token: string, roomId: string) {
+  return request<unknown>("POST", `/api/rooms/${encodeURIComponent(roomId)}/leave`, { token });
+}
+
+export function reportRoomMessage(token: string, roomId: string, messageId: string) {
+  return request<{ deleted: boolean }>(
+    "POST",
+    `/api/rooms/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(messageId)}/report`,
+    { token },
+  );
 }

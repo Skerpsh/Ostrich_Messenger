@@ -332,6 +332,7 @@ export default async function recoveryRoutes(server: FastifyInstance) {
         FROM users
         LEFT JOIN recovery_setups st ON st.user_id = users.id
         WHERE LOWER(users.username) = LOWER($1)
+          AND users.persona_of IS NULL
         `,
         [username],
       );

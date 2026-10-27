@@ -155,7 +155,7 @@ export default async function groupsRoutes(server: FastifyInstance) {
     },
     async (request, reply) => {
       const result = await db.query(
-        `SELECT id, username, public_key, ${PROFILE_COLUMNS} FROM users WHERE LOWER(username) = LOWER($1)`,
+        `SELECT id, username, public_key, ${PROFILE_COLUMNS} FROM users WHERE LOWER(username) = LOWER($1) AND persona_of IS NULL`,
         [request.params.username],
       );
 
@@ -251,7 +251,7 @@ export default async function groupsRoutes(server: FastifyInstance) {
     "/api/chats/:chatId/members",
     { preHandler: authenticate, schema: { params: chatParams } },
     async (request, reply) => {
-      if (!(await groupMembership(request.params.chatId, request.user.id))) {
+      if (!(await groupMembership(request.params.chatId, request.user.id, db, true))) {
         return reply.status(404).send({ error: "Group not found" });
       }
 

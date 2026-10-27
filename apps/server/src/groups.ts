@@ -54,16 +54,23 @@ export async function announceMessages(messages: ChatMessage[]) {
 }
 
 // The user's membership of a group (with the group's key state), or null.
-export async function groupMembership(chatId: string, userId: string, client: PoolClient | typeof db = db) {
+// `rooms`: anonymous rooms count too (keyed like a group, no admins).
+export async function groupMembership(
+  chatId: string,
+  userId: string,
+  client: PoolClient | typeof db = db,
+  rooms = false,
+) {
   const result = await client.query(
     `
     SELECT chat_members.role, chats.key_epoch, chats.rotation_needed
     FROM chat_members
-    JOIN chats ON chats.id = chat_members.chat_id AND chats.type = 'group'
+    JOIN chats ON chats.id = chat_members.chat_id
+     AND (chats.type = 'group' OR ($3 AND chats.type = 'room'))
     WHERE chat_members.chat_id = $1
       AND chat_members.user_id = $2
     `,
-    [chatId, userId],
+    [chatId, userId, rooms],
   );
 
   return (result.rows[0] ?? null) as {

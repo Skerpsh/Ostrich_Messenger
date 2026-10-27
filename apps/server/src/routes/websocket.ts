@@ -31,6 +31,7 @@ import {
   needsClientId,
 } from "../messages.js";
 import { notifyNewMessage } from "../push.js";
+import { chatActor } from "../rooms.js";
 import {
   announcePresence,
   chatPresence,
@@ -264,6 +265,13 @@ export default async function websocketRoutes(server: FastifyInstance) {
         sendError("Unknown message type");
       };
 
+      // Who the user is in the chat: in a room their persona (rooms.ts), or
+      // null if they are not in it.
+      const actorIn = async (chatId: string) => {
+        const actor = await chatActor(chatId, user.id);
+        return actor.room ? (actor.persona?.id ?? null) : user.id;
+      };
+
       const handle = async (data: ClientMessage) => {
         if (data.type === "join") {
           const { chatId } = data;
@@ -273,14 +281,16 @@ export default async function websocketRoutes(server: FastifyInstance) {
             return;
           }
 
-          if (!(await isChatMember(chatId, user.id))) {
+          const actorId = await actorIn(chatId);
+
+          if (!actorId || !(await isChatMember(chatId, actorId))) {
             sendError("You are not a member of this chat");
             return;
           }
 
           send({ type: "joined", chatId });
 
-          for (const event of await chatPresence(chatId, user.id)) {
+          for (const event of await chatPresence(chatId, actorId)) {
             send(event);
           }
 
@@ -351,9 +361,16 @@ export default async function websocketRoutes(server: FastifyInstance) {
             return;
           }
 
+          const actorId = await actorIn(chatId);
+
+          if (!actorId) {
+            sendError("You are not a member of this chat");
+            return;
+          }
+
           const result = await createMessage(
             chatId,
-            user.id,
+            actorId,
             content,
             replyTo ?? null,
             messageId,
@@ -362,7 +379,7 @@ export default async function websocketRoutes(server: FastifyInstance) {
           );
 
           if ("error" in result) {
-            send({ type: "error", error: CREATE_MESSAGE_ERRORS[result.error], code: result.error });
+            send({ type: "error", error: CREATE_MESSAGE_ERRORS[result.error], code: result.error, until: result.until });
             return;
           }
 
@@ -370,10 +387,10 @@ export default async function websocketRoutes(server: FastifyInstance) {
             type: "message",
             message: result.message,
           });
-          notifyNewMessage(chatId, user.id, result.message.mentions);
+          notifyNewMessage(chatId, actorId, result.message.mentions);
 
           if (result.firstFromSender) {
-            await announcePresence(user.id, chatId);
+            await announcePresence(actorId, chatId);
           }
           return;
         }
@@ -382,18 +399,24 @@ export default async function websocketRoutes(server: FastifyInstance) {
         if (data.type === "typing") {
           const { chatId } = data;
 
+          if (!validId(chatId)) {
+            return;
+          }
+
+          const actorId = await actorIn(chatId);
+
           if (
-            !validId(chatId) ||
-            !(await isChatMember(chatId, user.id)) ||
-            (await isBlockedInChat(chatId, user.id))
+            !actorId ||
+            !(await isChatMember(chatId, actorId)) ||
+            (await isBlockedInChat(chatId, actorId))
           ) {
             return;
           }
 
           await sendToChatMembers(
             chatId,
-            { type: "typing", chatId, userId: user.id },
-            user.id,
+            { type: "typing", chatId, userId: actorId },
+            actorId,
           );
           return;
         }

@@ -109,6 +109,7 @@ export default async function chatsRoutes(server: FastifyInstance) {
                ) AS blocked_me
         FROM users
         WHERE LOWER(username) = LOWER($1)
+          AND persona_of IS NULL
         `,
         [username, request.user.id],
       );
@@ -253,6 +254,14 @@ export default async function chatsRoutes(server: FastifyInstance) {
           chats.encrypted_info,
           chats.key_epoch,
           chats.rotation_needed,
+          -- Rooms: their number and key (rooms.ts), and the persona the
+          -- user is there (whose messages are theirs).
+          chats.room_number,
+          chats.room_key,
+          chat_members.user_id AS self_id,
+          CASE WHEN chats.type = 'room'
+            THEN (SELECT username FROM users WHERE id = chat_members.user_id)
+          END AS self_username,
           chat_members.role,
           (SELECT COUNT(*)::int FROM chat_members cm WHERE cm.chat_id = chats.id) AS member_count,
           peer.id AS user_id,
@@ -280,7 +289,7 @@ export default async function chatsRoutes(server: FastifyInstance) {
                 FROM chat_members cm
                 JOIN users u ON u.id = cm.user_id
                 WHERE cm.chat_id = chats.id
-                  AND cm.user_id <> $1
+                  AND cm.user_id <> chat_members.user_id
                   AND u.read_receipts
               )
             END
@@ -299,7 +308,7 @@ export default async function chatsRoutes(server: FastifyInstance) {
             SELECT COUNT(*)::int
             FROM messages
             WHERE messages.chat_id = chats.id
-              AND messages.sender_id <> $1
+              AND messages.sender_id <> chat_members.user_id
               AND messages.kind = 'text'
               AND messages.deliver_at IS NULL
               AND messages.created_at > chat_members.last_read_at
@@ -308,7 +317,7 @@ export default async function chatsRoutes(server: FastifyInstance) {
           (
             SELECT COUNT(*)::int
             FROM messages
-            JOIN message_mentions mm ON mm.message_id = messages.id AND mm.user_id = $1
+            JOIN message_mentions mm ON mm.message_id = messages.id AND mm.user_id = chat_members.user_id
             WHERE messages.chat_id = chats.id
               AND messages.deliver_at IS NULL
               AND messages.created_at > chat_members.last_read_at
@@ -320,7 +329,7 @@ export default async function chatsRoutes(server: FastifyInstance) {
         FROM chats
         JOIN chat_members
           ON chat_members.chat_id = chats.id
-         AND chat_members.user_id = $1
+         AND chat_members.user_id IN (SELECT $1::uuid UNION ALL SELECT id FROM users WHERE persona_of = $1)
         JOIN users me
           ON me.id = $1
         -- Direct chats: the other member.

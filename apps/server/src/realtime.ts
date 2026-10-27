@@ -205,17 +205,19 @@ export async function sendToChatMembers(
   // E.g. the typing user, who does not need their own "typing" event.
   exceptUserId?: string,
 ) {
+  // A room's persona has no sockets: its account gets the events.
   const result = await db.query(
     `
-    SELECT user_id
+    SELECT chat_members.user_id, COALESCE(users.persona_of, users.id) AS account_id
     FROM chat_members
-    WHERE chat_id = $1
+    JOIN users ON users.id = chat_members.user_id
+    WHERE chat_members.chat_id = $1
     `,
     [chatId],
   );
 
   await deliver(
-    result.rows.map((row) => row.user_id).filter((id) => id !== exceptUserId),
+    result.rows.filter((row) => row.user_id !== exceptUserId).map((row) => row.account_id),
     payload,
   );
 }

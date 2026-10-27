@@ -285,6 +285,10 @@ export default function ChatList() {
     safe && !chats?.some((chat) => chat.type === "saved") ? null : (
       <IconButton icon="bookmark-outline" label="Saved messages" onPress={openSaved} />
     );
+  // Not while the app lock shows only safe chats: it would tell the rooms.
+  const roomsButton = safe ? null : (
+    <IconButton icon="glasses-outline" label="Anonymous rooms" onPress={() => go("/chats/rooms")} />
+  );
   // With an app lock: locks it now (also Ctrl/⌘ L).
   const lockButton = lockConfig && !lockSeemsOff ? <IconButton icon="lock-closed-outline" label="Lock Ostrich" onPress={lockNow} /> : null;
   const newChatButton = (
@@ -302,6 +306,7 @@ export default function ChatList() {
           right={
             <>
               {lockButton}
+              {roomsButton}
               {savedButton}
               {settingsButton}
             </>
@@ -532,6 +537,7 @@ export default function ChatList() {
             </Text>
           </View>
           {lockButton}
+          {roomsButton}
           {savedButton}
           {settingsButton}
         </View>
@@ -572,7 +578,7 @@ export default function ChatList() {
                   updateChatSettings(menuFor.id, { muted: !menuFor.muted }),
                 ),
               },
-              ...(menuFor.type === "saved" ? [] : [{
+              ...(menuFor.type === "saved" || menuFor.type === "room" ? [] : [{
                 icon: "eye-off-outline" as const,
                 label: "Clear history for me",
                 confirmLabel:
@@ -592,12 +598,12 @@ export default function ChatList() {
                       onPress: () => deleteChat(menuFor.id, "everyone"),
                     },
                   ]
-                : menuFor.type === "group"
+                : menuFor.type === "group" || menuFor.type === "room"
                 ? [
                     {
                       icon: "exit-outline" as const,
-                      label: "Leave group",
-                      confirmLabel: "Leave the group?",
+                      label: menuFor.type === "room" ? "Leave room" : "Leave group",
+                      confirmLabel: menuFor.type === "room" ? "Leave? What you wrote stays" : "Leave the group?",
                       danger: true,
                       onPress: () =>
                         runAction(async () => {
@@ -664,8 +670,9 @@ function ChatRow({
   const last = chat.last_message;
   // Settings → Personalization → Chats list.
   const minimal = density === "minimal";
-  const own = last?.sender_id === ownId;
-  const group = chat.type === "group";
+  // In a room the user is their persona there.
+  const own = last?.sender_id === (chat.self_id ?? ownId);
+  const group = chat.type === "group" || chat.type === "room";
   const title = chatTitle(chat);
   const shownLast = last ? decrypt(last) : null;
   const read =
@@ -799,7 +806,10 @@ function ChatRow({
                       {shownLast.status === "system" || chat.type === "saved" ? null : own ? (
                         <Text style={{ color: colors.textSoft }}>You: </Text>
                       ) : group ? (
-                        <Text style={{ color: colors.textSoft }}>@{last.sender_username}: </Text>
+                        <Text style={{ color: colors.textSoft }}>
+                          {chat.type === "room" ? "" : "@"}
+                          {last.sender_username}:{" "}
+                        </Text>
                       ) : null}
                       {previewText(messagePreview(shownLast))}
                     </>

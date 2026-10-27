@@ -24,6 +24,8 @@ import groupsRoutes from "./routes/groups.js";
 import monitorRoutes from "./routes/monitor.js";
 import callsRoutes from "./routes/calls.js";
 import settingsRoutes from "./routes/settings.js";
+import roomsRoutes from "./routes/rooms.js";
+import { ensureRooms, leaveInactive } from "./rooms.js";
 import { cleanupAttachments, ensureAttachmentsDir } from "./attachments.js";
 import { listenForEvents } from "./realtime.js";
 import { setUpSharedState, sharedRedis } from "./shared-state.js";
@@ -149,12 +151,13 @@ async function healthRoutes(instance: FastifyInstance) {
 }
 
 // Expired sessions and username reservations; attachments never sent or
-// whose message is gone.
+// whose message is gone; users long away taken out of rooms.
 async function deleteExpired() {
   try {
     await db.query("DELETE FROM sessions WHERE expires_at <= NOW()");
     await db.query("DELETE FROM username_reservations WHERE reserved_until <= NOW()");
     await cleanupAttachments();
+    await leaveInactive();
   } catch (error) {
     server.log.error(error, "failed to delete expired rows");
   }
@@ -251,8 +254,10 @@ const start = async () => {
     await server.register(monitorRoutes);
     await server.register(callsRoutes);
     await server.register(settingsRoutes);
+    await server.register(roomsRoutes);
 
     await ensureAttachmentsDir();
+    await ensureRooms();
 
     await server.listen({
       port: PORT,

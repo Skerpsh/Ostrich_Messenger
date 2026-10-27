@@ -69,7 +69,7 @@ type ChatsContextValue = {
   // Unsent text per chat, kept on this device.
   drafts: Record<string, string>;
   setDraft: (chatId: string, text: string) => void;
-  // Leaves a group (it goes from the list).
+  // Leaves a group or room (it goes from the list).
   leaveGroup: (chatId: string) => Promise<void>;
   // Pins a message for both members (null unpins).
   pinMessage: (chatId: string, messageId: string | null) => Promise<void>;
@@ -333,7 +333,7 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
     (chatId: string, message: Message) => {
       const chat = chatsRef.current?.find((c) => c.id === chatId);
 
-      if (chat && chat.unread_count === 0 && message.sender_id === userId) {
+      if (chat && chat.unread_count === 0 && message.sender_id === (chat.self_id ?? userId)) {
         return;
       }
 
@@ -368,7 +368,7 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
     () =>
       subscribeEvents({
         onMessage: (message) => {
-          const known = chatsRef.current?.some((c) => c.id === message.chat_id);
+          const known = chatsRef.current?.find((c) => c.id === message.chat_id);
 
           if (!known) {
             // A chat someone else has just started.
@@ -376,9 +376,11 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
             return;
           }
 
-          const incoming = message.sender_id !== userId;
+          // In a room the user is their persona there.
+          const selfId = known.self_id ?? userId;
+          const incoming = message.sender_id !== selfId;
           const viewing = viewingRef.current === message.chat_id;
-          const mentionsMe = Boolean(userId && message.mentions?.includes(userId));
+          const mentionsMe = Boolean(selfId && message.mentions?.includes(selfId));
 
           setChats((current) => {
             if (!current) {
@@ -425,20 +427,25 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
 
             // Web: a browser notification unless the chat is on screen or
             // muted (a mention comes through anyway; none for group events).
+            // Rooms: only mentions.
             if (
               chat &&
               (!safeRef.current || safeRef.current.has(chat.id)) &&
-              (!chat.muted || mentionsMe) &&
+              (chat.type === "room" ? mentionsMe : !chat.muted || mentionsMe) &&
               !viewing &&
               message.kind !== "system"
             ) {
               const preview = messagePreview(
-                showMessage(message, privateKeyRef.current, chat, userId),
+                showMessage(message, privateKeyRef.current, chat, selfId),
               );
 
               showMessageNotification(
                 chatTitle(chat),
-                chat.type === "group" ? `@${message.sender_username}: ${preview}` : preview,
+                chat.type === "group"
+                  ? `@${message.sender_username}: ${preview}`
+                  : chat.type === "room"
+                    ? `${message.sender_username}: ${preview}`
+                    : preview,
                 chat.id,
                 openChat,
               );
@@ -454,7 +461,7 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
                 return chat;
               }
 
-              if (readerId !== userId) {
+              if (readerId !== (chat.self_id ?? userId)) {
                 return {
                   ...chat,
                   peer_last_read_at: later(chat.peer_last_read_at, lastReadAt),
@@ -655,11 +662,16 @@ export function ChatsProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      await withToken((token) => api.removeGroupMember(token, chatId, userId));
+      // A room is left as the account (its persona there is the member).
+      const room = chats?.find((chat) => chat.id === chatId)?.type === "room";
+
+      await withToken((token) =>
+        room ? api.leaveRoom(token, chatId) : api.removeGroupMember(token, chatId, userId),
+      );
       setChats((current) => current?.filter((chat) => chat.id !== chatId) ?? current);
       forgetCachedChat(userId, chatId);
     },
-    [withToken, userId],
+    [withToken, userId, chats],
   );
 
   const pinMessage = useCallback(

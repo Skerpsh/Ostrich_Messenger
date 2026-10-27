@@ -287,6 +287,7 @@ export default async function authRoutes(server: FastifyInstance) {
                public_key, encrypted_private_key
         FROM users
         WHERE LOWER(username) = LOWER($1)
+          AND persona_of IS NULL
         `,
         [username],
       );

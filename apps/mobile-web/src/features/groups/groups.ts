@@ -9,6 +9,7 @@ import {
   decryptGroupMessage,
   encryptGroupInfo,
   encryptGroupMessage,
+  fromBase64,
   newGroupKey,
   newMessageId,
   publicKeyOf,
@@ -71,6 +72,14 @@ function addGroupKey(chatId: string, epoch: number, key: Uint8Array) {
 
   epochs.set(epoch, key);
   changed();
+}
+
+// A room's key comes with the chats list: the server keeps it (rooms are
+// not end-to-end encrypted), and it never changes (epoch 0).
+function addRoomKey(chat: Chat) {
+  if (chat.type === "room" && chat.room_key && !groupKeyOf(chat.id, 0)) {
+    addGroupKey(chat.id, 0, fromBase64(chat.room_key));
+  }
 }
 
 const wrappedCacheKey = (userId: string, chatId: string) => `${userId}:group-keys:${chatId}`;
@@ -203,6 +212,13 @@ export function useGroupKeys(chat: Chat | null | undefined) {
 
   const chatId = chat?.type === "group" ? chat.id : null;
   const epoch = chat?.key_epoch ?? 0;
+  const roomChat = chat?.type === "room" ? chat : null;
+
+  useEffect(() => {
+    if (roomChat) {
+      addRoomKey(roomChat);
+    }
+  }, [roomChat]);
   const missing = chatId !== null && !groupKeyOf(chatId, epoch);
   const privateKey = signedIn?.privateKey ?? null;
   const ownId = signedIn?.user.id ?? null;
@@ -232,6 +248,8 @@ export function useAllGroupKeys(chats: Chat[] | null) {
     }
 
     for (const chat of chats) {
+      addRoomKey(chat);
+
       if (chat.type === "group" && !groupKeyOf(chat.id, chat.key_epoch)) {
         loadGroupKeys(chat.id, chat.key_epoch, ownId, privateKey, withToken).catch(() => {});
       }
@@ -254,6 +272,9 @@ export function groupInfo(chat: Chat): GroupInfo | null {
 
 export const SAVED_TITLE = "Saved messages";
 
+// "room_03", as the server names it.
+export const roomName = (number: number) => `room_${String(number).padStart(2, "0")}`;
+
 // What a chat is called: "@user", the group's name, Saved messages.
 export function chatTitle(chat: Chat) {
   if (chat.type === "saved") {
@@ -264,6 +285,10 @@ export function chatTitle(chat: Chat) {
     return groupInfo(chat)?.name ?? "Group";
   }
 
+  if (chat.type === "room") {
+    return roomName(chat.room_number ?? 0);
+  }
+
   return `@${chat.username ?? "…"}`;
 }
 
@@ -271,6 +296,10 @@ export function chatTitle(chat: Chat) {
 export function chatName(chat: Chat) {
   if (chat.type === "saved") {
     return SAVED_TITLE;
+  }
+
+  if (chat.type === "room") {
+    return roomName(chat.room_number ?? 0);
   }
 
   return chat.type === "group" ? (groupInfo(chat)?.name ?? "Group") : (chat.username ?? "?");

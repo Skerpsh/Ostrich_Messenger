@@ -40,7 +40,7 @@ export function showMessage(
   }
 
   const decrypted =
-    chat.type === "group"
+    chat.type === "group" || chat.type === "room"
       ? isGroupMessage(message.content)
         ? decryptGroupMessage(message, (epoch) => groupKeyOf(chat.id, epoch), chat.id)
         : decryptMessage(message, null, null, chat.id)
@@ -59,7 +59,7 @@ export function encryptForChat(
   message: MessageRef,
   privateKey: Uint8Array,
 ) {
-  if (chat.type === "group") {
+  if (chat.type === "group" || chat.type === "room") {
     const key = groupKeyOf(chat.id, chat.key_epoch);
 
     if (!key) {
@@ -79,9 +79,13 @@ export function encryptForChat(
 // Encrypting and decrypting a chat's messages with this device's keys.
 export function useChatCrypto(chat: Chat | null) {
   const privateKey = usePrivateKey();
-  const ownId = useCurrentUser()?.id ?? null;
+  const currentId = useCurrentUser()?.id ?? null;
+  // In a room, the user's persona there.
+  const ownId = chat?.self_id ?? currentId;
   const chatId = chat?.id ?? "";
   const type = chat?.type ?? "direct";
+  // Rooms are keyed like groups (with the key the server hands out).
+  const keyed = type === "group" || type === "room";
   const peerKey = chat?.public_key ?? null;
   const epoch = chat?.key_epoch ?? 0;
   const username = chat?.username;
@@ -89,7 +93,7 @@ export function useChatCrypto(chat: Chat | null) {
   const keysVersion = useGroupKeys(chat);
 
   return useMemo(() => {
-    const groupKey = type === "group" ? groupKeyOf(chatId, epoch) : undefined;
+    const groupKey = keyed ? groupKeyOf(chatId, epoch) : undefined;
     const keys: ChatKeys = { id: chatId, type, public_key: peerKey };
 
     return {
@@ -97,7 +101,7 @@ export function useChatCrypto(chat: Chat | null) {
 
       // Can messages be sent? Not until the other member has keys (or the
       // group's key has loaded).
-      canEncrypt: Boolean(privateKey && ownId && (type === "group" ? groupKey : peerKey)),
+      canEncrypt: Boolean(privateKey && ownId && (keyed ? groupKey : peerKey)),
 
       decrypt: (message: MessageRef & MessageText): Shown =>
         showMessage(message, privateKey, keys, ownId),
@@ -107,7 +111,7 @@ export function useChatCrypto(chat: Chat | null) {
       encrypt: (text: string, messageId: string) => {
         const ref = { id: messageId, sender_id: ownId ?? "" };
 
-        if (type === "group") {
+        if (keyed) {
           if (!groupKey || !ownId) {
             throw new Error("The group's key has not loaded yet: try again in a moment.");
           }
@@ -132,5 +136,5 @@ export function useChatCrypto(chat: Chat | null) {
           ? safetyCode(publicKeyOf(privateKey), peerKey)
           : null,
     };
-  }, [privateKey, peerKey, chatId, type, epoch, ownId, username, keysVersion]);
+  }, [privateKey, peerKey, chatId, type, keyed, epoch, ownId, username, keysVersion]);
 }

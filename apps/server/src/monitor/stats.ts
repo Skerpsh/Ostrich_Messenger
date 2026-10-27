@@ -133,8 +133,9 @@ async function database(options: CollectOptions): Promise<Snapshot["database"]> 
       db.query(
         `
         SELECT
-          (SELECT COUNT(*) FROM users)::int AS users,
-          (SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '1 day')::int AS new_users,
+          -- Accounts, not rooms' personas.
+          (SELECT COUNT(*) FROM users WHERE persona_of IS NULL)::int AS users,
+          (SELECT COUNT(*) FROM users WHERE persona_of IS NULL AND created_at > NOW() - INTERVAL '1 day')::int AS new_users,
           (SELECT COUNT(*) FROM messages WHERE created_at > NOW() - make_interval(mins => $1))::int AS messages_recent,
           (SELECT COUNT(*) FROM messages WHERE created_at > NOW() - INTERVAL '1 day')::int AS messages_day,
           (SELECT COUNT(*) FROM chats WHERE type = 'group')::int AS groups,
@@ -177,7 +178,7 @@ export async function periodCounts(from: Date, to: Date) {
     db.query(
       `
       SELECT
-        (SELECT COUNT(*) FROM users WHERE created_at >= $1 AND created_at < $2)::int AS new_users,
+        (SELECT COUNT(*) FROM users WHERE persona_of IS NULL AND created_at >= $1 AND created_at < $2)::int AS new_users,
         (SELECT COUNT(*) FROM messages WHERE created_at >= $1 AND created_at < $2)::int AS messages
       `,
       [from, to],

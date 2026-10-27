@@ -26,6 +26,7 @@ async function setBadge(input: string | undefined, value: boolean) {
     UPDATE users
     SET is_developer = $2
     WHERE LOWER(username) = LOWER($1)
+      AND persona_of IS NULL
     RETURNING username
     `,
     [username, value],
