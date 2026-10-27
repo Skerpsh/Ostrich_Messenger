@@ -36,6 +36,7 @@
 - [Testing and CI](#testing-and-ci)
 - [Releasing](#releasing)
 - [Project structure](#project-structure)
+- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [Contact](#contact)
 - [Security](#security)
@@ -676,6 +677,14 @@ what they share (the protocol, the encryption) is checked against the same test 
 ├── docs/                   which app runs where and how each is built
 └── .github/workflows/      CI and the releases of every app
 ```
+
+## Roadmap
+
+1. **A specification and threat model** of every protocol in Ostrich, ready for an independent audit
+2. **Reproducible builds** of every app, and Ostrich on **F-Droid** and **Flathub**
+3. **An independent security audit**, and fixes for what it finds
+4. **Forward secrecy**: a Double Ratchet for direct chats across all of a user's devices, then for groups
+5. **Sealed sender**: the server delivers a message without learning who sent it
 
 ## Contributing
 
