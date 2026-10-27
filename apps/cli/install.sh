@@ -5,17 +5,19 @@
 #
 # Into ~/.local/bin (or INSTALL_DIR=/usr/local/bin with sudo). The download
 # is checked against the release's SHA256SUMS. OSTRICH_RELEASE_BASE points
-# it at another copy of the release files (for testing).
+# it at another copy of the release files (for testing), OSTRICH_VERSION at
+# its version; in a release, release.yml writes the version in.
 set -eu
 
 repo="Skerpsh/Ostrich_Messenger"
 base="${OSTRICH_RELEASE_BASE:-https://github.com/$repo/releases/latest/download}"
 dir="${INSTALL_DIR:-$HOME/.local/bin}"
+version="${OSTRICH_VERSION:-@VERSION@}"
 
 case "$(uname -s)" in
   Linux) os=linux ;;
   Darwin) os=darwin ;;
-  *) echo "install.sh: on Windows, download ostrich-windows-amd64.exe from https://github.com/$repo/releases/latest" >&2; exit 1 ;;
+  *) echo "install.sh: on Windows, download ostrich-windows-amd64-$version.exe from https://github.com/$repo/releases/latest" >&2; exit 1 ;;
 esac
 
 case "$(uname -m)" in
@@ -24,7 +26,7 @@ case "$(uname -m)" in
   *) echo "install.sh: no build for $(uname -m)" >&2; exit 1 ;;
 esac
 
-name="ostrich-$os-$arch"
+name="ostrich-$os-$arch-$version"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 

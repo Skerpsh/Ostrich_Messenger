@@ -43,11 +43,11 @@ set_package() {
 }
 
 set_package ostrich-desktop-bin \
-  "sha256sums='$(sum Ostrich-Linux.pacman)' '$license'"
+  "sha256sums='$(sum "Ostrich-Linux-$version.pacman")' '$license'"
 
 set_package ostrich-cli-bin \
   "sha256sums='$license'" \
-  "sha256sums_x86_64='$(sum ostrich-linux-amd64)'" \
-  "sha256sums_aarch64='$(sum ostrich-linux-arm64)'"
+  "sha256sums_x86_64='$(sum "ostrich-linux-amd64-$version")'" \
+  "sha256sums_aarch64='$(sum "ostrich-linux-arm64-$version")'"
 
 echo "AUR packages set to $version"

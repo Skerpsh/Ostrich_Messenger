@@ -49,6 +49,6 @@ The pages are served from `app://ostrich` (see `main.js`); the server always all
 
 Each version tag builds and publishes it with the other apps
 ([`.github/workflows/release.yml`](../../.github/workflows/release.yml)):
-`Ostrich-Linux.AppImage`, `.deb`, `.rpm`, `.pacman` and `.flatpak`, and `Ostrich-Windows-Setup.exe`, plus
+`Ostrich-Linux-<version>.AppImage`, `.deb`, `.rpm`, `.pacman` and `.flatpak`, and `Ostrich-Windows-Setup-<version>.exe`, plus
 `latest-linux.yml` and `latest.yml`, which the installed apps read to update themselves.
 The packages are not signed: Windows warns about an unknown publisher the first time.

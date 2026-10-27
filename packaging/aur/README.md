@@ -1,7 +1,7 @@
 # Ostrich in the AUR
 
 - [`ostrich-desktop-bin`](https://aur.archlinux.org/packages/ostrich-desktop-bin): the desktop
-  app, the release's `Ostrich-Linux.pacman` as it is
+  app, the release's `Ostrich-Linux-<version>.pacman` as it is
 - [`ostrich-cli-bin`](https://aur.archlinux.org/packages/ostrich-cli-bin): the terminal client
 
 ```bash

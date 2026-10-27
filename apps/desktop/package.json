@@ -59,7 +59,7 @@
       ],
       "category": "Network;InstantMessaging",
       "synopsis": "End-to-end encrypted messenger",
-      "artifactName": "Ostrich-Linux.${ext}",
+      "artifactName": "Ostrich-Linux-${version}.${ext}",
       "executableName": "ostrich-desktop",
       "maintainer": "Ostrich <hello@ostrich-messenger.com>",
       "syncDesktopName": true
@@ -75,7 +75,7 @@
       ]
     },
     "flatpak": {
-      "artifactName": "Ostrich-Linux.${ext}",
+      "artifactName": "Ostrich-Linux-${version}.${ext}",
       "runtimeVersion": "24.08",
       "baseVersion": "24.08",
       "finishArgs": [
@@ -94,7 +94,7 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "Ostrich-Windows-Setup.${ext}"
+      "artifactName": "Ostrich-Windows-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": true,

@@ -4,7 +4,10 @@
 # Linux (AppImage, .deb, .rpm, .pacman, Flatpak) and Windows (an installer), all
 # under the same version, with SHA-256 checksums and a table of what to
 # download. The desktop app updates itself from these releases
-# (latest*.yml).
+# (latest*.yml). Every file carries the version (Ostrich-Android-1.5.0.apk,
+# ostrich-linux-amd64-1.5.0); the APK and the CLI also go out under their
+# old names (Ostrich-Android.apk, ostrich-linux-amd64), which apps up to
+# v1.5.3 update from: drop those once nobody runs them.
 #
 # The Android build needs EXPO_TOKEN in the repository's secrets (Settings →
 # Secrets and variables → Actions); without it the release has the CLI only.
@@ -41,15 +44,18 @@ jobs:
       - name: Build
         run: |
           mkdir -p dist
+          version="${GITHUB_REF_NAME#v}"
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
             os="${target%/*}"
             arch="${target#*/}"
-            name="ostrich-$os-$arch"
-            [ "$os" = windows ] && name="$name.exe"
+            ext=""
+            [ "$os" = windows ] && ext=".exe"
             GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath \
-              -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" -o "dist/$name" .
+              -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" -o "dist/ostrich-$os-$arch-$version$ext" .
+            # The old name, for CLIs up to v1.5.3.
+            cp "dist/ostrich-$os-$arch-$version$ext" "dist/ostrich-$os-$arch$ext"
           done
-          cp install.sh dist/
+          sed "s/@VERSION@/$version/" install.sh > dist/install.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cli
@@ -99,13 +105,15 @@ jobs:
           mkdir -p apk
           eas build --platform android --profile github --non-interactive --wait --json > build.json
           url=$(jq -r '.[0].artifacts.buildUrl' build.json)
-          curl -fsSL "$url" -o apk/Ostrich-Android.apk
+          curl -fsSL "$url" -o "apk/Ostrich-Android-$version.apk"
+          # The old name, for apps up to v1.5.3.
+          cp "apk/Ostrich-Android-$version.apk" apk/Ostrich-Android.apk
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: steps.token.outputs.set == 'true'
         with:
           name: android
           if-no-files-found: error
-          path: apps/mobile-web/apk/Ostrich-Android.apk
+          path: apps/mobile-web/apk/Ostrich-Android*.apk
 
   # The desktop app: the web app built into it (apps/desktop/scripts/
   # build-web.mjs), packed by electron-builder. Its version is the tag's.
@@ -131,7 +139,7 @@ jobs:
         with:
           name: desktop-linux
           path: |
-            apps/desktop/dist/Ostrich-Linux.*
+            apps/desktop/dist/Ostrich-Linux-*
             apps/desktop/dist/latest-linux.yml
 
   # Flatpak needs the Flathub runtimes, a large download: when it fails,
@@ -159,7 +167,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-flatpak
-          path: apps/desktop/dist/Ostrich-Linux.flatpak
+          path: apps/desktop/dist/Ostrich-Linux-*.flatpak
 
   desktop-windows:
     runs-on: windows-latest
@@ -185,8 +193,8 @@ jobs:
         with:
           name: desktop-windows
           path: |
-            apps/desktop/dist/Ostrich-Windows-Setup.exe
-            apps/desktop/dist/Ostrich-Windows-Setup.exe.blockmap
+            apps/desktop/dist/Ostrich-Windows-Setup-*.exe
+            apps/desktop/dist/Ostrich-Windows-Setup-*.exe.blockmap
             apps/desktop/dist/latest.yml
 
   publish:
@@ -207,27 +215,28 @@ jobs:
       - name: Notes
         run: |
           base="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
+          v="${GITHUB_REF_NAME#v}"
           # A link to a file of this release, if it was built.
           file() { [ -f "release/$1" ] && printf '[%s](%s/%s)' "$2" "$base" "$1"; }
           soon() { [ -n "$1" ] && printf '%s' "$1" || printf 'coming soon'; }
-          android=$(soon "$(file Ostrich-Android.apk Ostrich-Android.apk)")
-          windows=$(soon "$(file Ostrich-Windows-Setup.exe Ostrich-Windows-Setup.exe)")
-          linux=$(soon "$(for f in AppImage deb rpm pacman flatpak; do file "Ostrich-Linux.$f" ".$f"; printf ' '; done | sed 's/  */ /g; s/ $//; s/) \[/), [/g')")
+          android=$(soon "$(file "Ostrich-Android-$v.apk" "Ostrich-Android-$v.apk")")
+          windows=$(soon "$(file "Ostrich-Windows-Setup-$v.exe" "Ostrich-Windows-Setup-$v.exe")")
+          linux=$(soon "$(for f in AppImage deb rpm pacman flatpak; do file "Ostrich-Linux-$v.$f" ".$f"; printf ' '; done | sed 's/  */ /g; s/ $//; s/) \[/), [/g')")
           cat > notes.md <<EOF
           ## Download
 
           | System | The app | Terminal (CLI) |
           |---|---|---|
           | **Android** | $android | |
-          | **Windows** | $windows | [ostrich-windows-amd64.exe]($base/ostrich-windows-amd64.exe) |
-          | **Linux** | $linux | [x86-64]($base/ostrich-linux-amd64), [ARM64]($base/ostrich-linux-arm64) or \`curl -fsSL $base/install.sh \| sh\` |
-          | **macOS** | | [Apple silicon]($base/ostrich-darwin-arm64), [Intel]($base/ostrich-darwin-amd64) |
+          | **Windows** | $windows | [ostrich-windows-amd64-$v.exe]($base/ostrich-windows-amd64-$v.exe) |
+          | **Linux** | $linux | [x86-64]($base/ostrich-linux-amd64-$v), [ARM64]($base/ostrich-linux-arm64-$v) or \`curl -fsSL $base/install.sh \| sh\` |
+          | **macOS** | | [Apple silicon]($base/ostrich-darwin-arm64-$v), [Intel]($base/ostrich-darwin-amd64-$v) |
           | **iOS** | coming to the App Store | |
           | **Web** | [ostrich-messenger.online](https://ostrich-messenger.online), nothing to install | |
 
           - **Android:** open the APK on the phone and allow installing from that app when asked.
           - **Windows:** run the installer; Windows may warn about an unknown publisher: More info → Run anyway.
-          - **Linux:** the AppImage runs anywhere (\`chmod +x Ostrich-Linux.AppImage\`, then open it); the \`.deb\` is for Ubuntu and Debian, the \`.rpm\` for Fedora and openSUSE, the \`.pacman\` for Arch (\`sudo pacman -U Ostrich-Linux.pacman\`, or from the AUR: \`yay -S ostrich-desktop-bin\`, and \`ostrich-cli-bin\` for the CLI). They all update themselves (the packages ask for your password to install the new version); the Flatpak does not yet.
+          - **Linux:** the AppImage runs anywhere (\`chmod +x Ostrich-Linux-$v.AppImage\`, then open it); the \`.deb\` is for Ubuntu and Debian, the \`.rpm\` for Fedora and openSUSE, the \`.pacman\` for Arch (\`sudo pacman -U Ostrich-Linux-$v.pacman\`, or from the AUR: \`yay -S ostrich-desktop-bin\`, and \`ostrich-cli-bin\` for the CLI). They all update themselves (the packages ask for your password to install the new version); the Flatpak does not yet.
           - **Updates:** the Android app offers each new APK itself; the desktop apps install new versions themselves; the CLI replaces itself with the new version once its signature checks out.
 
           Check a download with \`sha256sum -c SHA256SUMS\`.

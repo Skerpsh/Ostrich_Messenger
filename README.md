@@ -89,10 +89,10 @@
 
 | System | Get Ostrich |
 |---|---|
-| 🤖 **Android** | [**Download the APK**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Android.apk) — open it on the phone and allow installing when asked; it updates itself |
-| 🪟 **Windows** | [**Download the installer**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Windows-Setup.exe), which updates itself · Terminal: [ostrich-windows-amd64.exe](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-windows-amd64.exe) |
-| 🐧 **Linux** | [**AppImage**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.AppImage) (any distribution) · [.deb](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.deb) (Ubuntu, Debian) · [.rpm](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.rpm) (Fedora, openSUSE) · [.pacman](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.pacman) (Arch, or from the AUR: `yay -S ostrich-desktop-bin`), all updating themselves · [Flatpak](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Linux.flatpak) · Terminal: [x86-64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-amd64), [ARM64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-linux-arm64) or the [one-line install](#terminal-client-cli) (Arch: `yay -S ostrich-cli-bin`) |
-| 🍎 **macOS** | Terminal: [Apple silicon](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-arm64), [Intel](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/ostrich-darwin-amd64) |
+| 🤖 **Android** | [**Download the APK**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) — open it on the phone and allow installing when asked; it updates itself |
+| 🪟 **Windows** | [**Download the installer**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest), which updates itself · Terminal: [ostrich-windows-amd64.exe](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) |
+| 🐧 **Linux** | [**AppImage**](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) (any distribution) · [.deb](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) (Ubuntu, Debian) · [.rpm](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) (Fedora, openSUSE) · [.pacman](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) (Arch, or from the AUR: `yay -S ostrich-desktop-bin`), all updating themselves · [Flatpak](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) · Terminal: [x86-64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest), [ARM64](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) or the [one-line install](#terminal-client-cli) (Arch: `yay -S ostrich-cli-bin`) |
+| 🍎 **macOS** | Terminal: [Apple silicon](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest), [Intel](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest) |
 | 📱 **iOS** | Coming to the App Store |
 | 🌐 **Web** | [ostrich-messenger.online](https://ostrich-messenger.online): nothing to install, and installable as an app from the browser |
 
@@ -172,7 +172,7 @@ The script downloads the build for your system, checks its SHA-256 checksum and 
 
 **Windows**
 
-Download `ostrich-windows-amd64.exe` from the
+Download `ostrich-windows-amd64-<version>.exe` from the
 [latest release](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest).
 SmartScreen asks once: *More info* → *Run anyway*.
 

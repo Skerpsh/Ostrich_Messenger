@@ -15,7 +15,7 @@ depends=('gtk3' 'nss' 'alsa-lib' 'libxss' 'libnotify' 'xdg-utils')
 provides=('ostrich-desktop')
 conflicts=('ostrich-desktop')
 options=('!strip' '!debug')
-source=("Ostrich-Linux-$pkgver.pacman::https://github.com/Skerpsh/Ostrich_Messenger/releases/download/v$pkgver/Ostrich-Linux.pacman"
+source=("Ostrich-Linux-$pkgver.pacman::https://github.com/Skerpsh/Ostrich_Messenger/releases/download/v$pkgver/Ostrich-Linux-$pkgver.pacman"
         "LICENSE-$pkgver::https://raw.githubusercontent.com/Skerpsh/Ostrich_Messenger/v$pkgver/LICENSE")
 noextract=("Ostrich-Linux-$pkgver.pacman")
 sha256sums=('SKIP'

@@ -7,7 +7,9 @@ import Constants from "expo-constants";
 // build could read the keys (security audit SEC-001).
 
 const RELEASES = "https://api.github.com/repos/Skerpsh/Ostrich_Messenger/releases/latest";
-const APK = "https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download/Ostrich-Android.apk";
+// The APK of a release: v1.5.0 → Ostrich-Android-1.5.0.apk.
+const apkUrl = (tag: string) =>
+  `https://github.com/Skerpsh/Ostrich_Messenger/releases/download/${tag}/Ostrich-Android-${tag.replace(/^v/, "")}.apk`;
 
 // At most this often, when the app comes to the front.
 const CHECK_EVERY_MS = 3 * 60 * 60 * 1000;
@@ -60,7 +62,7 @@ async function checkForUpdate(): Promise<AppUpdate | null> {
   }
 
   return running && latest && newerVersion(latest, running)
-    ? { kind: "download", version: latest.replace(/^v/, ""), apply: () => Linking.openURL(APK) }
+    ? { kind: "download", version: latest.replace(/^v/, ""), apply: () => Linking.openURL(apkUrl(latest)) }
     : null;
 }
 

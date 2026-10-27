@@ -30,7 +30,7 @@ curl -fsSL https://github.com/Skerpsh/Ostrich_Messenger/releases/latest/download
 
 It downloads the build for your system from the latest release, checks its
 SHA-256 and puts it in `~/.local/bin/ostrich`. Windows: download
-`ostrich-windows-amd64.exe` from the
+`ostrich-windows-amd64-<version>.exe` from the
 [latest release](https://github.com/Skerpsh/Ostrich_Messenger/releases/latest)
 (SmartScreen asks once: *More info* → *Run anyway*).
 

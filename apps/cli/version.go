@@ -134,9 +134,10 @@ func checkForUpdate() tea.Cmd {
 	})
 }
 
-// releaseBinary is this system's file in a release.
-func releaseBinary() string {
-	name := "ostrich-" + runtime.GOOS + "-" + runtime.GOARCH
+// releaseBinary is this system's file in the release of tag (v1.5.0 →
+// ostrich-linux-amd64-1.5.0).
+func releaseBinary(tag string) string {
+	name := "ostrich-" + runtime.GOOS + "-" + runtime.GOARCH + "-" + strings.TrimPrefix(tag, "v")
 
 	if runtime.GOOS == "windows" {
 		name += ".exe"
@@ -177,7 +178,7 @@ func replaceBinary(exe, tag string) error {
 	os.Remove(probe.Name())
 
 	base := "https://github.com/" + repository + "/releases/download/" + url.PathEscape(tag) + "/"
-	name := releaseBinary()
+	name := releaseBinary(tag)
 
 	sums, err := download(base+"SHA256SUMS", 1<<20)
 	if err != nil {
