@@ -87,7 +87,7 @@ export default function ChatLookSheet({
         style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
         onPress={() => {}}
       >
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView contentContainerStyle={styles.body} persistentScrollbar>
           <Text style={[styles.title, { color: colors.text }]}>Wallpaper & color</Text>
 
           {share ? (

@@ -224,7 +224,7 @@ export default function ServerView({
         style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
         onPress={() => {}}
       >
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView contentContainerStyle={styles.body} persistentScrollbar>
           <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="server-outline" size={24} color={colors.accent} />
           </View>

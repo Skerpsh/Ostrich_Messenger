@@ -205,7 +205,7 @@ export default function GroupInfo({
         style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
         onPress={() => {}}
       >
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" persistentScrollbar>
           <View style={styles.head}>
             <ChatAvatar chat={chat} size={72} />
             {admin ? (

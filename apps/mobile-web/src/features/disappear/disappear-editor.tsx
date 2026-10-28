@@ -214,6 +214,7 @@ export default function DisappearEditor({
         <ScrollView
           contentContainerStyle={styles.body}
           keyboardShouldPersistTaps="handled"
+          persistentScrollbar
         >
           <Text style={[styles.title, { color: colors.text }]}>
             A message if you disappear
