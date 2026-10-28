@@ -20,7 +20,6 @@ export default function ChatsLayout() {
     return (
       <>
         <DisappearWatch />
-      <RecoveryWatch />
         <RecoveryWatch />
         <Stack
           screenOptions={{

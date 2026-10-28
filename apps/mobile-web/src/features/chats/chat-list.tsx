@@ -155,8 +155,23 @@ export default function ChatList() {
     search !== user?.username.toLowerCase() &&
     !(chats ?? []).some((chat) => chat.username?.toLowerCase() === search);
 
-  const go = (path: Parameters<typeof router.push>[0]) =>
-    wide ? router.replace(path) : router.push(path);
+  // Phones: taps while a screen is still opening would stack more screens
+  // on top of it, so the list ignores them until it is shown again.
+  const leaving = useRef(false);
+  useEffect(() => {
+    if (pathname === "/chats") {
+      leaving.current = false;
+    }
+  }, [pathname]);
+
+  const go = (path: Parameters<typeof router.push>[0]) => {
+    if (wide) {
+      router.replace(path);
+    } else if (!leaving.current) {
+      leaving.current = true;
+      router.push(path);
+    }
+  };
 
   const openChat = (chat: Chat) => {
     setQuery("");
