@@ -3,9 +3,9 @@ import { Platform, Text, View } from "react-native";
 import { AccentPicker, ChatPreview, WallpaperPicker } from "@/features/settings/pickers";
 import type { IconName } from "@/ui/icon-button";
 import { SettingsPage } from "@/features/settings/page";
-import { Block, Divider, Section, Segmented, styles, ToggleRow } from "@/features/settings/ui";
+import { Block, Divider, Section, Segmented, StepSlider, styles, ToggleRow } from "@/features/settings/ui";
 import { useAppTheme, type ThemePreference } from "@/ui/theme";
-import { LIST_DENSITIES, TEXT_SIZES } from "@/features/settings/personalization";
+import { ANIMATION_SPEEDS, LIST_DENSITIES, TEXT_SIZES } from "@/features/settings/personalization";
 import Reveal from "@/ui/reveal";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: IconName }[] = [
@@ -13,6 +13,8 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; icon: IconName }[]
   { value: "light", label: "Light", icon: "sunny-outline" },
   { value: "dark", label: "Dark", icon: "moon-outline" },
 ];
+
+const SPEED_OPTIONS = ANIMATION_SPEEDS.map((speed) => ({ value: speed, label: `${speed}×` }));
 
 const DENSITY_HINTS = {
   comfortable: "Photos and the last message of each chat.",
@@ -86,6 +88,21 @@ export default function PersonalizationSettings() {
           value={theme.animations}
           onChange={theme.setAnimations}
         />
+        <Reveal>
+          {theme.animations ? (
+            <>
+              <Divider full />
+              <Block label="Speed">
+                <StepSlider
+                  label="Animation speed"
+                  options={SPEED_OPTIONS}
+                  value={theme.animationSpeed}
+                  onChange={theme.setAnimationSpeed}
+                />
+              </Block>
+            </>
+          ) : null}
+        </Reveal>
       </Section>
 
       <Section title="Chats list" footer={DENSITY_HINTS[theme.density]}>

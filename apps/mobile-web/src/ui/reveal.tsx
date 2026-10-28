@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Platform, StyleSheet, type StyleProp, type ViewStyle, type ViewInstance } from "react-native";
 import Animated, { type CSSAnimationProperties, type CSSTransitionProperties } from "react-native-reanimated";
-import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, SPRING, useMotion, type Motion } from "./motion";
+import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, ms, scaled, SPRING, useMotion, type Motion } from "./motion";
 
 // How a revealed thing looks while hidden.
 const HIDDEN = {
@@ -24,7 +24,7 @@ const SHOWN = {
   fade: [],
 } satisfies Record<RevealKind, ViewStyle["transform"]>;
 
-const ENTER_MS = { full: 300, reduced: 150, off: 0 } satisfies Record<Motion, number>;
+const ENTER_MS = scaled({ full: 300, reduced: 150, off: 0 });
 
 // Coming in from the hidden look, or going back to it (the phones).
 function keyframes(kind: RevealKind, motion: Motion, coming: boolean): CSSAnimationProperties<ViewStyle> | null {
@@ -308,7 +308,7 @@ export function useSlider(selected: number) {
         ...(motion === "full"
           ? {
               transitionProperty: "transform",
-              transitionDuration: 380,
+              transitionDuration: ms(380),
               transitionTimingFunction: SPRING,
             }
           : {}),
@@ -326,7 +326,7 @@ export function useSlider(selected: number) {
   };
 }
 
-const SWAP_MS = { full: 280, reduced: 150, off: 0 } satisfies Record<Motion, number>;
+const SWAP_MS = scaled({ full: 280, reduced: 150, off: 0 });
 
 // Another thing in the same place (a tab, what loaded in place of the
 // spinner): the one before goes as the new one comes, and the height

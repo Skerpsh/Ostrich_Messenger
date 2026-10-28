@@ -16,6 +16,29 @@ import { useAppTheme } from "./theme";
 
 export type Motion = "full" | "reduced" | "off";
 
+// Settings → Personalization's speed (ui/theme.tsx sets it before the app
+// renders with it): every duration here goes through ms().
+let speed = 1;
+
+export function setMotionSpeed(value: number) {
+  speed = value;
+}
+
+export const ms = (duration: number) => Math.round(duration / speed);
+
+// A table of durations by Motion, scaled as it is read.
+export function scaled(table: Record<Motion, number>): Record<Motion, number> {
+  return {
+    get full() {
+      return ms(table.full);
+    },
+    get reduced() {
+      return ms(table.reduced);
+    },
+    off: 0,
+  };
+}
+
 export function useMotion(): Motion {
   const { animations } = useAppTheme();
   const reduced = useReducedMotion();
@@ -127,7 +150,7 @@ export type Enter = keyof typeof ANIMATIONS;
 export const EASE_IN = cubicBezier(0.4, 0, 1, 1);
 
 // How long leaving takes, before the view is gone.
-export const LEAVE_MS = { full: 200, reduced: 120, off: 0 } satisfies Record<Motion, number>;
+export const LEAVE_MS = scaled({ full: 200, reduced: 120, off: 0 });
 
 const LEAVING = {
   // A screen closing: back to the right, fading.
@@ -162,7 +185,7 @@ const LEAVING = {
 } satisfies Record<string, Animation>;
 
 // Pictures fade in as they load (expo-image's transition).
-export const IMAGE_FADE_MS = { full: 200, reduced: 150, off: 0 } satisfies Record<Motion, number>;
+export const IMAGE_FADE_MS = scaled({ full: 200, reduced: 150, off: 0 });
 
 // The style that animates a view out before it goes (see useLeave).
 export function leaveStyle(kind: keyof typeof LEAVING, motion: Motion): Animation | null {
@@ -221,7 +244,9 @@ export function enterStyle(kind: Enter, motion: Motion): Animation | null {
     return null;
   }
 
-  return motion === "reduced" ? FADE : ANIMATIONS[kind];
+  const animation = motion === "reduced" ? FADE : ANIMATIONS[kind];
+
+  return { ...animation, animationDuration: ms(animation.animationDuration as number) };
 }
 
 // Runs after the next frame is drawn, so that what changes then animates
@@ -248,7 +273,7 @@ export function pressStyle(
   return {
     transform: [{ scale: pressed ? scale : 1 }],
     transitionProperty: "transform",
-    transitionDuration: pressed ? 90 : 320,
+    transitionDuration: ms(pressed ? 90 : 320),
     transitionTimingFunction: pressed ? EASE_OUT : SPRING,
   };
 }
@@ -301,7 +326,10 @@ export function useShake() {
   const [count, setCount] = useState(0);
 
   return {
-    style: motion === "full" && count > 0 ? SHAKES[count % 2] : null,
+    style:
+      motion === "full" && count > 0
+        ? { ...SHAKES[count % 2], animationDuration: ms(SHAKES[count % 2].animationDuration) }
+        : null,
     shake: () => setCount((current) => current + 1),
   };
 }

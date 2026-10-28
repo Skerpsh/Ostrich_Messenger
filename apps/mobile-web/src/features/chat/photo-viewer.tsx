@@ -9,7 +9,7 @@ import { useAuth } from "@/features/auth/auth";
 import { loadAttachment } from "./attachments";
 import { imageSource, saveFile } from "@/platform/files";
 import { useEscape } from "@/ui/keys";
-import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, useMotion } from "@/ui/motion";
+import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, ms, useMotion } from "@/ui/motion";
 import type { Attachment } from "./payload";
 import PressScale from "@/ui/press-scale";
 
@@ -86,7 +86,7 @@ const slide = (from: number, leaving: boolean): CSSAnimationProperties<ViewStyle
   animationName: leaving
     ? { from: { opacity: 1, transform: [{ translateX: 0 }] }, to: { opacity: 0, transform: [{ translateX: -from }] } }
     : { from: { opacity: 0, transform: [{ translateX: from }] }, to: { opacity: 1, transform: [{ translateX: 0 }] } },
-  animationDuration: leaving ? LEAVE_MS.full : OPEN_MS,
+  animationDuration: leaving ? LEAVE_MS.full : ms(OPEN_MS),
   animationTimingFunction: leaving ? EASE_IN : FLY,
   animationFillMode: "forwards",
 });
@@ -199,7 +199,7 @@ export default function PhotoViewer({
 
     setClosing(true);
     setOpen(false);
-    setTimeout(onClose, CLOSE_MS);
+    setTimeout(onClose, ms(CLOSE_MS));
   };
 
   useEffect(() => {
@@ -277,7 +277,7 @@ export default function PhotoViewer({
       ? {}
       : {
           transitionProperty: motion === "full" ? properties : "opacity",
-          transitionDuration: open ? OPEN_MS : CLOSE_MS,
+          transitionDuration: ms(open ? OPEN_MS : CLOSE_MS),
           transitionTimingFunction: open ? FLY : EASE_OUT,
         };
   // The backdrop, the bars and the arrows fade in and out.

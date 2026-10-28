@@ -1,12 +1,13 @@
-import type { ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, PanResponder, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import type { IconName } from "@/ui/icon-button";
 import { Swap, useSlider } from "@/ui/reveal";
 import PressScale from "@/ui/press-scale";
-import { SPRING, useMotion } from "@/ui/motion";
+import { ms, SPRING, useMotion } from "@/ui/motion";
 import { useAppTheme } from "@/ui/theme";
+import { useLatest } from "@/ui/use-latest";
 import { radius } from "@/ui/colors";
 
 // Building blocks of the settings screen and its styles.
@@ -148,7 +149,7 @@ export function Row({
             style={{
               transform: [{ rotate: expanded ? "180deg" : "0deg" }],
               ...(motion === "full"
-                ? { transitionProperty: "transform", transitionDuration: 320, transitionTimingFunction: SPRING }
+                ? { transitionProperty: "transform", transitionDuration: ms(320), transitionTimingFunction: SPRING }
                 : {}),
             }}
           >
@@ -208,6 +209,131 @@ export function Segmented<T extends string | number>({
     </View>
   );
 }
+
+// One of a few values in a row, dragged or tapped to (animation speed).
+export function StepSlider<T>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  // For screen readers.
+  label: string;
+}) {
+  const { colors } = useAppTheme();
+  const motion = useMotion();
+  const [width, setWidth] = useState(0);
+  const index = Math.max(0, options.findIndex((option) => option.value === value));
+  const last = options.length - 1;
+  const step = last > 0 ? width / last : 0;
+
+  // The pan responder is made once: it reads these as they are now.
+  const latest = useLatest({ step, index, options, onChange });
+  const start = useRef(0);
+
+  const pick = (x: number) => {
+    const { step, index, options, onChange } = latest.current;
+    const next = step > 0 ? Math.min(options.length - 1, Math.max(0, Math.round(x / step))) : index;
+
+    if (next !== index) {
+      onChange(options[next].value);
+    }
+  };
+
+  const pan = useMemo(
+    () =>
+      // Its handlers run on touches, not while rendering.
+      // eslint-disable-next-line react-hooks/refs
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        // Dragging along does not hand the touch over to the page's scroll.
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: (event) => {
+          start.current = event.nativeEvent.locationX - THUMB / 2;
+          pick(start.current);
+        },
+        onPanResponderMove: (_, gesture) => pick(start.current + gesture.dx),
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pick reads latest
+    [],
+  );
+
+  const move = (by: number) => {
+    const next = index + by;
+
+    if (next >= 0 && next <= last) {
+      onChange(options[next].value);
+    }
+  };
+
+  return (
+    <View style={styles.stepSlider}>
+      <View
+        {...pan.panHandlers}
+        onLayout={(event) => setWidth(event.nativeEvent.layout.width - THUMB)}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={label}
+        accessibilityValue={{ text: options[index].label }}
+        accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+        onAccessibilityAction={(event) => move(event.nativeEvent.actionName === "increment" ? 1 : -1)}
+        style={styles.stepTrackArea}
+      >
+        <View pointerEvents="none" style={[styles.stepTrack, { backgroundColor: colors.panelAlt }]}>
+          {options.map((option, i) => (
+            <View
+              key={String(option.value)}
+              style={[styles.stepDot, { left: i * step, backgroundColor: i <= index ? colors.accent : colors.line }]}
+            />
+          ))}
+        </View>
+        {width > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.stepThumb,
+              {
+                backgroundColor: colors.accent,
+                boxShadow: `0 1px 4px ${colors.shadow}`,
+                transform: [{ translateX: index * step }],
+              },
+              motion === "full"
+                ? { transitionProperty: "transform", transitionDuration: ms(240), transitionTimingFunction: SPRING }
+                : null,
+            ]}
+          />
+        ) : null}
+      </View>
+      <View style={styles.stepLabels}>
+        {options.map((option, i) => (
+          <Pressable
+            key={String(option.value)}
+            onPress={() => onChange(option.value)}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            style={[styles.stepLabel, { left: i * step, width: THUMB }]}
+          >
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.stepLabelText,
+                { color: i === index ? colors.text : colors.muted, fontWeight: i === index ? "700" : "400" },
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const THUMB = 24;
 
 // A labelled block inside a section (accent colors, wallpapers, ...).
 export function Block({ label, children }: { label: string; children: ReactNode }) {
@@ -377,6 +503,56 @@ export const styles = StyleSheet.create({
 
   segmentSlider: {
     borderRadius: 10,
+  },
+
+  stepSlider: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
+  stepTrackArea: {
+    height: 36,
+    justifyContent: "center",
+  },
+
+  stepTrack: {
+    height: 4,
+    borderRadius: 2,
+    marginHorizontal: THUMB / 2,
+  },
+
+  stepDot: {
+    position: "absolute",
+    top: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: -4,
+  },
+
+  stepThumb: {
+    position: "absolute",
+    left: 0,
+    width: THUMB,
+    height: THUMB,
+    borderRadius: THUMB / 2,
+  },
+
+  stepLabels: {
+    height: 24,
+  },
+
+  stepLabel: {
+    position: "absolute",
+    top: 0,
+    alignItems: "center",
+    overflow: "visible",
+  },
+
+  stepLabelText: {
+    fontSize: 12,
+    width: 48,
+    textAlign: "center",
   },
 
   segmentText: {

@@ -5,7 +5,7 @@ import Animated from "react-native-reanimated";
 import AnimatedPressable from "@/ui/animated-pressable";
 import Reveal, { Swap } from "@/ui/reveal";
 import { useKeydown } from "@/ui/keys";
-import { pressStyle, useMotion, usePressed, useShake } from "@/ui/motion";
+import { ms, pressStyle, useMotion, usePressed, useShake } from "@/ui/motion";
 import { useAppTheme } from "@/ui/theme";
 import { PIN_LENGTH } from "./lock";
 
@@ -93,7 +93,7 @@ export default function PinPad({
                 motion === "full" && {
                   transform: [{ scale: filled ? 1.15 : 1 }],
                   transitionProperty: ["transform", "backgroundColor"],
-                  transitionDuration: 160,
+                  transitionDuration: ms(160),
                 },
               ]}
             />

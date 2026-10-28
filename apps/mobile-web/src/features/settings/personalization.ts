@@ -16,6 +16,9 @@ export const TEXT_SIZES: { value: TextSize; label: string; scale: number }[] = [
 
 export const textScaleOf = (size: TextSize) => TEXT_SIZES.find((t) => t.value === size)?.scale ?? 1;
 
+// How fast animations play (ui/motion.ts): 1 is as designed.
+export const ANIMATION_SPEEDS = [0.5, 0.75, 1, 1.5, 2];
+
 // The chats list: as it was, smaller rows, or no message previews.
 export type ListDensity = "comfortable" | "compact" | "minimal";
 
@@ -65,6 +68,7 @@ export type Preferences = {
   wallpaper: Wallpaper;
   // Animations (ui/motion.ts); the system's "Reduce motion" also tones them down.
   animations: boolean;
+  animationSpeed: number;
   // Sync personalization with the account's other devices.
   sync: boolean;
 };
@@ -75,6 +79,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   density: "comfortable",
   wallpaper: DEFAULT_WALLPAPER,
   animations: true,
+  animationSpeed: 1,
   sync: false,
 };
 
@@ -90,6 +95,7 @@ export function readPreferences(value: unknown): Preferences {
     density: typeof p.density === "string" && DENSITIES.has(p.density) ? p.density : "comfortable",
     wallpaper: readWallpaper(p.wallpaper) ?? DEFAULT_WALLPAPER,
     animations: p.animations !== false,
+    animationSpeed: ANIMATION_SPEEDS.includes(p.animationSpeed as number) ? (p.animationSpeed as number) : 1,
     sync: p.sync === true,
   };
 }

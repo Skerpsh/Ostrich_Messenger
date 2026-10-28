@@ -19,6 +19,7 @@ import {
 } from "@/features/settings/personalization";
 import { getItem, setItem } from "@/platform/storage";
 import { fadeTheme, onSystemTheme } from "./theme-fade";
+import { setMotionSpeed } from "./motion";
 import {
   DEFAULT_ACCENT,
   isAccentChoice,
@@ -74,6 +75,9 @@ type ThemeContextValue = {
   setWallpaperPhoto: (photo: string | null) => void;
   animations: boolean;
   setAnimations: (animations: boolean) => void;
+  // 0.5–2 (ANIMATION_SPEEDS), 1 as designed.
+  animationSpeed: number;
+  setAnimationSpeed: (speed: number) => void;
   sync: boolean;
   setSync: (sync: boolean) => void;
   // Bumped on every change the user makes (not on applying synced ones).
@@ -179,6 +183,9 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     changed();
   };
 
+  // Before anything below renders: their durations are read from it.
+  setMotionSpeed(preferences.animationSpeed);
+
   return (
     <ThemeContext
       value={{
@@ -212,6 +219,8 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
         },
         animations: preferences.animations,
         setAnimations: (animations) => update({ animations }),
+        animationSpeed: preferences.animationSpeed,
+        setAnimationSpeed: (animationSpeed) => update({ animationSpeed }),
         sync: preferences.sync,
         // Not a change to sync: turning it on loads what is synced first.
         setSync: (sync) => savePreferences((current) => ({ ...current, sync })),
