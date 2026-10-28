@@ -1,20 +1,22 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import AnimatedPressable from "./animated-pressable";
 import { useAppTheme } from "./theme";
 import { useEscape } from "./keys";
 import { enterStyle, leaveStyle, useLeave } from "./motion";
 import { radius } from "./colors";
 import type { IconName } from "./icon-button";
-import { Swap } from "./reveal";
+import Button from "./button";
+import Reveal from "./reveal";
 
 export type ActionMenuItem = {
   icon: IconName;
   label: string;
   onPress: () => void;
   danger?: boolean;
-  // Destructive actions take a second tap: the label shown after the first.
+  // Destructive actions are confirmed: the question shown after the first
+  // tap, over Cancel and the action.
   confirmLabel?: string;
 };
 
@@ -38,6 +40,15 @@ export default function ActionMenu({
   const close = () => leave(onClose);
   useEscape(true, close);
   const [confirming, setConfirming] = useState<string | null>(null);
+  // The confirming button takes taps only after a moment, so a double tap
+  // on the item does not go through.
+  const [armedFor, setArmedFor] = useState<string | null>(null);
+  const armed = confirming !== null && armedFor === confirming;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setArmedFor(confirming), ARM_MS);
+    return () => clearTimeout(timer);
+  }, [confirming]);
 
   return (
     <AnimatedPressable
@@ -61,12 +72,45 @@ export default function ActionMenu({
           const asking = confirming === item.label;
           const color = item.danger ? colors.danger : colors.text;
 
+          if (asking) {
+            return (
+              <View key={item.label} style={styles.asking}>
+                <View style={styles.question}>
+                  <Ionicons name={item.icon} size={20} color={color} />
+                  <Text style={[styles.label, styles.flex, { color }]}>{item.confirmLabel}</Text>
+                </View>
+                {/* Below the question: where the first tap was, nothing. */}
+                <Reveal kind="rise" appear>
+                  <View style={styles.answers}>
+                    <Button
+                      title="Cancel"
+                      variant="secondary"
+                      style={styles.flex}
+                      onPress={() => {
+                        setConfirming(null);
+                        setArmedFor(null);
+                      }}
+                    />
+                    <Button
+                      title={item.label}
+                      icon={item.icon}
+                      variant="danger"
+                      style={styles.flex}
+                      disabled={!armed}
+                      onPress={item.onPress}
+                    />
+                  </View>
+                </Reveal>
+              </View>
+            );
+          }
+
           return (
             <Pressable
               key={item.label}
               accessibilityRole="button"
               onPress={() => {
-                if (item.confirmLabel && !asking) {
+                if (item.confirmLabel) {
                   setConfirming(item.label);
                   return;
                 }
@@ -79,12 +123,7 @@ export default function ActionMenu({
               ]}
             >
               <Ionicons name={item.icon} size={20} color={color} />
-              {/* The question comes in place of the label. */}
-              <Swap id={asking ? "ask" : "label"} resize={false} style={styles.flex}>
-                <Text style={[styles.label, { color }]}>
-                  {asking ? item.confirmLabel : item.label}
-                </Text>
-              </Swap>
+              <Text style={[styles.label, styles.flex, { color }]}>{item.label}</Text>
             </Pressable>
           );
         })}
@@ -92,6 +131,8 @@ export default function ActionMenu({
     </AnimatedPressable>
   );
 }
+
+const ARM_MS = 500;
 
 const styles = StyleSheet.create({
   flex: {
@@ -136,5 +177,23 @@ const styles = StyleSheet.create({
 
   label: {
     fontSize: 16,
+  },
+
+  asking: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 10,
+  },
+
+  question: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    minHeight: 32,
+  },
+
+  answers: {
+    flexDirection: "row",
+    gap: 10,
   },
 });
