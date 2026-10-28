@@ -697,7 +697,7 @@ Thanks to the people who try Ostrich before everyone else and tell us what break
 
 | | Who | What they found |
 |---|---|---|
-| 🐛 | [@slawti](https://github.com/slawti) | The first Android build on a Pixel: the keyboard covering the message field, notifications that did not pop up, no microphone or camera, panels that would not open |
+| 🤖 | [@slawti](https://github.com/slawti) | Tests every Android release. The first build on a Pixel: the keyboard covering the message field, notifications that did not pop up, no microphone or camera, panels that would not open. Later: chats stacking up on quick taps, a slow start, cards that would not scroll, a delete that a double tap went through, screen transitions that ignored the animation speed |
 
 Want to join? Write to [hello@ostrich-messenger.com](mailto:hello@ostrich-messenger.com).
 
