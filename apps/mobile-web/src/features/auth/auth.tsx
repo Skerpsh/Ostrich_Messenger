@@ -157,25 +157,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // The saved session opens at once (the chats list from the device);
+      // the server is asked meanwhile, not waited for: offline that would
+      // keep the splash screen up until the request times out.
+      setState({ status: "signedIn", token, user: offlineUser, pendingOstrichId, privateKey });
+
       try {
         const user = await api.getMe(token);
-        await setItem(USER_KEY, JSON.stringify(user));
-        setState({ status: "signedIn", token, user, pendingOstrichId, privateKey });
+
+        // Not if the account was left or changed meanwhile.
+        if ((await getItem(TOKEN_KEY)) === token) {
+          await setItem(USER_KEY, JSON.stringify(user));
+          setState((current) =>
+            current.status === "signedIn" && current.token === token ? { ...current, user } : current,
+          );
+        }
       } catch (error) {
         if (error instanceof api.SessionExpiredError) {
           setNotice(error.message);
           await clearSession();
-          return;
         }
-
         // Offline: keep the saved session, requests will retry later.
-        setState({
-          status: "signedIn",
-          token,
-          user: offlineUser,
-          pendingOstrichId,
-          privateKey,
-        });
       }
     })().catch(() => setState({ status: "signedOut" }));
   }, [clearSession]);
