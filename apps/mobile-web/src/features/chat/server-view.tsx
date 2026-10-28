@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
-import AnimatedPressable from "@/ui/animated-pressable";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import Button from "@/ui/button";
 import { useAuth } from "@/features/auth/auth";
 import { formatSize, isVoice } from "@/features/chat/attachments";
@@ -214,16 +214,14 @@ export default function ServerView({
   const readable = rows.some((row) => row.readable);
 
   return (
-    <AnimatedPressable
+    <Animated.View
       style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
       pointerEvents={leaving ? "none" : "auto"}
-      onPress={close}
-      accessibilityLabel="Close"
     >
-      <AnimatedPressable
-        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
-        onPress={() => {}}
-      >
+      {/* Taps around the card close it. The card is no pressable, so on
+          Android its scroll keeps the touch. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+      <Animated.View style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}>
         <ScrollView contentContainerStyle={styles.body} persistentScrollbar>
           <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="server-outline" size={24} color={colors.accent} />
@@ -320,8 +318,8 @@ export default function ServerView({
             <Button title="Close" variant="secondary" style={styles.flex} onPress={close} />
           </View>
         </ScrollView>
-      </AnimatedPressable>
-    </AnimatedPressable>
+      </Animated.View>
+    </Animated.View>
   );
 }
 

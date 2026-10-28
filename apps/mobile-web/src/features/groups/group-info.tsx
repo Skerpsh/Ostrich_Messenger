@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import * as Clipboard from "expo-clipboard";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import AnimatedPressable from "@/ui/animated-pressable";
+import Animated from "react-native-reanimated";
 import Avatar from "@/ui/avatar";
 import Button from "@/ui/button";
 import ChatAvatar from "@/features/chats/chat-avatar";
@@ -195,16 +195,14 @@ export default function GroupInfo({
     (chat.role === "owner" || (chat.role === "admin" && member.role === "member"));
 
   return (
-    <AnimatedPressable
+    <Animated.View
       style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
       pointerEvents={leaving ? "none" : "auto"}
-      onPress={close}
-      accessibilityLabel="Close"
     >
-      <AnimatedPressable
-        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
-        onPress={() => {}}
-      >
+      {/* Taps around the card close it. The card is no pressable, so on
+          Android its scroll keeps the touch. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+      <Animated.View style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" persistentScrollbar>
           <View style={styles.head}>
             <ChatAvatar chat={chat} size={72} />
@@ -448,7 +446,7 @@ export default function GroupInfo({
 
           <Button title="Close" variant="secondary" onPress={close} />
         </ScrollView>
-      </AnimatedPressable>
+      </Animated.View>
 
       <Overlay>
         {codeFor && me && codeFor.member.public_key ? (
@@ -464,7 +462,7 @@ export default function GroupInfo({
         />
       ) : null}
       </Overlay>
-    </AnimatedPressable>
+    </Animated.View>
   );
 }
 

@@ -1,14 +1,7 @@
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from "react-native";
-import AnimatedPressable from "@/ui/animated-pressable";
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import Button from "@/ui/button";
 import TextField from "@/ui/text-field";
 import { getKeys, type Chat } from "@/api/api";
@@ -194,22 +187,22 @@ export default function DisappearEditor({
   };
 
   return (
-    <AnimatedPressable
+    <Animated.View
       style={[
         styles.backdrop,
         leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion),
       ]}
       pointerEvents={leaving ? "none" : "auto"}
-      onPress={close}
-      accessibilityLabel="Close"
     >
-      <AnimatedPressable
+      {/* Taps around the card close it. The card is no pressable, so on
+          Android its scroll keeps the touch. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+      <Animated.View
         style={[
           styles.card,
           { backgroundColor: colors.panel },
           leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion),
         ]}
-        onPress={() => {}}
       >
         <ScrollView
           contentContainerStyle={styles.body}
@@ -380,7 +373,7 @@ export default function DisappearEditor({
             />
           </View>
         </ScrollView>
-      </AnimatedPressable>
+      </Animated.View>
 
       <Overlay>
         {picking ? (
@@ -395,7 +388,7 @@ export default function DisappearEditor({
         />
       ) : null}
       </Overlay>
-    </AnimatedPressable>
+    </Animated.View>
   );
 }
 

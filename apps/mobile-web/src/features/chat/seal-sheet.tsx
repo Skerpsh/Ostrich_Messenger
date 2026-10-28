@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import AnimatedPressable from "@/ui/animated-pressable";
+import Animated from "react-native-reanimated";
 import Button from "@/ui/button";
 import TextField from "@/ui/text-field";
 import { Segmented } from "@/features/settings/ui";
@@ -109,15 +109,15 @@ export default function SealSheet({
           : null;
 
   return (
-    <AnimatedPressable
+    <Animated.View
       style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
       pointerEvents={leaving ? "none" : "auto"}
-      onPress={close}
-      accessibilityLabel="Close"
     >
-      <AnimatedPressable
+      {/* Taps around the card close it. The card is no pressable, so on
+          Android its scroll keeps the touch. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+      <Animated.View
         style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
-        onPress={() => {}}
       >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>
@@ -198,8 +198,8 @@ export default function SealSheet({
             />
           </View>
         </ScrollView>
-      </AnimatedPressable>
-    </AnimatedPressable>
+      </Animated.View>
+    </Animated.View>
   );
 }
 

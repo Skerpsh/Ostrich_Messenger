@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import AnimatedPressable from "@/ui/animated-pressable";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import Button from "@/ui/button";
 import { AccentPicker, ChatPreview, WallpaperPicker } from "@/features/settings/pickers";
 import { Segmented } from "@/features/settings/ui";
@@ -77,16 +77,14 @@ export default function ChatLookSheet({
   };
 
   return (
-    <AnimatedPressable
+    <Animated.View
       style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
       pointerEvents={leaving ? "none" : "auto"}
-      onPress={close}
-      accessibilityLabel="Close"
     >
-      <AnimatedPressable
-        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
-        onPress={() => {}}
-      >
+      {/* Taps around the card close it. The card is no pressable, so on
+          Android its scroll keeps the touch. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+      <Animated.View style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}>
         <ScrollView contentContainerStyle={styles.body} persistentScrollbar>
           <Text style={[styles.title, { color: colors.text }]}>Wallpaper & color</Text>
 
@@ -145,8 +143,8 @@ export default function ChatLookSheet({
             />
           </View>
         </ScrollView>
-      </AnimatedPressable>
-    </AnimatedPressable>
+      </Animated.View>
+    </Animated.View>
   );
 }
 

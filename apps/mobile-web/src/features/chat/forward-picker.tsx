@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import AnimatedPressable from "@/ui/animated-pressable";
+import Animated from "react-native-reanimated";
 import ChatAvatar from "@/features/chats/chat-avatar";
 import DevBadge from "@/ui/dev-badge";
 import { noWebOutline } from "@/ui/text-field";
@@ -50,15 +50,15 @@ export default function ForwardPicker({
   }, [chats, query, allow]);
 
   return (
-    <AnimatedPressable
+    <Animated.View
       style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
       pointerEvents={leaving ? "none" : "auto"}
-      onPress={close}
-      accessibilityLabel="Close"
     >
-      <AnimatedPressable
+      {/* Taps around the card close it. The card is no pressable, so on
+          Android its scroll keeps the touch. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+      <Animated.View
         style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
-        onPress={() => {}}
       >
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         <View style={[styles.search, { backgroundColor: colors.panelAlt }]}>
@@ -97,8 +97,8 @@ export default function ForwardPicker({
             </Pressable>
           )}
         />
-      </AnimatedPressable>
-    </AnimatedPressable>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
