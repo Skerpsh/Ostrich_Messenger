@@ -108,6 +108,18 @@ jobs:
           curl -fsSL "$url" -o "apk/Ostrich-Android-$version.apk"
           # The old name, for apps up to v1.5.3.
           cp "apk/Ostrich-Android-$version.apk" apk/Ostrich-Android.apk
+          # The smaller APKs for one processor each (plugins/abi-splits.js),
+          # which EAS hands out as an archive.
+          curl -fsSL "$(jq -r '.[0].artifacts.buildArtifactsUrl' build.json)" -o splits.archive
+          mkdir splits
+          case "$(file -b splits.archive)" in
+            Zip*) unzip -q splits.archive -d splits ;;
+            *) tar -xzf splits.archive -C splits ;;
+          esac
+          for abi in arm64-v8a armeabi-v7a; do
+            find splits -name "app-$abi-release.apk" -exec cp {} "apk/Ostrich-Android-$abi-$version.apk" \;
+            [ -f "apk/Ostrich-Android-$abi-$version.apk" ] || { echo "::error::no $abi APK"; exit 1; }
+          done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: steps.token.outputs.set == 'true'
         with:
@@ -220,6 +232,9 @@ jobs:
           file() { [ -f "release/$1" ] && printf '[%s](%s/%s)' "$2" "$base" "$1"; }
           soon() { [ -n "$1" ] && printf '%s' "$1" || printf 'coming soon'; }
           android=$(soon "$(file "Ostrich-Android-$v.apk" "Ostrich-Android-$v.apk")")
+          if [ -f "release/Ostrich-Android-arm64-v8a-$v.apk" ]; then
+            android="$android (any phone); smaller: $(file "Ostrich-Android-arm64-v8a-$v.apk" "arm64-v8a"), $(file "Ostrich-Android-armeabi-v7a-$v.apk" "armeabi-v7a")"
+          fi
           windows=$(soon "$(file "Ostrich-Windows-Setup-$v.exe" "Ostrich-Windows-Setup-$v.exe")")
           linux=$(soon "$(for f in AppImage deb rpm pacman flatpak; do file "Ostrich-Linux-$v.$f" ".$f"; printf ' '; done | sed 's/  */ /g; s/ $//; s/) \[/), [/g')")
           cat > notes.md <<EOF
@@ -234,7 +249,7 @@ jobs:
           | **iOS** | coming to the App Store | |
           | **Web** | [ostrich-messenger.online](https://ostrich-messenger.online), nothing to install | |
 
-          - **Android:** open the APK on the phone and allow installing from that app when asked.
+          - **Android:** open the APK on the phone and allow installing from that app when asked. Not sure which one? Take the first; arm64-v8a fits nearly every phone from the last years, armeabi-v7a older 32-bit ones.
           - **Windows:** run the installer; Windows may warn about an unknown publisher: More info → Run anyway.
           - **Linux:** the AppImage runs anywhere (\`chmod +x Ostrich-Linux-$v.AppImage\`, then open it); the \`.deb\` is for Ubuntu and Debian, the \`.rpm\` for Fedora and openSUSE, the \`.pacman\` for Arch (\`sudo pacman -U Ostrich-Linux-$v.pacman\`, or from the AUR: \`yay -S ostrich-desktop-bin\`, and \`ostrich-cli-bin\` for the CLI). They all update themselves (the packages ask for your password to install the new version); the Flatpak does not yet.
           - **Updates:** the Android app offers each new APK itself; the desktop apps install new versions themselves; the CLI replaces itself with the new version once its signature checks out.

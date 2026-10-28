@@ -165,11 +165,14 @@
         ]
       ],
       "expo-asset",
+      "./plugins/abi-splits",
       [
         "expo-build-properties",
         {
           "android": {
             "enableMinifyInReleaseBuilds": true,
+            "buildArchs": ["armeabi-v7a", "arm64-v8a"],
+            "useLegacyPackaging": true,
             "extraProguardRules": "# react-native-incall-manager ships no keep rules: keep its module, proximity and Bluetooth helpers whole\n-keep class com.zxcpoiu.incallmanager.** { *; }\n# react-native-webrtc keeps org.webrtc itself; its React Native module classes are called from native WebRTC callbacks\n-keep class com.oney.WebRTCModule.** { *; }\n"
           }
         }

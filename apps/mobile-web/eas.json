@@ -14,15 +14,20 @@
     "quest": {
       "extends": "preview",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "applicationArchivePath": "android/app/build/outputs/apk/release/app-universal-release.apk"
       }
     },
     "github": {
       "extends": "preview",
       "autoIncrement": true,
       "android": {
-        "buildType": "apk"
-      }
+        "buildType": "apk",
+        "applicationArchivePath": "android/app/build/outputs/apk/release/app-universal-release.apk"
+      },
+      "buildArtifactPaths": [
+        "android/app/build/outputs/apk/release/app-arm*-release.apk"
+      ]
     },
     "production": {
       "autoIncrement": true
