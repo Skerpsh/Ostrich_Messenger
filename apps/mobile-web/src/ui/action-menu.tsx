@@ -92,8 +92,8 @@ export default function ActionMenu({
                       }}
                     />
                     <Button
-                      title={item.label}
-                      icon={item.icon}
+                      // The verb (Delete, Leave, Clear, ...): the question says the rest.
+                      title={item.label.split(" ")[0]}
                       variant="danger"
                       style={styles.flex}
                       disabled={!armed}
