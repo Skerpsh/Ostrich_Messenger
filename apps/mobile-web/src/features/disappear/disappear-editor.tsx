@@ -26,10 +26,10 @@ import {
 } from "@/crypto/crypto";
 import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
-import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
+import { useLeave } from "@/ui/motion";
 import { radius } from "@/ui/colors";
 import { disappearApi, setDisappearStatus } from "./disappear";
-import Reveal, { Overlay } from "@/ui/reveal";
+import Reveal, { Overlay, useAppear } from "@/ui/reveal";
 import PressScale from "@/ui/press-scale";
 
 // Writing a message of "If I disappear" (or changing one): to a chat or a
@@ -69,7 +69,9 @@ export default function DisappearEditor({
   const { withToken } = useAuth();
   const user = useCurrentUser();
   const privateKey = usePrivateKey();
-  const { motion, leaving, leave } = useLeave();
+  const { leaving, leave } = useLeave();
+  const fadeStyle = useAppear("fade", leaving);
+  const popStyle = useAppear("pop", leaving);
   const close = () => leave(onClose);
   useEscape(true, close);
 
@@ -190,7 +192,7 @@ export default function DisappearEditor({
     <Animated.View
       style={[
         styles.backdrop,
-        leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion),
+        fadeStyle,
       ]}
       pointerEvents={leaving ? "none" : "auto"}
     >
@@ -201,7 +203,7 @@ export default function DisappearEditor({
         style={[
           styles.card,
           { backgroundColor: colors.panel },
-          leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion),
+          popStyle,
         ]}
       >
         <ScrollView

@@ -1,65 +1,56 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Platform, StyleSheet, type StyleProp, type ViewStyle, type ViewInstance } from "react-native";
-import Animated, { type CSSAnimationProperties, type CSSTransitionProperties } from "react-native-reanimated";
-import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, ms, scaled, SPRING, useMotion, type Motion } from "./motion";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { StyleSheet, type LayoutChangeEvent, type StyleProp, type ViewStyle } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import { away, LEAVE_MS, lookAt, settleMs, toward, useMotion, type Look } from "./motion";
+import { useLatest } from "./use-latest";
 
-// How a revealed thing looks while hidden.
-const HIDDEN = {
-  // Bars and panels: rising a little (from the composer, under the header).
-  rise: [{ translateY: 10 }],
-  // Things at the top: coming down a little.
-  drop: [{ translateY: -10 }],
-  // Buttons, cards: growing.
-  pop: [{ scale: 0.85 }],
-  fade: [],
-} satisfies Record<string, ViewStyle["transform"]>;
+// A view that comes in as it mounts, springing from the `kind`'s hidden
+// look, and goes back to it while `leaving` (useLeave's), turning back
+// smoothly if that changes halfway. leave: another look to go with (the
+// call folding into its bar).
+export function Appear({
+  kind,
+  leave,
+  leaving = false,
+  style,
+  ...props
+}: ComponentProps<typeof Animated.View> & { kind: Look; leave?: Look; leaving?: boolean }) {
+  const animated = useAppear(kind, leaving, leave);
 
-export type RevealKind = keyof typeof HIDDEN;
-
-// The same, shown (for keyframes, which need the same transforms).
-const SHOWN = {
-  rise: [{ translateY: 0 }],
-  drop: [{ translateY: 0 }],
-  pop: [{ scale: 1 }],
-  fade: [],
-} satisfies Record<RevealKind, ViewStyle["transform"]>;
-
-const ENTER_MS = scaled({ full: 300, reduced: 150, off: 0 });
-
-// Coming in from the hidden look, or going back to it (the phones).
-function keyframes(kind: RevealKind, motion: Motion, coming: boolean): CSSAnimationProperties<ViewStyle> | null {
-  if (motion === "off") {
-    return null;
-  }
-
-  const moving = motion === "full";
-  const hidden = { opacity: 0, transform: moving ? HIDDEN[kind] : [] };
-  const visible = { opacity: 1, transform: moving ? SHOWN[kind] : [] };
-
-  return {
-    animationName: coming ? { from: hidden, to: visible } : { from: visible, to: hidden },
-    animationDuration: coming ? ENTER_MS[motion] : LEAVE_MS[motion],
-    animationTimingFunction: coming ? EASE_OUT : EASE_IN,
-    animationFillMode: coming ? "none" : "forwards",
-  };
+  return <Animated.View {...props} pointerEvents={leaving ? "none" : props.pointerEvents} style={[style, animated]} />;
 }
 
-function transition(
-  motion: Motion,
-  open: boolean,
-  properties: (keyof ViewStyle)[],
-): CSSTransitionProperties<ViewStyle> {
-  if (motion === "off") {
-    return {};
-  }
+// The same as a style, for an animated component of another kind (a
+// pressable) that is there as long as the one calling this. again: comes
+// in anew each time this changes (another tooltip in the same place).
+export function useAppear(kind: Look, leaving = false, leave?: Look, again?: unknown) {
+  const motion = useMotion();
+  const progress = useSharedValue(motion === "off" ? 1 : 0);
+  const look = leaving ? (leave ?? kind) : kind;
+  const reduced = motion !== "full";
 
-  return {
-    // Reduced motion: no growing or moving, only the fade.
-    transitionProperty: motion === "reduced" ? "opacity" : properties,
-    transitionDuration: open ? ENTER_MS[motion] : LEAVE_MS[motion],
-    transitionTimingFunction: open ? EASE_OUT : EASE_IN,
-  };
+  useEffect(() => {
+    if (leaving) {
+      progress.set(away(0, motion));
+      return;
+    }
+
+    if (again !== undefined && motion !== "off") {
+      progress.set(0);
+    }
+
+    progress.set(toward(1, motion));
+  }, [leaving, motion, progress, again]);
+
+  return useAnimatedStyle(() => lookAt(look, progress.value, reduced));
 }
+
+// How a revealed thing looks while hidden: bars and panels rise a little
+// (from the composer, under the header), things at the top come down,
+// buttons and cards grow.
+const REVEAL_LOOKS = { rise: "lift", drop: "lower", pop: "pop", fade: "fade" } satisfies Record<string, Look>;
+
+export type RevealKind = keyof typeof REVEAL_LOOKS;
 
 // Shows its child as it appears and keeps it, animating out, for a moment
 // after it is gone: {error ? <Text>…</Text> : null} inside a Reveal comes
@@ -88,11 +79,16 @@ export default function Reveal({
   // What is drawn: the child, or the last one while it goes.
   const [kept, setKept] = useState(children);
   const [mounted, setMounted] = useState(shown);
-  const [open, setOpen] = useState(shown && (!appear || motion === "off"));
-  const [height, setHeight] = useState<number | null>(null);
-  const measured = height !== null;
-  // There from the start (and not to appear): no animation until it goes.
-  const [quiet, setQuiet] = useState(shown && !appear);
+  const [was, setWas] = useState(shown);
+  // 0 hidden, 1 shown (a little more as it overshoots).
+  const progress = useSharedValue(shown && (!appear || !enter || motion === "off") ? 1 : 0);
+  // The content's height, and whether the box follows it (while it grows
+  // or shrinks; otherwise it takes the content's height as laid out).
+  const height = useSharedValue(0);
+  const [measured, setMeasured] = useState(false);
+  const [moving, setMoving] = useState(collapse && shown && appear && enter && motion !== "off");
+  const reduced = motion !== "full";
+  const look = REVEAL_LOOKS[kind];
 
   // Following the child as it is rendered (React's way to adjust state to
   // new props; only this component renders again).
@@ -100,42 +96,47 @@ export default function Reveal({
     setKept(children);
   }
 
-  if (!shown && quiet) {
-    setQuiet(false);
-  }
-
   if (shown && !mounted) {
     setMounted(true);
   }
 
-  if (!shown && open) {
-    setOpen(false);
-  }
+  if (shown !== was) {
+    setWas(shown);
 
-  if ((motion === "off" || !enter) && shown && !open) {
-    setOpen(true);
-  }
-
-  if (motion === "off" && !shown && mounted) {
-    setMounted(false);
+    if (collapse && motion !== "off" && (enter || !shown)) {
+      setMoving(true);
+    }
   }
 
   useEffect(() => {
-    if (motion === "off") {
-      return;
-    }
-
     if (!shown) {
+      progress.set(away(0, motion));
       const timer = setTimeout(() => setMounted(false), LEAVE_MS[motion]);
       return () => clearTimeout(timer);
     }
 
-    // Opens after a frame, from the hidden look it was drawn with (a
-    // collapsing one once it knows its height, see onLayout).
-    if (!open && (!collapse || measured)) {
-      return afterFrame(() => setOpen(true));
+    if (!enter || motion === "off") {
+      progress.set(1);
+      return;
     }
-  }, [shown, open, measured, motion, collapse]);
+
+    // A growing one waits to know how high it will be.
+    if (collapse && !measured) {
+      return;
+    }
+
+    progress.set(toward(1, motion));
+
+    if (collapse) {
+      const timer = setTimeout(() => setMoving(false), settleMs("enter", motion));
+      return () => clearTimeout(timer);
+    }
+  }, [shown, motion, enter, collapse, measured, progress]);
+
+  const content = useAnimatedStyle(() => lookAt(look, progress.value, reduced));
+  const box = useAnimatedStyle(() => ({
+    height: height.value * Math.min(1, Math.max(0, progress.value)),
+  }));
 
   if (!mounted) {
     return null;
@@ -143,26 +144,6 @@ export default function Reveal({
 
   // On its way out it takes no presses.
   const pointerEvents = shown ? "box-none" : "none";
-
-  // The phones: animations of their own (keyframes), no growing height. A
-  // view hidden at no height is not measured reliably on Android, and the
-  // panels stayed shut there.
-  if (Platform.OS !== "web") {
-    return (
-      <Animated.View
-        pointerEvents={pointerEvents}
-        style={[style, shown ? (quiet || !enter ? null : keyframes(kind, motion, true)) : keyframes(kind, motion, false)]}
-      >
-        {shown ? children : kept}
-      </Animated.View>
-    );
-  }
-
-  const content = {
-    opacity: open ? 1 : 0,
-    transform: open ? [] : HIDDEN[kind],
-    ...transition(motion, open, ["opacity", "transform"]),
-  };
 
   if (!collapse) {
     return (
@@ -175,17 +156,14 @@ export default function Reveal({
   return (
     <Animated.View
       pointerEvents={pointerEvents}
-      style={[
-        style,
-        { overflow: "hidden", justifyContent: "flex-end" },
-        // Not known yet: its own height (it is open, there from the start).
-        height === null ? (open ? null : { height: 0 }) : { height: open ? height : 0 },
-        transition(motion, open, ["height"]),
-      ]}
+      style={[style, moving && [styles.clip, styles.end, box]]}
     >
       <Animated.View
-        onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
-        style={[{ flexShrink: 0 }, content]}
+        onLayout={(event: LayoutChangeEvent) => {
+          height.set(event.nativeEvent.layout.height);
+          setMeasured(true);
+        }}
+        style={[styles.content, content]}
       >
         {shown ? children : kept}
       </Animated.View>
@@ -217,71 +195,34 @@ export function Collapse({
   children: ReactNode;
 }) {
   const motion = useMotion();
-  const ref = useRef<ViewInstance>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  const [shut, setShut] = useState(false);
-
-  const closed = useRef(onClosed);
-
-  useEffect(() => {
-    closed.current = onClosed;
-  });
+  const progress = useSharedValue(1);
+  const height = useSharedValue(0);
+  const closed = useLatest(onClosed);
+  const reduced = motion !== "full";
 
   useEffect(() => {
     if (!closing) {
       return;
     }
 
-    if (motion === "off") {
-      closed.current();
-      return;
-    }
+    progress.set(away(0, motion));
+    const timer = setTimeout(() => closed.current(), LEAVE_MS[motion]);
+    return () => clearTimeout(timer);
+  }, [closing, motion, progress, closed]);
 
-    // The phones: it fades and shrinks (keyframes, below), the list then
-    // closes up at once.
-    if (Platform.OS !== "web") {
-      const timer = setTimeout(() => closed.current(), LEAVE_MS[motion]);
-      return () => clearTimeout(timer);
-    }
-
-    let cancel = () => {};
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    // Measuring takes a moment on the web: the time counts from the start
-    // of the animation.
-    ref.current?.measure((_x, _y, _width, measured) => {
-      setHeight(measured);
-      cancel = afterFrame(() => {
-        setShut(true);
-        timer = setTimeout(() => closed.current(), LEAVE_MS[motion]);
-      });
-    });
-
-    return () => {
-      cancel();
-      clearTimeout(timer);
-    };
-  }, [closing, motion]);
+  const content = useAnimatedStyle(() => lookAt("pop", progress.value, reduced));
+  const box = useAnimatedStyle(() => ({ height: height.value * progress.value }));
 
   return (
-    <Animated.View
-      ref={ref}
-      pointerEvents={closing ? "none" : "auto"}
-      style={
-        closing && Platform.OS !== "web"
-          ? keyframes("pop", motion, false)
-          : closing && height !== null
-          ? {
-              overflow: "hidden",
-              height: shut ? 0 : height,
-              opacity: shut ? 0 : 1,
-              transform: [{ scale: shut && motion === "full" ? 0.9 : 1 }],
-              ...transition(motion, false, ["height", "opacity", "transform"]),
-            }
-          : null
-      }
-    >
-      {children}
+    <Animated.View pointerEvents={closing ? "none" : "auto"} style={closing && [styles.clip, styles.end, box]}>
+      <Animated.View
+        onLayout={(event: LayoutChangeEvent) => {
+          height.set(event.nativeEvent.layout.height);
+        }}
+        style={[styles.content, closing && content]}
+      >
+        {children}
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -293,40 +234,84 @@ export function useSlider(selected: number) {
   const motion = useMotion();
   const [places, setPlaces] = useState<Record<number, { x: number; y: number; width: number; height: number }>>({});
   const place = places[selected];
-  // Moved with a transform (what animates on the phones too), sized at once.
-  const style:
-    | (CSSTransitionProperties<ViewStyle> &
-        Pick<ViewStyle, "position" | "left" | "top" | "width" | "height" | "transform">)
-    | null = place
-    ? {
-        position: "absolute",
-        left: 0,
-        top: 0,
-        width: place.width,
-        height: place.height,
-        transform: [{ translateX: place.x }, { translateY: place.y }],
-        ...(motion === "full"
-          ? {
-              transitionProperty: "transform",
-              transitionDuration: ms(380),
-              transitionTimingFunction: SPRING,
-            }
-          : {}),
-      }
-    : null;
+  const x = useSharedValue<number | null>(null);
+  const y = useSharedValue(0);
+  const width = useSharedValue(0);
+  const height = useSharedValue(0);
+  const animated = useAnimatedStyle(() => ({
+    width: width.value,
+    height: height.value,
+    transform: [{ translateX: x.value ?? 0 }, { translateY: y.value }],
+  }));
+
+  useEffect(() => {
+    if (!place) {
+      return;
+    }
+
+    // The first place it is put at once, the next ones it slides to.
+    const first = x.get() === null;
+    x.set(first ? place.x : toward(place.x, motion, "move"));
+    y.set(first ? place.y : toward(place.y, motion, "move"));
+    width.set(first ? place.width : toward(place.width, motion, "move"));
+    height.set(first ? place.height : toward(place.height, motion, "move"));
+  }, [place, motion, x, y, width, height]);
 
   return {
     onLayout: (index: number) => (event: { nativeEvent: { layout: { x: number; y: number; width: number; height: number } } }) => {
       const { x, y, width, height } = event.nativeEvent.layout;
-      setPlaces((current) => ({ ...current, [index]: { x, y, width, height } }));
+      setPlaces((current) => {
+        const known = current[index];
+        return known && known.x === x && known.y === y && known.width === width && known.height === height
+          ? current
+          : { ...current, [index]: { x, y, width, height } };
+      });
     },
     // The highlight's style (an Animated.View, position absolute), or none
     // while the place is not known yet.
-    style,
+    style: place ? [styles.slider, animated] : null,
   };
 }
 
-const SWAP_MS = scaled({ full: 280, reduced: 150, off: 0 });
+// One of a Swap's things: it comes in from its side as it mounts (when it
+// replaces another), and goes out to the other while going.
+function SwapPane({
+  going,
+  shift,
+  appear,
+  fill,
+  onLayout,
+  children,
+}: {
+  going: boolean;
+  shift: number;
+  appear: boolean;
+  fill: boolean;
+  onLayout?: (event: LayoutChangeEvent) => void;
+  children: ReactNode;
+}) {
+  const motion = useMotion();
+  const progress = useSharedValue(appear && motion !== "off" ? 0 : 1);
+  const reduced = motion !== "full";
+  const animated = useAnimatedStyle(() => ({
+    opacity: Math.min(1, Math.max(0, progress.value)),
+    transform: reduced ? [] : [{ translateX: (going ? -shift : shift) * (1 - progress.value) }],
+  }));
+
+  useEffect(() => {
+    progress.set(going ? away(0, motion) : toward(1, motion, "move"));
+  }, [going, motion, progress]);
+
+  return (
+    <Animated.View
+      pointerEvents={going ? "none" : "auto"}
+      onLayout={onLayout}
+      style={[fill && styles.fill, going && [styles.going, fill && styles.bottom], animated]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
 
 // Another thing in the same place (a tab, what loaded in place of the
 // spinner): the one before goes as the new one comes, and the height
@@ -350,79 +335,77 @@ export function Swap({
   children: ReactNode;
 }) {
   const motion = useMotion();
-  const [current, setCurrent] = useState({ id, children });
-  const [previous, setPrevious] = useState<{ id: string | number; children: ReactNode; step: number } | null>(null);
-  const [height, setHeight] = useState<number | null>(null);
+  const [current, setCurrent] = useState({ id, children, step: 0 });
+  const [previous, setPrevious] = useState<{
+    id: string | number;
+    children: ReactNode;
+    height: number | null;
+  } | null>(null);
+  // The shown one's height as laid out.
+  const [last, setLast] = useState<number | null>(null);
+  const height = useSharedValue<number | null>(null);
+  const sizing = resize && !fill && previous !== null && previous.height !== null && last !== null;
+  const box = useAnimatedStyle(() => (height.value === null ? {} : { height: height.value }));
 
   // Following what it is given, as it renders (only this component renders
   // again).
   if (id !== current.id) {
     if (motion !== "off") {
-      setPrevious({ ...current, step });
+      setPrevious({ id: current.id, children: current.children, height: last });
     }
 
-    setCurrent({ id, children });
+    setCurrent({ id, children, step });
   } else if (children !== current.children) {
-    setCurrent({ id, children });
+    setCurrent({ ...current, children });
   }
 
+  // While swapping, the box springs from the old one's height to the new.
+  useEffect(() => {
+    if (!sizing || !previous || last === null) {
+      height.set(null);
+      return;
+    }
+
+    if (height.get() === null) {
+      height.set(previous.height);
+    }
+
+    height.set(toward(last, motion, "move"));
+  }, [sizing, previous, last, motion, height]);
+
+  // The one going is kept until the height has settled too.
   useEffect(() => {
     if (!previous) {
       return;
     }
 
-    const timer = setTimeout(() => setPrevious(null), SWAP_MS[motion]);
+    const timer = setTimeout(
+      () => setPrevious(null),
+      Math.max(LEAVE_MS[motion], resize && !fill ? settleMs("move", motion) : 0),
+    );
     return () => clearTimeout(timer);
-  }, [previous, motion]);
+  }, [previous, motion, resize, fill]);
 
-  const shift = motion === "full" ? 40 * (previous?.step ?? 0) : 0;
-  const going: CSSAnimationProperties<ViewStyle> = {
-    animationName: {
-      from: { opacity: 1, transform: [{ translateX: 0 }] },
-      to: { opacity: 0, transform: [{ translateX: -shift }] },
-    },
-    animationDuration: LEAVE_MS[motion],
-    animationTimingFunction: EASE_IN,
-    animationFillMode: "forwards",
-  };
-  const coming: CSSAnimationProperties<ViewStyle> = {
-    animationName: {
-      from: { opacity: 0, transform: [{ translateX: shift }] },
-      to: { opacity: 1, transform: [{ translateX: 0 }] },
-    },
-    animationDuration: SWAP_MS[motion],
-    animationTimingFunction: EASE_OUT,
-  };
+  const shift = motion === "full" ? 40 * current.step : 0;
 
   return (
-    <Animated.View
-      style={[
-        fill && styles.fill,
-        style,
-        previous && resize && !fill && Platform.OS === "web" && height !== null
-          ? {
-              height,
-              overflow: "hidden",
-              ...(motion === "full"
-                ? { transitionProperty: "height", transitionDuration: SWAP_MS.full, transitionTimingFunction: EASE_OUT }
-                : {}),
-            }
-          : null,
-      ]}
-    >
+    <Animated.View style={[fill && styles.fill, style, sizing && [styles.clip, box]]}>
       {/* Same keys as before: the one going is the very view it was. */}
       {previous ? (
-        <Animated.View key={previous.id} pointerEvents="none" style={[styles.going, fill && styles.bottom, going]}>
+        <SwapPane key={previous.id} going shift={shift} appear={false} fill={fill}>
           {previous.children}
-        </Animated.View>
+        </SwapPane>
       ) : null}
-      <Animated.View
+      <SwapPane
         key={current.id}
-        onLayout={resize && !fill ? (event) => setHeight(event.nativeEvent.layout.height) : undefined}
-        style={[fill && styles.fill, previous && coming]}
+        going={false}
+        shift={shift}
+        appear={previous !== null}
+        fill={fill}
+        onLayout={resize && !fill ? (event) => setLast(event.nativeEvent.layout.height) : undefined}
       >
         {current.children}
-      </Animated.View>
+      </SwapPane>
     </Animated.View>
   );
 }
@@ -435,6 +418,24 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     zIndex: 10,
+  },
+
+  clip: {
+    overflow: "hidden",
+  },
+
+  end: {
+    justifyContent: "flex-end",
+  },
+
+  content: {
+    flexShrink: 0,
+  },
+
+  slider: {
+    position: "absolute",
+    left: 0,
+    top: 0,
   },
 
   fill: {

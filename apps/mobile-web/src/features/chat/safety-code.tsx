@@ -5,11 +5,11 @@ import AnimatedPressable from "@/ui/animated-pressable";
 import Button from "@/ui/button";
 import QrCode from "@/ui/qr-code";
 import QrScanner from "@/features/devices/qr-scanner";
-import { Overlay, Swap } from "@/ui/reveal";
+import { Overlay, Swap, useAppear } from "@/ui/reveal";
 import { parseLink, safetyQr } from "@/api/links";
 import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
-import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
+import { useLeave } from "@/ui/motion";
 import { radius } from "@/ui/colors";
 
 // The chat's safety code over a dimmed background (placed like
@@ -30,7 +30,9 @@ export default function SafetyCode({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
-  const { motion, leaving, leave } = useLeave();
+  const { leaving, leave } = useLeave();
+  const fadeStyle = useAppear("fade", leaving);
+  const popStyle = useAppear("pop", leaving);
   // Leaves with an animation (also on Esc, on the web).
   const close = () => leave(onClose);
   useEscape(true, close);
@@ -54,13 +56,13 @@ export default function SafetyCode({
 
   return (
     <AnimatedPressable
-      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      style={[styles.backdrop, fadeStyle]}
       pointerEvents={leaving ? "none" : "auto"}
       onPress={close}
       accessibilityLabel="Close"
     >
       <AnimatedPressable
-        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
+        style={[styles.card, { backgroundColor: colors.panel }, popStyle]}
         onPress={() => {}}
       >
         <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>

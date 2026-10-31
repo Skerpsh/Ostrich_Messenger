@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { Image } from "expo-image";
 import { StyleSheet, Text, View } from "react-native";
-import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "./theme";
-import { enterStyle, useMotion } from "./motion";
+
 import IconButton from "./icon-button";
 import ThemeToggle from "./theme-toggle";
+import { Appear } from "./reveal";
 
 type AppHeaderProps = {
   // Shows a back arrow on the left.
@@ -45,7 +45,6 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const motion = useMotion();
 
   return (
     <View
@@ -79,7 +78,7 @@ export default function AppHeader({
       <View style={styles.titles}>
         {title ? (
           // Another title (New chat → New group) fades in.
-          <Animated.View key={title} style={[styles.titleRow, enterStyle("fade", motion)]}>
+          <Appear kind="fade" key={title} style={styles.titleRow}>
             <Text
               numberOfLines={1}
               style={[styles.title, { color: colors.text }]}
@@ -87,12 +86,12 @@ export default function AppHeader({
               {title}
             </Text>
             {titleBadge}
-          </Animated.View>
+          </Appear>
         ) : null}
         {subtitle ? (
-          <Animated.View
+          <Appear kind="fade"
             key={typeof subtitle === "string" ? subtitle : subtitleKey}
-            style={[styles.subtitleRow, enterStyle("fade", motion)]}
+            style={styles.subtitleRow}
           >
             <Text
               numberOfLines={1}
@@ -101,7 +100,7 @@ export default function AppHeader({
               {subtitle}
             </Text>
             {subtitleAccessory}
-          </Animated.View>
+          </Appear>
         ) : null}
       </View>
 

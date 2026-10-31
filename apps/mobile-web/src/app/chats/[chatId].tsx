@@ -17,7 +17,6 @@ import {
   type TextInputInstance,
   type ViewInstance,
 } from "react-native";
-import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ActionMenu, { type ActionMenuItem } from "@/ui/action-menu";
 import AppHeader, { HEADER_HEIGHT } from "@/ui/app-header";
@@ -33,7 +32,7 @@ import GroupInfo from "@/features/groups/group-info";
 import IconButton from "@/ui/icon-button";
 import MessageBubble from "@/features/chat/message-bubble";
 import PhotoViewer from "@/features/chat/photo-viewer";
-import Reveal, { Collapse, Overlay, Swap } from "@/ui/reveal";
+import Reveal, { Appear, Collapse, Overlay, Swap } from "@/ui/reveal";
 import SafetyCode from "@/features/chat/safety-code";
 import ServerView, { type ServerViewTarget } from "@/features/chat/server-view";
 import SealSheet, { type Sealing } from "@/features/chat/seal-sheet";
@@ -93,7 +92,7 @@ import { loadCachedMessages, saveCachedMessages } from "@/api/local-cache";
 import { mentionedUsernames, plainText } from "@/features/chat/markup";
 import { useInvertedWheel } from "@/features/chat/inverted-wheel";
 import { useEscape } from "@/ui/keys";
-import { enterStyle, LEAVE_MS, useMotion } from "@/ui/motion";
+import { LEAVE_MS, useMotion } from "@/ui/motion";
 import { linkImage } from "@/features/chat/link-preview";
 import { encodePayload, type Attachment, type LinkPreview, type LookEntry } from "@/features/chat/payload";
 import type { ChatLook } from "@/features/settings/personalization";
@@ -1848,7 +1847,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
           <ActivityIndicator color={colors.muted} style={styles.screen} />
         ) : (
           // The messages fade in as they load.
-          <Reanimated.View ref={listWrapRef} style={[styles.screen, enterStyle("fade", motion)]}>
+          <Appear kind="fade" ref={listWrapRef} style={styles.screen}>
             <FlatList
               ref={listRef}
               inverted
@@ -2028,7 +2027,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                 />
               ) : null}
             </Reveal>
-          </Reanimated.View>
+          </Appear>
         )}
 
         <Reveal>
@@ -2302,7 +2301,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                     )}
                     </Reveal>
                     {/* Back after a recording: it fades in. */}
-                    <Reanimated.View style={[styles.inputBox, { backgroundColor: colors.panelAlt }, enterStyle("fade", motion)]}>
+                    <Appear kind="fade" style={[styles.inputBox, { backgroundColor: colors.panelAlt }]}>
                       <TextInput
                         ref={inputRef}
                         value={draft}
@@ -2333,12 +2332,12 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                           noWebOutline,
                         ]}
                       />
-                    </Reanimated.View>
+                    </Appear>
                   </>
                 )}
 
                 {/* The button turns into another as the draft changes. */}
-                <Reanimated.View key={composerAction} style={enterStyle("grow", motion)}>
+                <Appear kind="grow" key={composerAction}>
                   {voice.active ? (
                     <IconButton
                       icon="arrow-up"
@@ -2360,7 +2359,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
                       disabled={!canSend}
                     />
                   )}
-                </Reanimated.View>
+                </Appear>
               </View>
             </View>
           )}

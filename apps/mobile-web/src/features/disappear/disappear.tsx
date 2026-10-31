@@ -8,7 +8,6 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { AppState, Platform, StyleSheet, Text } from "react-native";
-import Animated from "react-native-reanimated";
 import {
   deleteDisappearMessage,
   disappearAlive,
@@ -24,8 +23,9 @@ import { useRealtime } from "@/api/realtime-context";
 import { useAuth } from "@/features/auth/auth";
 import { formatDate } from "@/ui/format";
 import { useAppTheme } from "@/ui/theme";
-import { enterStyle, useMotion } from "@/ui/motion";
+
 import PressScale from "@/ui/press-scale";
+import { Appear } from "@/ui/reveal";
 
 // "If I disappear": messages written ahead, sent for the user by the
 // server when they have not opened Ostrich for the days they chose
@@ -198,7 +198,6 @@ const WARNED = ["", "a week", "a day", "an hour"];
 // went off while they were away.
 export function DisappearBanner() {
   const { colors } = useAppTheme();
-  const motion = useMotion();
   const router = useRouter();
   const current = useDisappearStatus();
   const back = useCameBack();
@@ -224,11 +223,10 @@ export function DisappearBanner() {
   };
 
   return (
-    <Animated.View
+    <Appear kind="pop"
       style={[
         styles.banner,
         { backgroundColor: colors.accentSoft },
-        enterStyle("pop", motion),
       ]}
     >
       <Ionicons
@@ -251,7 +249,7 @@ export function DisappearBanner() {
       >
         <Ionicons name="close" size={18} color={colors.muted} />
       </PressScale>
-    </Animated.View>
+    </Appear>
   );
 }
 

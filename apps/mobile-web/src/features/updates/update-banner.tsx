@@ -1,17 +1,16 @@
 import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text } from "react-native";
-import Animated from "react-native-reanimated";
 import { useAppUpdate } from "@/platform/app-update";
 import { useAppTheme } from "@/ui/theme";
-import { enterStyle, useMotion } from "@/ui/motion";
+
 import PressScale from "@/ui/press-scale";
+import { Appear } from "@/ui/reveal";
 
 // Over the chats list: a new version is ready (restart), or a new app to
 // download (platform/app-update.ts).
 export function UpdateBanner() {
   const { colors } = useAppTheme();
-  const motion = useMotion();
   const update = useAppUpdate();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
@@ -22,7 +21,7 @@ export function UpdateBanner() {
   }
 
   return (
-    <Animated.View style={[styles.banner, { backgroundColor: colors.accentSoft }, enterStyle("pop", motion)]}>
+    <Appear kind="pop" style={[styles.banner, { backgroundColor: colors.accentSoft }]}>
       <Ionicons
         name={update.kind === "restart" ? "refresh-outline" : "download-outline"}
         size={18}
@@ -38,7 +37,7 @@ export function UpdateBanner() {
       <PressScale scale={0.85} onPress={() => setDismissed(key)} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
         <Ionicons name="close" size={18} color={colors.muted} />
       </PressScale>
-    </Animated.View>
+    </Appear>
   );
 }
 

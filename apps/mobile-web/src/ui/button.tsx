@@ -12,7 +12,7 @@ import {
 import AnimatedPressable from "./animated-pressable";
 import { Swap } from "./reveal";
 import { useAppTheme } from "./theme";
-import { pressStyle, useMotion, usePressed } from "./motion";
+import { usePressed } from "./motion";
 import { radius } from "./colors";
 import type { IconName } from "./icon-button";
 
@@ -35,11 +35,10 @@ export default function Button({
   ...props
 }: ButtonProps) {
   const { colors } = useAppTheme();
-  const motion = useMotion();
-  const { pressed, handlers } = usePressed();
+  const inactive = disabled || loading;
+  const { pressed, handlers, style: pressStyle } = usePressed(0.96, !inactive);
   const [hovered, setHovered] = useState(false);
 
-  const inactive = disabled || loading;
   const textColor =
     variant === "primary"
       ? colors.onAccent
@@ -66,7 +65,7 @@ export default function Button({
             },
         variant === "primary" && (pressed || hovered) && !inactive && styles.primaryActive,
         inactive && styles.inactive,
-        pressStyle(pressed && !inactive, motion, 0.96),
+        pressStyle,
         style,
       ]}
       {...props}

@@ -5,11 +5,10 @@ import { getDrandSignature } from "@/api/api";
 import { serverNow } from "@/api/server-clock";
 import { useAuth } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
-import { enterStyle, useMotion } from "@/ui/motion";
-import Animated from "react-native-reanimated";
+
 import { decodePayload, type Payload } from "./payload";
 import { openingTime, openLetter, type SealedLetter } from "./sealed";
-import { Swap } from "@/ui/reveal";
+import { Appear, Swap } from "@/ui/reveal";
 import PressScale from "@/ui/press-scale";
 
 // Sealed letters in a chat: they open by themselves when their round
@@ -219,18 +218,17 @@ export function SealedEnvelope({
 // Over an opened letter's contents.
 export function OpenedNote({ letter, own, onPress }: { letter: SealedLetter; own: boolean; onPress?: () => void }) {
   const { colors } = useAppTheme();
-  const motion = useMotion();
   const color = own ? colors.onAccent : colors.accent;
 
   return (
-    <Animated.View style={enterStyle("pop", motion)}>
+    <Appear kind="pop">
       <PressScale scale={0.97} onPress={onPress} disabled={!onPress} style={styles.opened}>
         <Ionicons name="lock-open" size={12} color={color} />
         <Text style={[styles.openedText, { color }]}>
           {letter.surprise ? "Surprise letter" : "Sealed letter"}, opened {formatOpening(openingTime(letter.round))}
         </Text>
       </PressScale>
-    </Animated.View>
+    </Appear>
   );
 }
 

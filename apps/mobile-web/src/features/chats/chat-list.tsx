@@ -27,7 +27,7 @@ import Avatar from "@/ui/avatar";
 import ChatAvatar from "./chat-avatar";
 import DevBadge from "@/ui/dev-badge";
 import IconButton from "@/ui/icon-button";
-import Reveal, { Swap } from "@/ui/reveal";
+import Reveal, { Appear, Swap } from "@/ui/reveal";
 import TypingDots from "@/ui/typing-dots";
 import Welcome from "./welcome";
 import { noWebOutline } from "@/ui/text-field";
@@ -43,7 +43,7 @@ import { chatTitle } from "@/features/groups/groups";
 import { messagePreview } from "./preview";
 import { hasMod, useEscape, useKeydown } from "@/ui/keys";
 import { useIsWide } from "@/ui/layout";
-import { enterStyle, LIST_LAYOUT, useMotion } from "@/ui/motion";
+import { LIST_LAYOUT, useMotion } from "@/ui/motion";
 import { useChatCrypto } from "@/features/chat/use-chat-crypto";
 import { useMinuteTick } from "@/ui/use-minute-tick";
 import { useStartChat } from "./use-start-chat";
@@ -687,7 +687,6 @@ function ChatRow({
   onMenu: () => void;
 }) {
   const { colors, density, textScale } = useAppTheme();
-  const motion = useMotion();
   const { decrypt } = useChatCrypto(chat);
   const last = chat.last_message;
   // Settings → Personalization → Chats list.
@@ -732,11 +731,10 @@ function ChatRow({
       </Reveal>
       <Reveal kind="pop" collapse={false}>
         {chat.unread_count > 0 ? (
-        <Reanimated.View
+        <Appear kind="badge"
           // A new count pops in.
           key={chat.unread_count}
           style={[
-            enterStyle("badge", motion),
             styles.badge,
             // Muted chats count quietly.
             { backgroundColor: chat.muted ? colors.muted : colors.accent },
@@ -750,7 +748,7 @@ function ChatRow({
           >
             {chat.unread_count > 99 ? "99+" : chat.unread_count}
           </Text>
-        </Reanimated.View>
+        </Appear>
       ) : null}
       </Reveal>
     </>

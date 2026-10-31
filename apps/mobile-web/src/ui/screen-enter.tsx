@@ -1,7 +1,8 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { Platform, StyleSheet } from "react-native";
 import Animated from "react-native-reanimated";
-import { enterStyle, leaveStyle, useLeave } from "./motion";
+import { useLeave } from "./motion";
+import { useAppear } from "./reveal";
 
 type Leave = (then: () => void) => void;
 
@@ -10,7 +11,8 @@ const LeaveContext = createContext<Leave | null>(null);
 // A screen sliding in as it opens and out as it closes, on the web (the
 // phones' navigation animates its screens itself, see useScreenAnimation).
 export default function ScreenEnter({ children }: { children: ReactNode }) {
-  const { motion, leaving, leave } = useLeave();
+  const { leaving, leave } = useLeave();
+  const pushStyle = useAppear("push", leaving);
 
   if (Platform.OS !== "web") {
     return children;
@@ -20,7 +22,7 @@ export default function ScreenEnter({ children }: { children: ReactNode }) {
     <LeaveContext value={leave}>
       <Animated.View
         pointerEvents={leaving ? "none" : "auto"}
-        style={[styles.screen, leaving ? leaveStyle("push", motion) : enterStyle("push", motion)]}
+        style={[styles.screen, pushStyle]}
       >
         {children}
       </Animated.View>

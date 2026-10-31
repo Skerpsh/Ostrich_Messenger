@@ -4,11 +4,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import AnimatedPressable from "./animated-pressable";
 import { useAppTheme } from "./theme";
 import { useEscape } from "./keys";
-import { enterStyle, leaveStyle, useLeave } from "./motion";
+import { useLeave } from "./motion";
 import { radius } from "./colors";
 import type { IconName } from "./icon-button";
 import Button from "./button";
-import Reveal from "./reveal";
+import Reveal, { useAppear } from "./reveal";
 
 export type ActionMenuItem = {
   icon: IconName;
@@ -35,7 +35,9 @@ export default function ActionMenu({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
-  const { motion, leaving, leave } = useLeave();
+  const { leaving, leave } = useLeave();
+  const fadeStyle = useAppear("fade", leaving);
+  const popStyle = useAppear("pop", leaving);
   // Leaves with an animation (also on Esc, on the web).
   const close = () => leave(onClose);
   useEscape(true, close);
@@ -52,14 +54,14 @@ export default function ActionMenu({
 
   return (
     <AnimatedPressable
-      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      style={[styles.backdrop, fadeStyle]}
       pointerEvents={leaving ? "none" : "auto"}
       onPress={close}
       accessibilityLabel="Close menu"
     >
       {/* Taps inside the card do not close the menu. */}
       <AnimatedPressable
-        style={[styles.menu, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
+        style={[styles.menu, { backgroundColor: colors.panel }, popStyle]}
         onPress={() => {}}
       >
         {title ? (

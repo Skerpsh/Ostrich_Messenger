@@ -7,10 +7,10 @@ import { Segmented } from "@/features/settings/ui";
 import { useChatLooks } from "./chat-looks";
 import { ChatAccentProvider, useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
-import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
+import { useLeave } from "@/ui/motion";
 import type { ChatLook, Wallpaper } from "@/features/settings/personalization";
 import { radius, type AccentChoice } from "@/ui/colors";
-import Reveal from "@/ui/reveal";
+import Reveal, { useAppear } from "@/ui/reveal";
 
 type Audience = "me" | "everyone";
 
@@ -30,7 +30,9 @@ export default function ChatLookSheet({
   onClose: () => void;
 }) {
   const { colors, wallpaper: deviceWallpaper, wallpaperPhoto } = useAppTheme();
-  const { motion, leaving, leave } = useLeave();
+  const { leaving, leave } = useLeave();
+  const fadeStyle = useAppear("fade", leaving);
+  const popStyle = useAppear("pop", leaving);
   // Leaves with an animation (also on Esc, on the web).
   const close = () => leave(onClose);
   useEscape(true, close);
@@ -78,13 +80,13 @@ export default function ChatLookSheet({
 
   return (
     <Animated.View
-      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      style={[styles.backdrop, fadeStyle]}
       pointerEvents={leaving ? "none" : "auto"}
     >
       {/* Taps around the card close it. The card is no pressable, so on
           Android its scroll keeps the touch. */}
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
-      <Animated.View style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}>
+      <Animated.View style={[styles.card, { backgroundColor: colors.panel }, popStyle]}>
         <ScrollView contentContainerStyle={styles.body} persistentScrollbar>
           <Text style={[styles.title, { color: colors.text }]}>Wallpaper & color</Text>
 

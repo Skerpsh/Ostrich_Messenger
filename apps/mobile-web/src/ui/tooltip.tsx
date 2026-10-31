@@ -4,8 +4,9 @@ import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "./theme";
 import { useEscape } from "./keys";
-import { enterStyle, leaveStyle, useLeave } from "./motion";
+import { useLeave } from "./motion";
 import { radius } from "./colors";
+import { useAppear } from "./reveal";
 
 // Short explanations in a bubble next to what they explain (the DEV
 // badge): shown while the mouse is over it, or on a tap until the next
@@ -31,7 +32,7 @@ const GAP = 8;
 export function TooltipProvider({ children }: { children: ReactNode }) {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { motion, leaving, leave, stay } = useLeave();
+  const { leaving, leave, stay } = useLeave();
   const [shown, setShown] = useState<Shown | null>(null);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [screen, setScreen] = useState<{ width: number; height: number } | null>(null);
@@ -105,6 +106,9 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
     };
   }
 
+  // Each one grows out of its badge once it is placed.
+  const popStyle = useAppear("pop", leaving, undefined, place ? shown?.key : null);
+
   return (
     <TooltipContext value={value}>
       <View style={styles.fill} onLayout={(event) => setScreen(event.nativeEvent.layout)}>
@@ -135,7 +139,7 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
                     transformOrigin: `${place.arrow}px ${place.below ? "0%" : "100%"}`,
                   }
                 : styles.measuring,
-              place && (leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)),
+              place && popStyle,
             ]}
             accessibilityRole="text"
             accessibilityLiveRegion="polite"

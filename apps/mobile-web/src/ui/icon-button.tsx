@@ -3,7 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import AnimatedPressable from "./animated-pressable";
 import { useAppTheme } from "./theme";
-import { pressStyle, useMotion, usePressed } from "./motion";
+import { usePressed } from "./motion";
 
 export type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -32,8 +32,7 @@ export default function IconButton({
   style,
 }: IconButtonProps) {
   const { colors } = useAppTheme();
-  const motion = useMotion();
-  const { pressed, handlers } = usePressed();
+  const { pressed, handlers, style: pressStyle } = usePressed(0.88, !disabled);
   const [hovered, setHovered] = useState(false);
   const box = Math.round(size * 1.85);
 
@@ -59,7 +58,7 @@ export default function IconButton({
             : null,
         pressed && filled && styles.pressed,
         disabled && !filled && styles.disabled,
-        pressStyle(pressed && !disabled, motion, 0.88),
+        pressStyle,
         style,
       ]}
     >

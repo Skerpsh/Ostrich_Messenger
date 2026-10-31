@@ -5,7 +5,7 @@ import Animated from "react-native-reanimated";
 import AnimatedPressable from "@/ui/animated-pressable";
 import Reveal, { Swap } from "@/ui/reveal";
 import { useKeydown } from "@/ui/keys";
-import { ms, pressStyle, useMotion, usePressed, useShake } from "@/ui/motion";
+import { ms, useMotion, usePressed, useShake } from "@/ui/motion";
 import { useAppTheme } from "@/ui/theme";
 import { PIN_LENGTH } from "./lock";
 
@@ -134,8 +134,7 @@ export default function PinPad({
 
 function Key({ label, disabled, onPress }: { label: string; disabled: boolean; onPress: () => void }) {
   const { colors } = useAppTheme();
-  const motion = useMotion();
-  const { pressed, handlers } = usePressed();
+  const { pressed, handlers, style: pressStyle } = usePressed(0.9, !disabled);
   const erase = label === "erase";
 
   return (
@@ -148,7 +147,7 @@ function Key({ label, disabled, onPress }: { label: string; disabled: boolean; o
       style={[
         styles.key,
         !erase && { backgroundColor: pressed ? colors.hover : colors.panelAlt },
-        pressStyle(pressed, motion, 0.9),
+        pressStyle,
         disabled && styles.disabled,
       ]}
     >

@@ -8,14 +8,14 @@ import Button from "@/ui/button";
 import ChatAvatar from "@/features/chats/chat-avatar";
 import DevBadge from "@/ui/dev-badge";
 import QrCode from "@/ui/qr-code";
-import Reveal, { Overlay, Swap } from "@/ui/reveal";
+import Reveal, { Overlay, Swap, useAppear } from "@/ui/reveal";
 import SafetyCode from "@/features/chat/safety-code";
 import TextField from "@/ui/text-field";
 import { useAuth } from "@/features/auth/auth";
 import { useRealtime } from "@/api/realtime-context";
 import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
-import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
+import { useLeave } from "@/ui/motion";
 import {
   declineJoinRequest,
   findUser,
@@ -71,7 +71,9 @@ export default function GroupInfo({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
-  const { motion, leaving, leave } = useLeave();
+  const { leaving, leave } = useLeave();
+  const fadeStyle = useAppear("fade", leaving);
+  const popStyle = useAppear("pop", leaving);
   // Leaves with an animation (also on Esc, on the web).
   const close = () => leave(onClose);
   useEscape(true, close);
@@ -196,13 +198,13 @@ export default function GroupInfo({
 
   return (
     <Animated.View
-      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      style={[styles.backdrop, fadeStyle]}
       pointerEvents={leaving ? "none" : "auto"}
     >
       {/* Taps around the card close it. The card is no pressable, so on
           Android its scroll keeps the touch. */}
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
-      <Animated.View style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}>
+      <Animated.View style={[styles.card, { backgroundColor: colors.panel }, popStyle]}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" persistentScrollbar>
           <View style={styles.head}>
             <ChatAvatar chat={chat} size={72} />

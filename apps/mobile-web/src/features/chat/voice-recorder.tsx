@@ -12,7 +12,7 @@ import { LiveWaveform } from "./voice-message";
 import { useAppTheme } from "@/ui/theme";
 import { formatDuration, type PickedFile } from "./attachments";
 import { readUri, removeUri } from "@/platform/files";
-import { enterStyle, useMotion } from "@/ui/motion";
+import { useMotion } from "@/ui/motion";
 import {
   encodeWaveform,
   level,
@@ -22,6 +22,7 @@ import {
   VOICE_RECORDING,
   voiceFile,
 } from "./voice";
+import { Appear } from "@/ui/reveal";
 
 // Bars shown while recording.
 const LIVE_BARS = 40;
@@ -193,12 +194,12 @@ export function RecordingBar({ voice }: { voice: VoiceRecorder }) {
 
   return (
     // Slides out of the microphone button, the red dot blinking.
-    <Animated.View style={[styles.bar, { backgroundColor: colors.panelAlt }, enterStyle("push", motion)]}>
+    <Appear kind="push" style={[styles.bar, { backgroundColor: colors.panelAlt }]}>
       <IconButton icon="trash-outline" label="Cancel the recording" size={20} color={colors.danger} onPress={voice.cancel} />
       <Animated.View style={[styles.dot, { backgroundColor: colors.danger }, motion === "full" && BLINK]} />
       <Text style={[styles.time, { color: colors.text }]}>{formatDuration(voice.durationMillis)}</Text>
       <LiveWaveform levels={voice.levels} color={colors.accent} />
-    </Animated.View>
+    </Appear>
   );
 }
 

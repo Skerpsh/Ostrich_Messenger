@@ -2,7 +2,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text } from "react-native";
-import Animated from "react-native-reanimated";
 import { approveRecovery, getGuarding, getRecovery, setRecovery, type Guarding, type RecoveryPerson, type RecoveryStatus } from "@/api/api";
 import { useRealtime } from "@/api/realtime-context";
 import { useAuth } from "@/features/auth/auth";
@@ -21,12 +20,13 @@ import {
 import { getItem, removeItem } from "@/platform/storage";
 import { formatDate, formatTime } from "@/ui/format";
 import { useAppTheme } from "@/ui/theme";
-import { enterStyle, useMotion } from "@/ui/motion";
+
 import { withAlpha } from "@/ui/colors";
 import { RECOVERED_KEY } from "./saved";
 import { changeFake, fakeRecovery } from "@/features/lock/duress";
 import { inDuress, useLock } from "@/features/lock/lock";
 import PressScale from "@/ui/press-scale";
+import { Appear } from "@/ui/reveal";
 
 // Recovery through friends (backend recovery.ts): the user's OstrichID
 // split on this device among friends ("guardians"), any `threshold` of
@@ -193,7 +193,6 @@ export const formatWhen = (iso: string) => `${formatDate(iso)} ${formatTime(iso)
 // asks for help, or the guardians are to be chosen again.
 export function RecoveryBanner() {
   const { colors } = useAppTheme();
-  const motion = useMotion();
   const router = useRouter();
   const status = useRecoveryStatus();
   const friends = useGuarding();
@@ -231,11 +230,10 @@ export function RecoveryBanner() {
   }
 
   return (
-    <Animated.View
+    <Appear kind="pop"
       style={[
         styles.banner,
         { backgroundColor: shown.danger ? withAlpha(colors.danger, 0.14) : colors.accentSoft },
-        enterStyle("pop", motion),
       ]}
     >
       <Ionicons name={shown.icon} size={18} color={shown.danger ? colors.danger : colors.accent} />
@@ -250,7 +248,7 @@ export function RecoveryBanner() {
       >
         <Ionicons name="close" size={18} color={colors.muted} />
       </PressScale>
-    </Animated.View>
+    </Appear>
   );
 }
 

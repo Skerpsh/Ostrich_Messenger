@@ -14,9 +14,9 @@ import {
 } from "@/api/api";
 import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
-import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
+import { useLeave } from "@/ui/motion";
 import { radius } from "@/ui/colors";
-import Reveal from "@/ui/reveal";
+import Reveal, { useAppear } from "@/ui/reveal";
 import PressScale from "@/ui/press-scale";
 
 // "What the server sees" of a message or a chat: the rows the server keeps,
@@ -171,7 +171,9 @@ export default function ServerView({
 }) {
   const { colors } = useAppTheme();
   const { withToken } = useAuth();
-  const { motion, leaving, leave } = useLeave();
+  const { leaving, leave } = useLeave();
+  const fadeStyle = useAppear("fade", leaving);
+  const popStyle = useAppear("pop", leaving);
   // Leaves with an animation (also on Esc, on the web).
   const close = () => leave(onClose);
   useEscape(true, close);
@@ -215,13 +217,13 @@ export default function ServerView({
 
   return (
     <Animated.View
-      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      style={[styles.backdrop, fadeStyle]}
       pointerEvents={leaving ? "none" : "auto"}
     >
       {/* Taps around the card close it. The card is no pressable, so on
           Android its scroll keeps the touch. */}
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
-      <Animated.View style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}>
+      <Animated.View style={[styles.card, { backgroundColor: colors.panel }, popStyle]}>
         <ScrollView contentContainerStyle={styles.body} persistentScrollbar>
           <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="server-outline" size={24} color={colors.accent} />

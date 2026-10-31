@@ -8,10 +8,10 @@ import { Segmented } from "@/features/settings/ui";
 import { serverNow } from "@/api/server-clock";
 import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
-import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
+import { useLeave } from "@/ui/motion";
 import { radius } from "@/ui/colors";
 import { MAX_SEAL_YEARS, MIN_SEAL_MS } from "./sealed";
-import Reveal from "@/ui/reveal";
+import Reveal, { useAppear } from "@/ui/reveal";
 
 // How the next message is sealed: until when (ms), and whether the server
 // keeps it from the others until then.
@@ -83,7 +83,9 @@ export default function SealSheet({
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
-  const { motion, leaving, leave } = useLeave();
+  const { leaving, leave } = useLeave();
+  const fadeStyle = useAppear("fade", leaving);
+  const popStyle = useAppear("pop", leaving);
   const close = () => leave(onClose);
   useEscape(true, close);
 
@@ -110,14 +112,14 @@ export default function SealSheet({
 
   return (
     <Animated.View
-      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      style={[styles.backdrop, fadeStyle]}
       pointerEvents={leaving ? "none" : "auto"}
     >
       {/* Taps around the card close it. The card is no pressable, so on
           Android its scroll keeps the touch. */}
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
       <Animated.View
-        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
+        style={[styles.card, { backgroundColor: colors.panel }, popStyle]}
       >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}>

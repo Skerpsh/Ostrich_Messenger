@@ -17,14 +17,14 @@ import { formatOstrichId, isLegacyMessage } from "@/crypto/crypto";
 import type { MessageRow } from "./chat-rows";
 import type { Attachment, CallEntry, LookEntry } from "./payload";
 import { formatTime, previewText } from "@/ui/format";
-import { enterStyle, useMotion } from "@/ui/motion";
+
 import { messagePreview } from "@/features/chats/preview";
 import { TOUCH_UI } from "@/platform/touch";
 import type { Shown } from "./use-chat-crypto";
 import { personaColor, personaTag } from "@/features/rooms/persona";
 import { accentVariant, isAccentChoice, radius, type AccentChoice } from "@/ui/colors";
 import PressScale from "@/ui/press-scale";
-import Reveal from "@/ui/reveal";
+import Reveal, { useAppear } from "@/ui/reveal";
 
 // Touch screens (platform/touch.ts): swipe left to reply, long press for the
 // menu. Mouse users get a reply button on hover instead, and can select
@@ -96,12 +96,13 @@ export default function MessageBubble({
 }) {
   const selecting = selected !== undefined;
   const { colors, textScale } = useAppTheme();
-  const motion = useMotion();
   // Settings → Personalization → Text size.
   const contentSize = { fontSize: 16 * textScale, lineHeight: 22 * textScale };
   const [hovered, setHovered] = useState(false);
   const { message, own, joinedAbove, joinedBelow } = row;
   const swipe = useSwipeToReply(onReply);
+  // A new message rises in, growing from its corner.
+  const enterStyle = useAppear("bubble");
   const quote = message.reply_to;
 
   // The corners next to the bubble's neighbours in its group are smaller.
@@ -135,7 +136,7 @@ export default function MessageBubble({
       onPointerLeave={() => setHovered(false)}
       {...swipe.handlers}
       style={[
-        animateIn && enterStyle("bubble", motion),
+        animateIn && enterStyle,
         { transformOrigin: own ? "right bottom" : "left bottom" },
         styles.row,
         own ? styles.rowOwn : styles.rowOther,

@@ -7,11 +7,12 @@ import { noWebOutline } from "@/ui/text-field";
 import { useChats } from "@/features/chats/chats";
 import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
-import { enterStyle, leaveStyle, useLeave } from "@/ui/motion";
+import { useLeave } from "@/ui/motion";
 import type { Chat } from "@/api/api";
 import { chatTitle, groupKeyOf } from "@/features/groups/groups";
 import { TOUCH_UI } from "@/platform/touch";
 import { radius } from "@/ui/colors";
+import { useAppear } from "@/ui/reveal";
 
 // "Forward to…": a chat to forward a message to, over a dimmed background
 // (placed like ActionMenu).
@@ -28,7 +29,9 @@ export default function ForwardPicker({
   allow?: (chat: Chat) => boolean;
 }) {
   const { colors } = useAppTheme();
-  const { motion, leaving, leave } = useLeave();
+  const { leaving, leave } = useLeave();
+  const fadeStyle = useAppear("fade", leaving);
+  const popStyle = useAppear("pop", leaving);
   // Leaves with an animation (also on Esc, on the web).
   const close = () => leave(onClose);
   useEscape(true, close);
@@ -51,14 +54,14 @@ export default function ForwardPicker({
 
   return (
     <Animated.View
-      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
+      style={[styles.backdrop, fadeStyle]}
       pointerEvents={leaving ? "none" : "auto"}
     >
       {/* Taps around the card close it. The card is no pressable, so on
           Android its scroll keeps the touch. */}
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
       <Animated.View
-        style={[styles.card, { backgroundColor: colors.panel }, leaving ? leaveStyle("pop", motion) : enterStyle("pop", motion)]}
+        style={[styles.card, { backgroundColor: colors.panel }, popStyle]}
       >
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         <View style={[styles.search, { backgroundColor: colors.panelAlt }]}>

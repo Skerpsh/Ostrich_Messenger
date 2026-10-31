@@ -2,16 +2,15 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { Animated, Easing, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CallVideo from "./call-video";
 import ChatAvatar from "@/features/chats/chat-avatar";
 import IconButton, { type IconName } from "@/ui/icon-button";
-import Reveal, { Swap } from "@/ui/reveal";
+import Reveal, { Appear, Swap } from "@/ui/reveal";
 import { useCalls } from "./calls-context";
 import { useAppTheme } from "@/ui/theme";
 import { useEscape } from "@/ui/keys";
-import { enterStyle, LEAVE_MS, leaveStyle, useMotion } from "@/ui/motion";
+import { LEAVE_MS, useMotion } from "@/ui/motion";
 import { formatDuration } from "@/features/chat/attachments";
 import type { CallStats } from "./call-connection";
 import type { CallView, HandshakeView } from "./calls";
@@ -87,7 +86,7 @@ export default function CallScreen() {
 
   if (drawn === "bar") {
     return (
-      <Reanimated.View pointerEvents="box-none" style={[styles.barWrap, { top: insets.top + 8 }, enterStyle("drop", motion)]}>
+      <Appear kind="drop" pointerEvents="box-none" style={[styles.barWrap, { top: insets.top + 8 }]}>
         <PressScale scale={0.98}
           onPress={() => setMinimized(false)}
           accessibilityRole="button"
@@ -102,7 +101,7 @@ export default function CallScreen() {
             <Ionicons name="close-circle" size={20} color="#08240f" />
           </PressScale>
         </PressScale>
-      </Reanimated.View>
+      </Appear>
     );
   }
 
@@ -110,9 +109,9 @@ export default function CallScreen() {
   const screen = videoShown(call) ? (
     <VideoScreen call={call} status={status} wide={wide} />
   ) : (
-    <Reanimated.View
+    <Appear
+      kind="fade"
       style={[
-        enterStyle("fade", motion),
         styles.screen,
         wide
           ? [styles.card, { backgroundColor: colors.surface, borderColor: colors.line }]
@@ -159,29 +158,27 @@ export default function CallScreen() {
       <Swap id={controlsOf(call)}>
         <Controls call={call} />
       </Swap>
-    </Reanimated.View>
+    </Appear>
   );
 
   // Opening: over a fading background on a wide screen, coming up from
   // below on a phone; out of the bar, growing from the top. Leaving the
   // same way back, or folding into the bar.
   const folding = leaving && wanted === "bar";
-  const sheet = leaving
-    ? leaveStyle(folding ? "fold" : wide ? "pop" : "rise", motion)
-    : enterStyle(unfolding ? "unfold" : wide ? "pop" : "rise", motion);
+  const kind = unfolding ? "fold" : wide ? "pop" : "rise";
+  const leave = folding ? "fold" : wide ? "pop" : "rise";
   const origin = (folding || unfolding) && styles.fromTop;
 
   return wide ? (
-    <Reanimated.View
-      pointerEvents={leaving ? "none" : "auto"}
-      style={[styles.backdrop, leaving ? leaveStyle("fade", motion) : enterStyle("fade", motion)]}
-    >
-      <Reanimated.View style={[styles.cardPlace, origin, sheet]}>{screen}</Reanimated.View>
-    </Reanimated.View>
+    <Appear kind="fade" leaving={leaving} style={styles.backdrop}>
+      <Appear kind={kind} leave={leave} leaving={leaving} style={[styles.cardPlace, origin]}>
+        {screen}
+      </Appear>
+    </Appear>
   ) : (
-    <Reanimated.View pointerEvents={leaving ? "none" : "auto"} style={[styles.full, origin, sheet]}>
+    <Appear kind={kind} leave={leave} leaving={leaving} style={[styles.full, origin]}>
       {screen}
-    </Reanimated.View>
+    </Appear>
   );
 }
 
@@ -241,7 +238,6 @@ const LAYOUT_KEY = "ostrich-call-layout";
 // them and hides after a while (a tap brings it back).
 function VideoScreen({ call, status, wide }: { call: CallView; status: string; wide: boolean }) {
   const { setMinimized } = useCalls();
-  const motion = useMotion();
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const [layout, setLayout] = useState<Layout>("pip");
@@ -283,9 +279,9 @@ function VideoScreen({ call, status, wide }: { call: CallView; status: string; w
   const overlays = shown || !autoHide;
 
   return (
-    <Reanimated.View
+    <Appear
+      kind="fade"
       style={[
-        enterStyle("fade", motion),
         styles.videoScreen,
         wide ? [styles.videoCard, { borderColor: colors.line }] : styles.flex,
       ]}
@@ -352,7 +348,7 @@ function VideoScreen({ call, status, wide }: { call: CallView; status: string; w
           </>
         ) : null}
       </Reveal>
-    </Reanimated.View>
+    </Appear>
   );
 }
 

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
-import { useSlider } from "@/ui/reveal";
+import { Appear, useSlider } from "@/ui/reveal";
 import { useAppTheme } from "@/ui/theme";
 import { EMOJI_CATEGORIES, recentEmoji, rememberEmoji } from "./emoji";
-import { enterStyle, useMotion } from "@/ui/motion";
+
 import { radius } from "@/ui/colors";
 import PressScale from "@/ui/press-scale";
 
@@ -12,7 +12,6 @@ import PressScale from "@/ui/press-scale";
 // message being written and for reactions.
 export default function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
   const { colors } = useAppTheme();
-  const motion = useMotion();
   const [recent, setRecent] = useState<string[]>([]);
   const [category, setCategory] = useState(-1);
   // Under the tabs: the chosen one's highlight sliding to it.
@@ -65,7 +64,7 @@ export default function EmojiPicker({ onPick }: { onPick: (emoji: string) => voi
       </ScrollView>
       <ScrollView style={styles.grid} keyboardShouldPersistTaps="always">
         {/* Another category fades in. */}
-        <Animated.View key={category} style={[styles.gridContent, enterStyle("fade", motion)]}>
+        <Appear kind="fade" key={category} style={styles.gridContent}>
         {shown.length === 0 ? (
           <Text style={[styles.empty, { color: colors.muted }]}>Emoji you use show here.</Text>
         ) : (
@@ -81,7 +80,7 @@ export default function EmojiPicker({ onPick }: { onPick: (emoji: string) => voi
             </Pressable>
           ))
         )}
-        </Animated.View>
+        </Appear>
       </ScrollView>
     </View>
   );
