@@ -61,7 +61,7 @@
 
 **Messaging**
 - 💬 Direct chats, **groups** of up to 50 members with roles, **invite links** and join requests
-- 📎 Encrypted **files and photos** (up to 10 per message, 25 MB each) with upload progress and a photo viewer
+- 📎 Encrypted **files and photos** (up to 10 per message, 25 MB each) with upload progress and a photo viewer (swipe to go through or to close, pinch or double tap to zoom)
 - 🎤 Encrypted **voice messages** with a waveform, seeking and playback speed
 - 📞 **Audio and video calls**, peer to peer and end-to-end encrypted, with the **Ostrich handshake** to make sure nobody is listening in
 - 🔗 **Link previews** made by the sender's phone and sent inside the encrypted message, so the server never sees the link
@@ -75,6 +75,7 @@
 - 🐦 **Chat wallpapers**: ostrich patterns in the accent color or your own photo, three brightness levels
 - 🖼 A **look for each chat**: its own accent and wallpaper, for you or for everyone in it (sent end-to-end encrypted)
 - 🔠 Text size, a compact or minimal chats list, and an **app icon** that follows the accent
+- ✨ **Springy animations** everywhere, interrupted smoothly, at the speed you choose (0.5× to 2×), short fades with Reduce motion or none at all; light **haptics** on the phones
 - 🔄 Optional **sync across devices**, encrypted with your account's key
 
 **Everywhere**

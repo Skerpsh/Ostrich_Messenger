@@ -135,8 +135,10 @@ export default function Reveal({
   }, [shown, motion, enter, collapse, measured, progress]);
 
   const content = useAnimatedStyle(() => lookAt(look, progress.value, reduced));
+  // Settled, back to "auto": an animated height left set would stay on
+  // the view after the animation.
   const box = useAnimatedStyle(() => ({
-    height: height.value * Math.min(1, Math.max(0, progress.value)),
+    height: moving ? height.value * Math.min(1, Math.max(0, progress.value)) : "auto",
   }));
 
   if (!mounted) {
@@ -157,7 +159,7 @@ export default function Reveal({
   return (
     <Animated.View
       pointerEvents={pointerEvents}
-      style={[style, moving && [styles.clip, styles.end, box]]}
+      style={[style, moving && [styles.clip, styles.end], box]}
     >
       <Animated.View
         onLayout={(event: LayoutChangeEvent) => {
@@ -253,15 +255,27 @@ export function useSlider(selected: number) {
     // The first place it is put at once, the next ones it slides to.
     const first = x.get() === null;
 
-    if (!first) {
-      haptic("tick");
-    }
-
     x.set(first ? place.x : toward(place.x, motion, "move"));
     y.set(first ? place.y : toward(place.y, motion, "move"));
     width.set(first ? place.width : toward(place.width, motion, "move"));
     height.set(first ? place.height : toward(place.height, motion, "move"));
   }, [place, motion, x, y, width, height]);
+
+  // A tick under the finger as another one is chosen (not as the layout
+  // changes).
+  const [chosen, setChosen] = useState(selected);
+  const [choices, setChoices] = useState(0);
+
+  if (chosen !== selected) {
+    setChosen(selected);
+    setChoices(choices + 1);
+  }
+
+  useEffect(() => {
+    if (choices > 0) {
+      haptic("tick");
+    }
+  }, [choices]);
 
   return {
     onLayout: (index: number) => (event: { nativeEvent: { layout: { x: number; y: number; width: number; height: number } } }) => {
@@ -358,7 +372,8 @@ export function Swap({
   const [last, setLast] = useState<number | null>(null);
   const height = useSharedValue<number | null>(null);
   const sizing = resize && !fill && previous !== null && previous.height !== null && last !== null;
-  const box = useAnimatedStyle(() => (height.value === null ? {} : { height: height.value }));
+  // Back to "auto" once settled (an animated height left set would stay).
+  const box = useAnimatedStyle(() => ({ height: height.value === null ? "auto" : height.value }));
 
   // Following what it is given, as it renders (only this component renders
   // again).
@@ -402,7 +417,7 @@ export function Swap({
   const shift = motion === "full" ? (vertical ? 14 : 40) * current.step : 0;
 
   return (
-    <Animated.View style={[fill && styles.fill, style, sizing && [styles.clip, box]]}>
+    <Animated.View style={[fill && styles.fill, style, sizing && styles.clip, resize && !fill && box]}>
       {/* Same keys as before: the one going is the very view it was. */}
       {previous ? (
         <SwapPane key={previous.id} going shift={shift} vertical={vertical} appear={false} fill={fill}>

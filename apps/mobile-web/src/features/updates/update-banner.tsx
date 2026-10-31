@@ -3,7 +3,6 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text } from "react-native";
 import { useAppUpdate } from "@/platform/app-update";
 import { useAppTheme } from "@/ui/theme";
-
 import PressScale from "@/ui/press-scale";
 import { Appear } from "@/ui/reveal";
 

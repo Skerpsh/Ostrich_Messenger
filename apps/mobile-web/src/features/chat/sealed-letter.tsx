@@ -5,7 +5,6 @@ import { getDrandSignature } from "@/api/api";
 import { serverNow } from "@/api/server-clock";
 import { useAuth } from "@/features/auth/auth";
 import { useAppTheme } from "@/ui/theme";
-
 import { decodePayload, type Payload } from "./payload";
 import { openingTime, openLetter, type SealedLetter } from "./sealed";
 import { Appear, Swap } from "@/ui/reveal";

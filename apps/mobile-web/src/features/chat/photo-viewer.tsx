@@ -288,6 +288,8 @@ export default function PhotoViewer({
   const shiftY = useSharedValue(0);
   const shiftFrom = useSharedValue({ x: 0, y: 0 });
   const size = useSharedValue({ width: 0, height: 0 });
+  // Two fingers on it: no closing nor going to another one then.
+  const pinching = useSharedValue(false);
   const first = index === 0;
   const last = index === photos.length - 1;
   const spring = motion === "full" ? { duration: ms(400), dampingRatio: 0.86 } : { duration: ms(150), dampingRatio: 1 };
@@ -310,6 +312,10 @@ export default function PhotoViewer({
     },
     onUpdate: (event) => {
       "worklet";
+      if (pinching.get()) {
+        return;
+      }
+
       if (zoom.get() > 1) {
         shiftX.set(shiftFrom.get().x + event.translationX);
         shiftY.set(shiftFrom.get().y + event.translationY);
@@ -325,7 +331,7 @@ export default function PhotoViewer({
     },
     onDeactivate: (event) => {
       "worklet";
-      if (zoom.get() > 1) {
+      if (zoom.get() > 1 || pinching.get()) {
         springBack(shiftX, bound(shiftX.get(), size.get().width));
         springBack(shiftY, bound(shiftY.get(), size.get().height));
         return;
@@ -354,6 +360,7 @@ export default function PhotoViewer({
   const pinch = usePinchGesture({
     onActivate: () => {
       "worklet";
+      pinching.set(true);
       zoomFrom.set(zoom.get());
     },
     onUpdate: (event) => {
@@ -363,6 +370,7 @@ export default function PhotoViewer({
     onDeactivate: () => {
       "worklet";
       const to = Math.max(1, Math.min(4, zoom.get()));
+      pinching.set(false);
       springBack(zoom, to);
 
       if (to === 1) {

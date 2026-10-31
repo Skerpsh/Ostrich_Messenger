@@ -17,7 +17,6 @@ import { formatOstrichId, isLegacyMessage } from "@/crypto/crypto";
 import type { MessageRow } from "./chat-rows";
 import type { Attachment, CallEntry, LookEntry } from "./payload";
 import { formatTime, previewText } from "@/ui/format";
-
 import { messagePreview } from "@/features/chats/preview";
 import { TOUCH_UI } from "@/platform/touch";
 import type { Shown } from "./use-chat-crypto";
@@ -105,6 +104,7 @@ export default function MessageBubble({
   // A new message rises in, growing from its corner.
   const enterStyle = useAppear("bubble");
   const quote = message.reply_to;
+  const longPress = selecting ? onToggle : onMenu;
 
   // The corners next to the bubble's neighbours in its group are smaller.
   const side = own ? "Right" : "Left";
@@ -170,10 +170,13 @@ export default function MessageBubble({
       >
         <Pressable
           onPress={selecting ? onToggle : undefined}
-          onLongPress={() => {
-            haptic("hold");
-            (selecting ? onToggle : onMenu)?.();
-          }}
+          onLongPress={
+            longPress &&
+            (() => {
+              haptic("hold");
+              longPress();
+            })
+          }
           delayLongPress={350}
           // Web: right click opens the message menu instead of the browser's.
           {...({

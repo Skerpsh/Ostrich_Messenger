@@ -3,7 +3,6 @@ import { Image } from "expo-image";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "./theme";
-
 import IconButton from "./icon-button";
 import ThemeToggle from "./theme-toggle";
 import { Appear } from "./reveal";

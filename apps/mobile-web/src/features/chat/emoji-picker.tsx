@@ -4,7 +4,6 @@ import Animated from "react-native-reanimated";
 import { Appear, useSlider } from "@/ui/reveal";
 import { useAppTheme } from "@/ui/theme";
 import { EMOJI_CATEGORIES, recentEmoji, rememberEmoji } from "./emoji";
-
 import { radius } from "@/ui/colors";
 import PressScale from "@/ui/press-scale";
 

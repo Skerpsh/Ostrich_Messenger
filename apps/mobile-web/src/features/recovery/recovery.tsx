@@ -20,7 +20,6 @@ import {
 import { getItem, removeItem } from "@/platform/storage";
 import { formatDate, formatTime } from "@/ui/format";
 import { useAppTheme } from "@/ui/theme";
-
 import { withAlpha } from "@/ui/colors";
 import { RECOVERED_KEY } from "./saved";
 import { changeFake, fakeRecovery } from "@/features/lock/duress";

@@ -9,7 +9,6 @@ import { useCurrentUser } from "@/features/auth/auth";
 import { useChats } from "@/features/chats/chats";
 import { useAppTheme } from "@/ui/theme";
 import { useIsWide } from "@/ui/layout";
-
 import { radius } from "@/ui/colors";
 import { Appear, Swap } from "@/ui/reveal";
 

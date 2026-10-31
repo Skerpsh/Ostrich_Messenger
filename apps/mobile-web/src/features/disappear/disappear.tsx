@@ -23,7 +23,6 @@ import { useRealtime } from "@/api/realtime-context";
 import { useAuth } from "@/features/auth/auth";
 import { formatDate } from "@/ui/format";
 import { useAppTheme } from "@/ui/theme";
-
 import PressScale from "@/ui/press-scale";
 import { Appear } from "@/ui/reveal";
 
