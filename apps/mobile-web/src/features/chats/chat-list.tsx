@@ -776,8 +776,12 @@ function ChatRow({
       style={({ hovered, pressed }) => [
         styles.row,
         density !== "comfortable" && styles.rowDense,
+        // Opaque: rows passing each other as a chat goes to the top
+        // cover one another instead of mixing their text.
+        { backgroundColor: colors.surface },
         selected
-          ? { backgroundColor: colors.accentSoft }
+          ? // The see-through tint over the solid background.
+            { boxShadow: `inset 0 0 0 1000px ${colors.accentSoft}` }
           : (hovered || pressed) && { backgroundColor: colors.hover },
       ]}
     >
