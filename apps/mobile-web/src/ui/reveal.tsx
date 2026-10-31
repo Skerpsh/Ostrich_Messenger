@@ -284,6 +284,7 @@ export function useSlider(selected: number) {
 function SwapPane({
   going,
   shift,
+  vertical,
   appear,
   fill,
   onLayout,
@@ -291,6 +292,7 @@ function SwapPane({
 }: {
   going: boolean;
   shift: number;
+  vertical: boolean;
   appear: boolean;
   fill: boolean;
   onLayout?: (event: LayoutChangeEvent) => void;
@@ -301,7 +303,9 @@ function SwapPane({
   const reduced = motion !== "full";
   const animated = useAnimatedStyle(() => ({
     opacity: Math.min(1, Math.max(0, progress.value)),
-    transform: reduced ? [] : [{ translateX: (going ? -shift : shift) * (1 - progress.value) }],
+    transform: reduced
+      ? []
+      : [{ [vertical ? "translateY" : "translateX"]: (going ? -shift : shift) * (1 - progress.value) } as { translateX: number }],
   }));
 
   useEffect(() => {
@@ -324,12 +328,14 @@ function SwapPane({
 // follows. id: which one is shown; step: the way it went (-1 back to the
 // left, 1 on to the right, 0 in place, fading). resize: the height
 // animates (off for things of a fixed size); fill: it takes all the room
-// (flex: 1), for what fills a screen.
+// (flex: 1), for what fills a screen; vertical: up and down instead (-1
+// down, 1 up: a number rolling).
 export function Swap({
   id,
   step = 0,
   resize = true,
   fill = false,
+  vertical = false,
   style,
   children,
 }: {
@@ -337,6 +343,7 @@ export function Swap({
   step?: number;
   resize?: boolean;
   fill?: boolean;
+  vertical?: boolean;
   style?: StyleProp<ViewStyle>;
   children: ReactNode;
 }) {
@@ -392,13 +399,13 @@ export function Swap({
     return () => clearTimeout(timer);
   }, [previous, motion, resize, fill]);
 
-  const shift = motion === "full" ? 40 * current.step : 0;
+  const shift = motion === "full" ? (vertical ? 14 : 40) * current.step : 0;
 
   return (
     <Animated.View style={[fill && styles.fill, style, sizing && [styles.clip, box]]}>
       {/* Same keys as before: the one going is the very view it was. */}
       {previous ? (
-        <SwapPane key={previous.id} going shift={shift} appear={false} fill={fill}>
+        <SwapPane key={previous.id} going shift={shift} vertical={vertical} appear={false} fill={fill}>
           {previous.children}
         </SwapPane>
       ) : null}
@@ -406,6 +413,7 @@ export function Swap({
         key={current.id}
         going={false}
         shift={shift}
+        vertical={vertical}
         appear={previous !== null}
         fill={fill}
         onLayout={resize && !fill ? (event) => setLast(event.nativeEvent.layout.height) : undefined}
@@ -413,6 +421,51 @@ export function Swap({
         {current.children}
       </SwapPane>
     </Animated.View>
+  );
+}
+
+// Something that changed in place (a tick turning double, a reaction
+// added again): it gives a little jump, growing and springing back, each
+// time `id` changes (not as it first appears).
+export function Bump({ id, children }: { id: string | number | boolean; children: ReactNode }) {
+  const motion = useMotion();
+  const size = useSharedValue(1);
+  const [last, setLast] = useState(id);
+  const [bumps, setBumps] = useState(0);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: size.value }] }));
+
+  if (last !== id) {
+    setLast(id);
+    setBumps(bumps + 1);
+  }
+
+  useEffect(() => {
+    if (bumps === 0 || motion !== "full") {
+      return;
+    }
+
+    size.set(0.6);
+    size.set(toward(1, motion, "press"));
+  }, [bumps, motion, size]);
+
+  return <Animated.View style={motion === "full" ? style : null}>{children}</Animated.View>;
+}
+
+// A number rolling to another: a bigger one comes up from below, a
+// smaller one down from above.
+export function Rolling({ value, children }: { value: number; children: ReactNode }) {
+  const [last, setLast] = useState(value);
+  const [step, setStep] = useState(0);
+
+  if (value !== last) {
+    setStep(value > last ? 1 : -1);
+    setLast(value);
+  }
+
+  return (
+    <Swap id={value} step={step} vertical resize={false} style={styles.clip}>
+      {children}
+    </Swap>
   );
 }
 

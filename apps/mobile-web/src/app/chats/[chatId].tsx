@@ -110,6 +110,7 @@ import { TOUCH_UI } from "@/platform/touch";
 import { radius } from "@/ui/colors";
 import PressScale from "@/ui/press-scale";
 import { haptic } from "@/ui/haptics";
+import { MessagesSkeleton } from "@/ui/skeleton";
 
 const MAX_MESSAGE_LENGTH = 4096;
 
@@ -1846,7 +1847,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         behavior={KEYBOARD_BEHAVIOR}
       >
         {messages === null ? (
-          <ActivityIndicator color={colors.muted} style={styles.screen} />
+          <MessagesSkeleton />
         ) : (
           // The messages fade in as they load.
           <Appear kind="fade" ref={listWrapRef} style={styles.screen}>

@@ -24,7 +24,7 @@ import type { Shown } from "./use-chat-crypto";
 import { personaColor, personaTag } from "@/features/rooms/persona";
 import { accentVariant, isAccentChoice, radius, type AccentChoice } from "@/ui/colors";
 import PressScale from "@/ui/press-scale";
-import Reveal, { useAppear } from "@/ui/reveal";
+import Reveal, { Bump, Rolling, useAppear } from "@/ui/reveal";
 import { haptic } from "@/ui/haptics";
 
 // Touch screens (platform/touch.ts): swipe left to reply, long press for the
@@ -312,9 +312,14 @@ export default function MessageBubble({
                     },
                   ]}
                 >
-                  <Text style={styles.reactionEmoji}>{emoji}</Text>
+                  {/* Added or taken back: the emoji jumps, the count rolls. */}
+                  <Bump id={`${count}${mine}`}>
+                    <Text style={styles.reactionEmoji}>{emoji}</Text>
+                  </Bump>
                   {count > 1 ? (
-                    <Text style={[styles.reactionCount, { color: textColor }]}>{count}</Text>
+                    <Rolling value={count}>
+                      <Text style={[styles.reactionCount, { color: textColor }]}>{count}</Text>
+                    </Rolling>
                   ) : null}
                 </PressScale>
               ))}
@@ -353,18 +358,21 @@ export default function MessageBubble({
             <Text style={[styles.time, { color: metaColor }]}>
               {formatTime(message.created_at)}
             </Text>
-            {sending === "failed" ? (
-              <Text style={[styles.time, styles.failed, { color: metaColor }]}>⚠ Not sent</Text>
-            ) : sending ? (
-              <Ionicons name="time-outline" size={13} color={metaColor} accessibilityLabel="sending" />
-            ) : own ? (
-              <Ionicons
-                name={read ? "checkmark-done" : "checkmark"}
-                size={14}
-                color={metaColor}
-                accessibilityLabel={read ? "read" : "sent"}
-              />
-            ) : null}
+            {/* Sent, then read: the tick jumps as it changes. */}
+            <Bump id={sending === "failed" ? "failed" : sending ? "sending" : read ? "read" : "sent"}>
+              {sending === "failed" ? (
+                <Text style={[styles.time, styles.failed, { color: metaColor }]}>⚠ Not sent</Text>
+              ) : sending ? (
+                <Ionicons name="time-outline" size={13} color={metaColor} accessibilityLabel="sending" />
+              ) : own ? (
+                <Ionicons
+                  name={read ? "checkmark-done" : "checkmark"}
+                  size={14}
+                  color={metaColor}
+                  accessibilityLabel={read ? "read" : "sent"}
+                />
+              ) : null}
+            </Bump>
           </View>
         </Pressable>
       </Animated.View>

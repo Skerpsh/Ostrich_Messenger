@@ -27,7 +27,7 @@ import Avatar from "@/ui/avatar";
 import ChatAvatar from "./chat-avatar";
 import DevBadge from "@/ui/dev-badge";
 import IconButton from "@/ui/icon-button";
-import Reveal, { Appear, Swap } from "@/ui/reveal";
+import Reveal, { Bump, Rolling, Swap } from "@/ui/reveal";
 import TypingDots from "@/ui/typing-dots";
 import Welcome from "./welcome";
 import { noWebOutline } from "@/ui/text-field";
@@ -51,6 +51,7 @@ import { cleanUsername, USERNAME_RE } from "@/features/auth/validation";
 import { radius } from "@/ui/colors";
 import PressScale from "@/ui/press-scale";
 import { haptic } from "@/ui/haptics";
+import { ChatsSkeleton } from "@/ui/skeleton";
 
 // Focuses the search of the chats list on screen (the welcome screen on the
 // right of a wide screen asks for it).
@@ -62,7 +63,7 @@ export const focusChatSearch = () => focusSearch?.();
 export default function ChatList() {
   const router = useRouter();
   const pathname = usePathname();
-  const { colors } = useAppTheme();
+  const { colors, density } = useAppTheme();
   const motion = useMotion();
   const insets = useSafeAreaInsets();
   const wide = useIsWide();
@@ -489,7 +490,7 @@ export default function ChatList() {
           // Loading, no matches, no chats: one fades into the other.
           <Swap id={chats === null ? "loading" : search ? "search" : "empty"}>
             {chats === null ? (
-              <ActivityIndicator color={colors.muted} style={styles.loading} />
+              <ChatsSkeleton avatar={AVATAR_SIZES[density]} />
             ) : search ? (
               canStart || shownMatches.length > 0 ? null : (
                 <Text style={[styles.notice, { color: colors.muted }]}>
@@ -732,24 +733,25 @@ function ChatRow({
       </Reveal>
       <Reveal kind="pop" collapse={false}>
         {chat.unread_count > 0 ? (
-        <Appear kind="badge"
-          // A new count pops in.
-          key={chat.unread_count}
+        <View
           style={[
             styles.badge,
             // Muted chats count quietly.
             { backgroundColor: chat.muted ? colors.muted : colors.accent },
           ]}
         >
-          <Text
-            style={[
-              styles.badgeText,
-              { color: chat.muted ? colors.bg : colors.onAccent },
-            ]}
-          >
-            {chat.unread_count > 99 ? "99+" : chat.unread_count}
-          </Text>
-        </Appear>
+          {/* A new count rolls in. */}
+          <Rolling value={chat.unread_count}>
+            <Text
+              style={[
+                styles.badgeText,
+                { color: chat.muted ? colors.bg : colors.onAccent },
+              ]}
+            >
+              {chat.unread_count > 99 ? "99+" : chat.unread_count}
+            </Text>
+          </Rolling>
+        </View>
       ) : null}
       </Reveal>
     </>
@@ -803,11 +805,13 @@ function ChatRow({
           </View>
           <View style={styles.meta}>
             {own && chat.type !== "saved" ? (
-              <Ionicons
-                name={read ? "checkmark-done" : "checkmark"}
-                size={16}
-                color={read ? colors.accent : colors.muted}
-              />
+              <Bump id={read}>
+                <Ionicons
+                  name={read ? "checkmark-done" : "checkmark"}
+                  size={16}
+                  color={read ? colors.accent : colors.muted}
+                />
+              </Bump>
             ) : null}
             <Text style={[styles.time, { color: chat.unread_count ? colors.accent : colors.muted }]}>
               {formatChatDate(last?.created_at ?? chat.created_at)}
@@ -1059,10 +1063,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 14,
     padding: 16,
-  },
-
-  loading: {
-    marginTop: 40,
   },
 
   empty: {
