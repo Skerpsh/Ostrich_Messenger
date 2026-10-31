@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { GestureDetector } from "react-native-gesture-handler";
+import Animated from "react-native-reanimated";
 import AnimatedPressable from "./animated-pressable";
 import { useAppTheme } from "./theme";
 import { useEscape } from "./keys";
@@ -9,6 +11,7 @@ import { radius } from "./colors";
 import type { IconName } from "./icon-button";
 import Button from "./button";
 import Reveal, { useAppear } from "./reveal";
+import { useDragClose } from "./drag-close";
 
 export type ActionMenuItem = {
   icon: IconName;
@@ -41,6 +44,8 @@ export default function ActionMenu({
   // Leaves with an animation (also on Esc, on the web).
   const close = () => leave(onClose);
   useEscape(true, close);
+  // Dragged down, it goes too.
+  const drag = useDragClose(close);
   const [confirming, setConfirming] = useState<string | null>(null);
   // The confirming button takes taps only after a moment, so a double tap
   // on the item does not go through.
@@ -59,6 +64,8 @@ export default function ActionMenu({
       onPress={close}
       accessibilityLabel="Close menu"
     >
+      <GestureDetector gesture={drag.gesture}>
+      <Animated.View style={[styles.place, drag.style]}>
       {/* Taps inside the card do not close the menu. */}
       <AnimatedPressable
         style={[styles.menu, { backgroundColor: colors.panel }, popStyle]}
@@ -130,6 +137,8 @@ export default function ActionMenu({
           );
         })}
       </AnimatedPressable>
+      </Animated.View>
+      </GestureDetector>
     </AnimatedPressable>
   );
 }
@@ -152,6 +161,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 24,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+
+  place: {
+    width: "100%",
+    alignItems: "center",
   },
 
   menu: {

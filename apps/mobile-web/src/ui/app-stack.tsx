@@ -26,6 +26,9 @@ export default function AppStack({ screens = [] }: { screens?: { name: string; m
           headerShown: false,
           cardStyle: { backgroundColor: colors.bg },
           animation: motion === "off" ? "none" : undefined,
+          // Back with a swipe from the left edge, as on iOS.
+          gestureEnabled: true,
+          gestureDirection: "horizontal",
           cardStyleInterpolator:
             motion === "reduced"
               ? CardStyleInterpolators.forFadeFromCenter
@@ -41,6 +44,8 @@ export default function AppStack({ screens = [] }: { screens?: { name: string; m
               modal
                 ? {
                     presentation: "modal",
+                    // Pulled down to close.
+                    gestureDirection: "vertical",
                     cardStyleInterpolator:
                       motion === "reduced"
                         ? CardStyleInterpolators.forFadeFromCenter

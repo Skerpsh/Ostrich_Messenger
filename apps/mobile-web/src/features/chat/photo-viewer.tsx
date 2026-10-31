@@ -1,8 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ViewStyle, type ViewInstance } from "react-native";
-import Animated, { cubicBezier, type CSSAnimationProperties, type CSSTransitionProperties } from "react-native-reanimated";
+import { ActivityIndicator, Platform, StyleSheet, Text, View, type ViewStyle, type ViewInstance } from "react-native";
+import { GestureDetector, useExclusiveGestures, usePanGesture, usePinchGesture, useSimultaneousGestures, useTapGesture } from "react-native-gesture-handler";
+import Animated, {
+  cubicBezier,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  type CSSAnimationProperties,
+  type CSSTransitionProperties,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Swap } from "@/ui/reveal";
 import { useAuth } from "@/features/auth/auth";
@@ -12,6 +21,7 @@ import { useEscape } from "@/ui/keys";
 import { afterFrame, EASE_IN, EASE_OUT, LEAVE_MS, ms, useMotion } from "@/ui/motion";
 import type { Attachment } from "./payload";
 import PressScale from "@/ui/press-scale";
+import { haptic } from "@/ui/haptics";
 
 // Where each photo is in the chat (its thumbnail, while on the screen),
 // for the viewer to open out of it and close back into it.
@@ -268,6 +278,153 @@ export default function PhotoViewer({
     }
   };
 
+  // Dragging and zooming: dragged down (or up) far enough it closes, to
+  // the side it goes to the next one, following the finger and springing
+  // back otherwise; pinched or tapped twice it zooms, and zoomed it is
+  // moved around. A tap closes it.
+  const zoom = useSharedValue(1);
+  const zoomFrom = useSharedValue(1);
+  const shiftX = useSharedValue(0);
+  const shiftY = useSharedValue(0);
+  const shiftFrom = useSharedValue({ x: 0, y: 0 });
+  const size = useSharedValue({ width: 0, height: 0 });
+  const first = index === 0;
+  const last = index === photos.length - 1;
+  const spring = motion === "full" ? { duration: ms(400), dampingRatio: 0.86 } : { duration: ms(150), dampingRatio: 1 };
+  const springBack = (value: { set: (to: number) => void }, to: number) => {
+    "worklet";
+    value.set(motion === "off" ? to : withSpring(to, spring));
+  };
+  // How far a zoomed photo can be moved: to its edges.
+  const bound = (value: number, length: number) => {
+    "worklet";
+    const room = (length * (zoom.get() - 1)) / 2;
+    return Math.max(-room, Math.min(room, value));
+  };
+
+  const pan = usePanGesture({
+    minDistance: 8,
+    onActivate: () => {
+      "worklet";
+      shiftFrom.set({ x: shiftX.get(), y: shiftY.get() });
+    },
+    onUpdate: (event) => {
+      "worklet";
+      if (zoom.get() > 1) {
+        shiftX.set(shiftFrom.get().x + event.translationX);
+        shiftY.set(shiftFrom.get().y + event.translationY);
+      } else if (Math.abs(event.translationX) > Math.abs(event.translationY)) {
+        // Past the first or the last it only gives a little.
+        const edge = (event.translationX > 0 && first) || (event.translationX < 0 && last);
+        shiftX.set(edge ? event.translationX * 0.3 : event.translationX);
+        shiftY.set(0);
+      } else {
+        shiftX.set(0);
+        shiftY.set(event.translationY);
+      }
+    },
+    onDeactivate: (event) => {
+      "worklet";
+      if (zoom.get() > 1) {
+        springBack(shiftX, bound(shiftX.get(), size.get().width));
+        springBack(shiftY, bound(shiftY.get(), size.get().height));
+        return;
+      }
+
+      const x = shiftX.get();
+      const y = shiftY.get();
+
+      if (Math.abs(y) > 120 || (Math.abs(y) > 30 && Math.abs(event.velocityY) > 900)) {
+        scheduleOnRN(close);
+      } else if ((x < -80 || (x < -20 && event.velocityX < -700)) && !last) {
+        springBack(shiftX, 0);
+        scheduleOnRN(go, 1);
+        return;
+      } else if ((x > 80 || (x > 20 && event.velocityX > 700)) && !first) {
+        springBack(shiftX, 0);
+        scheduleOnRN(go, -1);
+        return;
+      }
+
+      springBack(shiftX, 0);
+      springBack(shiftY, 0);
+    },
+  });
+
+  const pinch = usePinchGesture({
+    onActivate: () => {
+      "worklet";
+      zoomFrom.set(zoom.get());
+    },
+    onUpdate: (event) => {
+      "worklet";
+      zoom.set(Math.max(0.8, Math.min(5, zoomFrom.get() * event.scale)));
+    },
+    onDeactivate: () => {
+      "worklet";
+      const to = Math.max(1, Math.min(4, zoom.get()));
+      springBack(zoom, to);
+
+      if (to === 1) {
+        springBack(shiftX, 0);
+        springBack(shiftY, 0);
+      }
+    },
+  });
+
+  // Tapped twice: zoomed in where tapped, or back out.
+  const doubleTap = useTapGesture({
+    numberOfTaps: 2,
+    onDeactivate: (event) => {
+      "worklet";
+      if (event.canceled) {
+        return;
+      }
+
+      const zoomed = zoom.get() > 1;
+      const to = zoomed ? 1 : 2.5;
+      const { width, height } = size.get();
+      springBack(zoom, to);
+      springBack(shiftX, zoomed ? 0 : (width / 2 - event.x) * (to - 1));
+      springBack(shiftY, zoomed ? 0 : (height / 2 - event.y) * (to - 1));
+      scheduleOnRN(haptic, "tick");
+    },
+  });
+
+  const tap = useTapGesture({
+    onDeactivate: (event) => {
+      "worklet";
+      if (!event.canceled) {
+        scheduleOnRN(close);
+      }
+    },
+  });
+
+  const gestures = useSimultaneousGestures(pan, pinch, useExclusiveGestures(doubleTap, tap));
+
+  // The photo follows the finger, shrinking a little as it is dragged
+  // away; the background clears as it goes.
+  const dragged = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: shiftX.get() },
+      { translateY: shiftY.get() },
+      { scale: zoom.get() * (1 - Math.min(0.25, Math.abs(shiftY.get()) / 1600)) },
+    ],
+  }));
+  const clearing = useAnimatedStyle(() => ({
+    opacity: 1 - Math.min(0.8, Math.abs(shiftY.get()) / 400),
+  }));
+
+  // Another photo is shown whole.
+  useEffect(() => {
+    if (zoom.get() !== 1) {
+      shiftX.set(0);
+    }
+
+    zoom.set(1);
+    shiftY.set(0);
+  }, [index, zoom, shiftX, shiftY]);
+
   if (!photo) {
     return null;
   }
@@ -301,7 +458,9 @@ export default function PhotoViewer({
 
   return (
     <View pointerEvents={closing ? "none" : "auto"} style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, chrome]} />
+      <Animated.View style={[StyleSheet.absoluteFill, clearing]}>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, chrome]} />
+      </Animated.View>
 
       <Animated.View style={[styles.bar, chrome]}>
         <Text style={styles.counter}>
@@ -319,12 +478,25 @@ export default function PhotoViewer({
         </View>
       </Animated.View>
 
-      <Pressable ref={stageRef} onLayout={onStageLayout} style={styles.stage} onPress={close} accessibilityLabel="Close">
-        <Animated.View style={[StyleSheet.absoluteFill, flight]}>
-          {previous ? frame(previous.photo, previous.uri, slide(previous.step * 80, true)) : null}
-          {frame(photo, uri, previous ? slide(previous.step * 80, false) : null)}
-        </Animated.View>
-      </Pressable>
+      <GestureDetector gesture={gestures}>
+        <View
+          ref={stageRef}
+          onLayout={(event) => {
+            size.set({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height });
+            onStageLayout();
+          }}
+          style={styles.stage}
+        >
+          <Animated.View style={[StyleSheet.absoluteFill, flight]}>
+            {/* No touches of its own: the gestures are the stage's (and a
+                browser would start dragging the picture away). */}
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, dragged]}>
+              {previous ? frame(previous.photo, previous.uri, slide(previous.step * 80, true)) : null}
+              {frame(photo, uri, previous ? slide(previous.step * 80, false) : null)}
+            </Animated.View>
+          </Animated.View>
+        </View>
+      </GestureDetector>
 
       {/* Always there: the one with nowhere to go fades out. */}
       <PressScale scale={0.88}
@@ -363,6 +535,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     zIndex: 40,
+    // A photo dragged away stays inside.
+    overflow: "hidden",
   },
 
   backdrop: {

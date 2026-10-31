@@ -11,6 +11,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { Platform, StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/features/auth/auth";
 import { CallsProvider } from "@/features/calls/calls-context";
@@ -42,6 +43,8 @@ const WebSafeArea = Platform.OS === "web" ? SafeAreaProvider : ({ children }: { 
 
 export default function RootLayout() {
   return (
+    // Gestures (the photo viewer's swipes and pinches, sheets dragged down).
+    <GestureHandlerRootView style={styles.root}>
     <WebSafeArea>
       <AppThemeProvider>
         <TooltipProvider>
@@ -62,6 +65,7 @@ export default function RootLayout() {
         </TooltipProvider>
       </AppThemeProvider>
     </WebSafeArea>
+    </GestureHandlerRootView>
   );
 }
 
@@ -188,6 +192,10 @@ function RootNavigator() {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+
   screens: {
     flex: 1,
   },
