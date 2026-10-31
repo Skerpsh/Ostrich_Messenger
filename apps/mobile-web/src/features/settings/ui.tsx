@@ -9,6 +9,7 @@ import { ms, SPRING, useMotion } from "@/ui/motion";
 import { useAppTheme } from "@/ui/theme";
 import { useLatest } from "@/ui/use-latest";
 import { radius } from "@/ui/colors";
+import { haptic } from "@/ui/haptics";
 
 // Building blocks of the settings screen and its styles.
 
@@ -41,7 +42,10 @@ export function ToggleRow({
       </View>
       <Switch
         value={value}
-        onValueChange={onChange}
+        onValueChange={(next) => {
+          haptic("tick");
+          onChange(next);
+        }}
         disabled={disabled}
         accessibilityLabel={label}
         trackColor={{ false: colors.panelAlt, true: colors.accent }}
@@ -239,6 +243,7 @@ export function StepSlider<T>({
     const next = step > 0 ? Math.min(options.length - 1, Math.max(0, Math.round(x / step))) : index;
 
     if (next !== index) {
+      haptic("tick");
       onChange(options[next].value);
     }
   };

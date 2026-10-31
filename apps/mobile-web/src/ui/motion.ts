@@ -13,6 +13,7 @@ import {
   type CSSAnimationProperties,
 } from "react-native-reanimated";
 import { useAppTheme } from "./theme";
+import { haptic } from "./haptics";
 
 // The app's animations: real springs (they overshoot a little and settle,
 // and turn back smoothly when interrupted), Reanimated's, so they run the
@@ -277,6 +278,9 @@ export function useShake() {
       motion === "full" && count > 0
         ? { ...SHAKES[count % 2], animationDuration: ms(SHAKES[count % 2].animationDuration) }
         : null,
-    shake: () => setCount((current) => current + 1),
+    shake: () => {
+      haptic("wrong");
+      setCount((current) => current + 1);
+    },
   };
 }

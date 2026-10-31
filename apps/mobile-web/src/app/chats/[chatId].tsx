@@ -109,6 +109,7 @@ import { useMinuteTick } from "@/ui/use-minute-tick";
 import { TOUCH_UI } from "@/platform/touch";
 import { radius } from "@/ui/colors";
 import PressScale from "@/ui/press-scale";
+import { haptic } from "@/ui/haptics";
 
 const MAX_MESSAGE_LENGTH = 4096;
 
@@ -1219,6 +1220,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
   // Tapping your own reaction removes it; another emoji replaces it.
   const react = async (message: Message, emoji: string) => {
     setMenuFor(null);
+    haptic("tick");
 
     const mine = message.reactions.find((r) => r.user_id === user?.id);
     const next = mine?.emoji === emoji ? null : emoji;

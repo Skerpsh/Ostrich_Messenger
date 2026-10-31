@@ -23,6 +23,7 @@ import {
   voiceFile,
 } from "./voice";
 import { Appear } from "@/ui/reveal";
+import { haptic } from "@/ui/haptics";
 
 // Bars shown while recording.
 const LIVE_BARS = 40;
@@ -98,6 +99,7 @@ export function useVoiceRecorder({
       levels.current = [];
       setLive([]);
       recorder.record();
+      haptic("hold");
       setActive(true);
     } catch (e) {
       onError(e instanceof Error ? e.message : "Failed to start recording");

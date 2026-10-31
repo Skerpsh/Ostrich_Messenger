@@ -50,6 +50,7 @@ import { useStartChat } from "./use-start-chat";
 import { cleanUsername, USERNAME_RE } from "@/features/auth/validation";
 import { radius } from "@/ui/colors";
 import PressScale from "@/ui/press-scale";
+import { haptic } from "@/ui/haptics";
 
 // Focuses the search of the chats list on screen (the welcome screen on the
 // right of a wide screen asks for it).
@@ -757,7 +758,10 @@ function ChatRow({
   return (
     <Pressable
       onPress={onPress}
-      onLongPress={onMenu}
+      onLongPress={() => {
+        haptic("hold");
+        onMenu();
+      }}
       // Web: right click opens the menu instead of the browser's.
       {...({
         onContextMenu: (event: { preventDefault: () => void }) => {

@@ -25,6 +25,7 @@ import { personaColor, personaTag } from "@/features/rooms/persona";
 import { accentVariant, isAccentChoice, radius, type AccentChoice } from "@/ui/colors";
 import PressScale from "@/ui/press-scale";
 import Reveal, { useAppear } from "@/ui/reveal";
+import { haptic } from "@/ui/haptics";
 
 // Touch screens (platform/touch.ts): swipe left to reply, long press for the
 // menu. Mouse users get a reply button on hover instead, and can select
@@ -169,7 +170,10 @@ export default function MessageBubble({
       >
         <Pressable
           onPress={selecting ? onToggle : undefined}
-          onLongPress={selecting ? onToggle : onMenu}
+          onLongPress={() => {
+            haptic("hold");
+            (selecting ? onToggle : onMenu)?.();
+          }}
           delayLongPress={350}
           // Web: right click opens the message menu instead of the browser's.
           {...({
@@ -485,6 +489,7 @@ function groupReactions(reactions: Reaction[], ownId: string | undefined) {
 function useSwipeToReply(onReply: () => void) {
   const [offset] = useState(() => new Animated.Value(0));
   const onReplyRef = useRef(onReply);
+  const reached = useRef(false);
 
   useLayoutEffect(() => {
     onReplyRef.current = onReply;
@@ -514,8 +519,20 @@ function useSwipeToReply(onReply: () => void) {
       onMoveShouldSetPanResponderCapture: (_, g) => isSwipe(g.dx, g.dy),
       onMoveShouldSetPanResponder: (_, g) => isSwipe(g.dx, g.dy),
       onPanResponderTerminationRequest: () => false,
-      onPanResponderMove: (_, g) =>
-        offset.setValue(Math.max(-SWIPE_MAX, Math.min(0, g.dx))),
+      onPanResponderMove: (_, g) => {
+        offset.setValue(Math.max(-SWIPE_MAX, Math.min(0, g.dx)));
+
+        // A tick as it gets far enough to reply, and back.
+        const far = g.dx <= -SWIPE_REPLY_AT;
+
+        if (far !== reached.current) {
+          reached.current = far;
+          haptic("tick");
+        }
+      },
+      onPanResponderGrant: () => {
+        reached.current = false;
+      },
       onPanResponderRelease: (_, g) => {
         if (g.dx <= -SWIPE_REPLY_AT) {
           onReplyRef.current();

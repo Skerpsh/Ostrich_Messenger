@@ -3,6 +3,7 @@ import { StyleSheet, type LayoutChangeEvent, type StyleProp, type ViewStyle } fr
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { away, LEAVE_MS, lookAt, settleMs, toward, useMotion, type Look } from "./motion";
 import { useLatest } from "./use-latest";
+import { haptic } from "./haptics";
 
 // A view that comes in as it mounts, springing from the `kind`'s hidden
 // look, and goes back to it while `leaving` (useLeave's), turning back
@@ -251,6 +252,11 @@ export function useSlider(selected: number) {
 
     // The first place it is put at once, the next ones it slides to.
     const first = x.get() === null;
+
+    if (!first) {
+      haptic("tick");
+    }
+
     x.set(first ? place.x : toward(place.x, motion, "move"));
     y.set(first ? place.y : toward(place.y, motion, "move"));
     width.set(first ? place.width : toward(place.width, motion, "move"));

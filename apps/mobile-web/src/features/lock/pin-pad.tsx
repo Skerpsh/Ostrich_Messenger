@@ -8,6 +8,7 @@ import { useKeydown } from "@/ui/keys";
 import { ms, useMotion, usePressed, useShake } from "@/ui/motion";
 import { useAppTheme } from "@/ui/theme";
 import { PIN_LENGTH } from "./lock";
+import { haptic } from "@/ui/haptics";
 
 // Typing a PIN: its dots and a keypad (and the keyboard's digits on the
 // web). onComplete gets the PIN once it is all typed; false back: it was
@@ -40,6 +41,7 @@ export default function PinPad({
     }
 
     const next = pin + digit;
+    haptic("tap");
     setPin(next);
 
     if (next.length === PIN_LENGTH) {
