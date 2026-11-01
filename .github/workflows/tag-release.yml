@@ -1,0 +1,53 @@
+# Tags a commit with a new version and starts its release. The server's
+# deploy (deploy/deploy.sh) asks for this with a token that can only start
+# workflows, so that a server taken over cannot get other code built and
+# signed (security audit SEC-011): only a commit already on main and newer
+# than the last release, under a higher version. A tag made with this
+# workflow's token does not start release.yml by itself, so it is started here.
+name: Tag a release
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: The commit to release (a full hash)
+        required: true
+      version:
+        description: The new version (v1.2.3)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check, tag and start the release
+        env:
+          SHA: ${{ inputs.sha }}
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::not a full commit hash"; exit 1; }
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a version like v1.2.3"; exit 1; }
+          git merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$SHA is not on main"; exit 1; }
+
+          last=$(git tag -l 'v*' --sort=-v:refname | head -1)
+
+          if [ -n "$last" ]; then
+            [ "$(printf '%s\n%s\n' "$last" "$VERSION" | sort -V | tail -1)" = "$VERSION" ] && [ "$VERSION" != "$last" ] \
+              || { echo "::error::$VERSION is not newer than $last"; exit 1; }
+            git merge-base --is-ancestor "$last" "$SHA" || { echo "::error::$SHA is older than $last"; exit 1; }
+          fi
+
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$VERSION" -f sha="$SHA" --silent
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"

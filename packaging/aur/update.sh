@@ -5,7 +5,8 @@
 #
 #   packaging/aur/update.sh v1.5.4
 #
-# Needs makepkg (Arch) for .SRCINFO.
+# Needs makepkg (Arch) for .SRCINFO, and OpenSSL 3 to check SHA256SUMS'
+# signature: the packages take their checksums from it.
 set -euo pipefail
 
 tag="${1:?usage: update.sh vX.Y.Z}"
@@ -16,6 +17,21 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 curl -fsSL -o "$tmp/SHA256SUMS" "https://github.com/$repo/releases/download/$tag/SHA256SUMS"
+curl -fsSL -o "$tmp/SHA256SUMS.sig" "https://github.com/$repo/releases/download/$tag/SHA256SUMS.sig"
+
+# The public half of the key release.yml signs with (as in apps/cli/version.go).
+cat > "$tmp/release-key.pem" <<'KEY'
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAZn7AoRPQh0TtFNiJOCnLELZeCeqp74kjK7pdEST9+Wk=
+-----END PUBLIC KEY-----
+KEY
+
+if ! openssl pkeyutl -verify -pubin -inkey "$tmp/release-key.pem" -rawin \
+  -in "$tmp/SHA256SUMS" -sigfile "$tmp/SHA256SUMS.sig" >/dev/null; then
+  echo "update.sh: SHA256SUMS of $tag is not signed by Ostrich's release key" >&2
+  exit 1
+fi
+
 curl -fsSL -o "$tmp/LICENSE" "https://raw.githubusercontent.com/$repo/$tag/LICENSE"
 
 sum() { awk -v f="$1" '$2 == f || $2 == "*" f { print $1 }' "$tmp/SHA256SUMS"; }

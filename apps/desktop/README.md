@@ -17,7 +17,9 @@ On top of the web app:
 - **`ostrich://` links** (`ostrich://chats/join/…`, `ostrich://chats/u/…`)
   open the screen in the running app
 - the window remembers its size and place
-- **updates** from the GitHub releases, looked for at start and every 4 hours:
+- **updates** from the GitHub releases, looked for at start and every 4 hours,
+  each installed only if it is in the release's signed `SHA256SUMS`
+  (`verify-update.js`):
   the AppImage and the Windows app install them when they quit; the `.deb`,
   `.rpm` and `.pacman` when you choose "Restart to update" (in the
   notification, the tray's menu or Settings), asking for your password. The

@@ -1,5 +1,6 @@
 # Publishes a release of every app when a version tag is pushed
-# (git tag v1.3.0 && git push origin v1.3.0): the CLI for Linux, macOS and
+# (git tag v1.3.0 && git push origin v1.3.0), or when tag-release.yml has made
+# one and starts this on it (deploys do that): the CLI for Linux, macOS and
 # Windows, the Android app (an APK built with EAS) and the desktop app for
 # Linux (AppImage, .deb, .rpm, .pacman, Flatpak) and Windows (an installer), all
 # under the same version, with SHA-256 checksums and a table of what to
@@ -11,8 +12,10 @@
 #
 # The Android build needs EXPO_TOKEN in the repository's secrets (Settings →
 # Secrets and variables → Actions); without it the release has the CLI only.
-# RELEASE_SIGNING_KEY (an Ed25519 private key, PEM) signs SHA256SUMS: the
-# CLI installs only releases signed with it (apps/cli/version.go).
+# RELEASE_SIGNING_KEY (an Ed25519 private key, PEM), a secret of the "release"
+# environment, which only v* tags may use, signs SHA256SUMS: the CLI and the
+# desktop app install only releases signed with it (apps/cli/version.go,
+# apps/desktop/verify-update.js).
 #
 # Actions are pinned to commits, and nothing is cached: a release runs only
 # code this repository chose (security audit SEC-002).
@@ -21,6 +24,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 # Only the publish job writes (the release itself).
 permissions:
@@ -214,6 +218,7 @@ jobs:
     # The CLI is enough to publish; the apps join when they were built.
     if: ${{ !cancelled() && needs.cli.result == 'success' }}
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
     steps:
@@ -309,7 +314,7 @@ jobs:
         env:
           AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
         run: |
-          pacman -Syu --noconfirm --needed git openssh perl curl
+          pacman -Syu --noconfirm --needed git openssh perl curl openssl
           # makepkg (for .SRCINFO) does not run as root.
           useradd -m builder
           chown -R builder .

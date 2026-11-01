@@ -36,9 +36,12 @@ deployed commit with the next version (v1.5.1 → v1.5.2), which starts
 from that release. Nothing is tagged if the
 commit has a version already.
 
-It tags through GitHub's API with a token, so the server needs no key to push.
-Once: on GitHub, Settings → Developer settings → Fine-grained tokens → Generate,
-only this repository, **Contents: Read and write**; then on the server:
+It asks GitHub to tag ([`tag-release.yml`](../.github/workflows/tag-release.yml),
+which takes only a commit on `main`, newer than the last release) with a token
+that can do nothing else: a server taken over cannot get other code built and
+signed, nor change a release. Once: on GitHub, Settings → Developer settings →
+Fine-grained tokens → Generate, only this repository, only **Actions: Read and
+write**; then on the server:
 
 ```bash
 sudo install -d -m 700 /etc/ostrich && sudo sh -c 'read -r t && printf %s "$t" > /etc/ostrich/release-token' && sudo chmod 600 /etc/ostrich/release-token

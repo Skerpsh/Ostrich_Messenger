@@ -153,6 +153,7 @@ The version you have is at the bottom of **Settings**.
 | Android | A banner offers the new release's APK. Nothing comes over the air: code a phone runs comes only in an APK |
 | Windows, AppImage | Looked for at start and every 4 hours, downloaded in the background, installed when you quit Ostrich (or *Restart to update*) |
 | .deb, .rpm, .pacman | The same, installed when you choose *Restart to update* in the notification, the tray's menu or Settings; your password is asked |
+| Windows, AppImage, .deb, .rpm, .pacman | Installed only if the download is in the release's `SHA256SUMS` and its signature `SHA256SUMS.sig` checks out |
 | AUR, Flatpak | By the package manager (`yay -Syu`, `flatpak update`) |
 | CLI | Replaces itself at start with the new release (checked against `SHA256SUMS` and its signature, `SHA256SUMS.sig`), used from the next start; installed by a package manager, it says to update with it |
 
@@ -639,7 +640,21 @@ The [Release](.github/workflows/release.yml) workflow publishes every app under 
 
 The release gets the files, `install.sh`, `SHA256SUMS` and its Ed25519 signature `SHA256SUMS.sig`, a table of what to download for
 which system, and notes generated from the commits. The [Download](#download) links always
-point at the latest release.
+point at the latest release. The CLI, the desktop app and the AUR script take only what that
+signature covers. To check a download by hand (OpenSSL 3), put the release's public key in `key.pem`:
+
+```
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAZn7AoRPQh0TtFNiJOCnLELZeCeqp74kjK7pdEST9+Wk=
+-----END PUBLIC KEY-----
+```
+
+then run `openssl pkeyutl -verify -pubin -inkey key.pem -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig`
+and `sha256sum --ignore-missing -c SHA256SUMS`. `install.sh` checks only the checksum: it comes from
+the same release, so a check of its own would prove nothing.
+
+Deploys start the release through [`tag-release.yml`](.github/workflows/tag-release.yml), which tags
+only a commit on `main` newer than the last release.
 
 Secrets, on GitHub under the repository's **Settings → Secrets and variables → Actions**:
 
@@ -647,7 +662,7 @@ Secrets, on GitHub under the repository's **Settings → Secrets and variables �
 |---|---|---|
 | `EXPO_TOKEN` | The Android app: [expo.dev → Account settings → Access tokens](https://expo.dev/settings/access-tokens) | No Android app in the release |
 | `AUR_SSH_KEY` | The AUR packages: the private half of an SSH key whose public half is in the AUR account | The AUR is not updated |
-| `RELEASE_SIGNING_KEY` | Signing `SHA256SUMS`: an Ed25519 private key (PEM, `openssl genpkey -algorithm ed25519`) whose public half is `releasePublicKey` in [`apps/cli/version.go`](apps/cli/version.go) | The release fails: the CLI would not update to it |
+| `RELEASE_SIGNING_KEY` (in the `release` environment, which only `v*` tags may use) | Signing `SHA256SUMS`: an Ed25519 private key (PEM, `openssl genpkey -algorithm ed25519`) whose public half is `releasePublicKey` in [`apps/cli/version.go`](apps/cli/version.go) and `apps/desktop/verify-update.js` | The release fails: the CLI and the desktop app would not update to it |
 
 ## Project structure
 

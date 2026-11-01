@@ -13,7 +13,8 @@
   "scripts": {
     "web": "node scripts/build-web.mjs",
     "start": "electron .",
-    "dist": "electron-builder --publish never"
+    "dist": "electron-builder --publish never",
+    "test": "node --test"
   },
   "dependencies": {
     "builder-util-runtime": "9.7.0",
@@ -29,6 +30,7 @@
     "files": [
       "main.js",
       "preload.cjs",
+      "verify-update.js",
       "web/**"
     ],
     "directories": {

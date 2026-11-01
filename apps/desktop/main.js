@@ -11,6 +11,7 @@ import updater from "electron-updater";
 import runtime from "builder-util-runtime";
 import http from "node:http";
 import https from "node:https";
+import { verifyUpdate } from "./verify-update.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, "web");
@@ -140,7 +141,8 @@ function startUpdates() {
   const { autoUpdater } = updater;
   autoUpdater.httpExecutor = new NodeHttpExecutor();
   const silent = type === "appimage" || type === "windows";
-  autoUpdater.autoInstallOnAppQuit = silent;
+  // Not before the download's signature checks out (update-downloaded).
+  autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} };
 
   if (["deb", "rpm", "pacman"].includes(type) && noNewPrivileges()) {
@@ -173,7 +175,21 @@ function startUpdates() {
     retries++;
   });
 
-  autoUpdater.on("update-downloaded", (info) => {
+  autoUpdater.on("update-downloaded", async (info) => {
+    try {
+      await verifyUpdate(info.downloadedFile, info.version);
+    } catch (error) {
+      // As any failed update: said in Settings and tried again later, with
+      // the file kept (the network may be why), and never installed.
+      autoUpdater.emit("error", new Error(`Update ${info.version} refused: ${error.message}`));
+      return;
+    }
+
+    log(`update: the signature of ${info.version} checks out`);
+    autoUpdater.autoInstallOnAppQuit = silent;
+    // The updater's own call came before the check, and did nothing.
+    autoUpdater.addQuitHandler();
+
     retries = 0;
     const first = updateReady !== info.version;
     updateReady = info.version;

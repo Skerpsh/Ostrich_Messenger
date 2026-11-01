@@ -83,6 +83,7 @@ jobs:
           cache-dependency-path: apps/desktop/package-lock.json
       - run: npm ci
       - run: node --check main.js && node --check scripts/build-web.mjs
+      - run: npm test
 
   cli:
     runs-on: ubuntu-latest

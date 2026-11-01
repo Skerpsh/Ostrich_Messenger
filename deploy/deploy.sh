@@ -26,7 +26,9 @@ SERVICES="${SERVICES:-$SERVICE}"
 WEB_ROOT="${WEB_ROOT:-/var/www/ostrich-web}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
 # The release of the apps (below): a fine-grained GitHub token of the
-# repository with "Contents: Read and write", in a file only root reads.
+# repository with only "Actions: Read and write", in a file only root reads.
+# It starts .github/workflows/tag-release.yml, and cannot change the code nor
+# the releases, so this server cannot get anything else built and signed.
 RELEASE_TOKEN_FILE="${RELEASE_TOKEN_FILE:-/etc/ostrich/release-token}"
 GITHUB_REPO="${GITHUB_REPO:-Skerpsh/Ostrich_Messenger}"
 
@@ -179,9 +181,9 @@ fi
 
 # The apps (desktop, Android, CLI) carry their own copy of the code: the
 # next version's tag on what was deployed starts their release
-# (.github/workflows/release.yml), from which they update themselves. Made
-# through GitHub's API, so the server needs no key to push; a failure does
-# not undo the deploy.
+# (.github/workflows/release.yml), from which they update themselves. GitHub
+# makes the tag (tag-release.yml), if the commit is on main and newer than
+# the last release; a failure does not undo the deploy.
 if [ "$release" = 1 ] && [ -r "$RELEASE_TOKEN_FILE" ]; then
   step "Releasing the apps"
   cd "$REPO"
@@ -196,11 +198,11 @@ if [ "$release" = 1 ] && [ -r "$RELEASE_TOKEN_FILE" ]; then
     if curl -fsS -o /dev/null -X POST \
       -H "Authorization: Bearer $(cat "$RELEASE_TOKEN_FILE")" \
       -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/repos/$GITHUB_REPO/git/refs" \
-      -d "{\"ref\": \"refs/tags/$next\", \"sha\": \"$commit\"}"; then
-      echo "Tagged $next: GitHub Actions builds and publishes it, and the apps update to it"
+      "https://api.github.com/repos/$GITHUB_REPO/actions/workflows/tag-release.yml/dispatches" \
+      -d "{\"ref\": \"main\", \"inputs\": {\"sha\": \"$commit\", \"version\": \"$next\"}}"; then
+      echo "Asked for $next: GitHub Actions tags, builds and publishes it, and the apps update to it"
     else
-      echo "deploy: could not tag $next (is the token in $RELEASE_TOKEN_FILE valid?); the deploy itself is done" >&2
+      echo "deploy: could not ask for $next (is the token in $RELEASE_TOKEN_FILE valid?); the deploy itself is done" >&2
     fi
   fi
 elif [ "$release" = 1 ]; then
