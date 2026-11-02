@@ -1,22 +1,46 @@
 # One backend process of several (see "Several backend processes" in
 # deploy/README.md); the instance name is its port: ostrich@3001,
-# ostrich@3002, ... They share state through Redis (REDIS_URL in .env).
+# ostrich@3002, ... They share state through Redis (REDIS_URL in .env). The
+# same user and sandbox as ostrich.service.
 [Unit]
 Description=Ostrich backend on port %i
 After=network.target postgresql.service redis-server.service
 
 [Service]
+User=ostrich
+Group=ostrich
 WorkingDirectory=/opt/ostrich/apps/server
 EnvironmentFile=/opt/ostrich/apps/server/.env
 Environment=NODE_ENV=production
+Environment=NVM_DIR=/opt/nvm
 # Set on the command line: values from EnvironmentFile would win over
 # Environment= (and .env may have a PORT).
-# Node from nvm (/root/.nvm) if installed there, else from PATH.
-ExecStart=/bin/bash -c '[ -s /root/.nvm/nvm.sh ] && . /root/.nvm/nvm.sh; PORT=%i HOST=127.0.0.1 exec node dist/server.js'
+# Node from nvm (/opt/nvm) if installed there, else from PATH.
+ExecStart=/bin/bash -c '[ -s /opt/nvm/nvm.sh ] && . /opt/nvm/nvm.sh; PORT=%i HOST=127.0.0.1 exec node dist/server.js'
 Restart=always
 RestartSec=2
 # Time to tell the connected users they were last seen now.
 TimeoutStopSec=15
+ReadWritePaths=/opt/ostrich/apps/server/data
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
 
 [Install]
 WantedBy=multi-user.target

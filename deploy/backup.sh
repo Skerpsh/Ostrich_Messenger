@@ -75,8 +75,18 @@ export PGDATABASE="${DB_NAME:-ostrich_db}"
 export PGUSER="${DB_USER:-ostrich}"
 export PGPASSWORD="${DB_PASSWORD:-}"
 
+# Dumps, partial ones too, are root's alone.
+umask 077
 mkdir -p "$BACKUP_DIR"
-chmod 700 "$BACKUP_DIR"
+
+# The monitoring bot, as user ostrich, looks at the names and dates of the
+# backups; it cannot open them.
+if getent group ostrich >/dev/null; then
+  chgrp ostrich "$BACKUP_DIR"
+  chmod 750 "$BACKUP_DIR"
+else
+  chmod 700 "$BACKUP_DIR"
+fi
 
 # A compressed dump is smaller than the database; its size is an upper
 # bound for the space the backup needs.

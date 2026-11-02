@@ -79,6 +79,18 @@ header {
 
 Then `systemctl reload caddy`.
 
+## The backend's user
+
+The backend and the monitoring bot run as the user `ostrich`, in a sandbox
+([`ostrich.service`](ostrich.service), [`ostrich@.service`](ostrich@.service),
+[`ostrich-monitor.service`](ostrich-monitor.service)): a flaw in them does not
+give the whole server. They write only `apps/server/data` (the bot also its
+`/var/lib/ostrich-monitor`) and cannot read `.env` as a file, `/root`,
+`/etc/ostrich` or the backups' contents; systemd hands them the values from
+`.env`. `deploy.sh` itself stays root's, and `npm ci` runs there.
+
+Node must be where they can reach it: nvm in `/opt/nvm`, not `/root/.nvm`.
+
 ## Several backend processes
 
 One backend process is enough for a long time. For more (several CPU
@@ -106,7 +118,7 @@ grep -q '^REDIS_URL=' /opt/ostrich/apps/server/.env || echo 'REDIS_URL=redis://1
 
 3. Two processes on ports 3001 and 3002 instead of the single service (check
 first with `systemctl cat ostrich` that it runs as the same user as
-`deploy/ostrich@.service`, which has none, i.e. root; add `User=` there if not):
+`deploy/ostrich@.service`, `ostrich`; see "The backend's user"):
 
 ```bash
 cp /opt/ostrich/deploy/ostrich@.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now ostrich@3001 ostrich@3002 && curl -fsS http://127.0.0.1:3001/api/health && curl -fsS http://127.0.0.1:3002/api/health

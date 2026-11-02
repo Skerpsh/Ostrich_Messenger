@@ -1,19 +1,46 @@
 # The monitoring bot (apps/server/src/monitor/): reports to Telegram every 15
 # minutes and alerts when something breaks. See "Monitoring bot" in
-# deploy/README.md.
+# deploy/README.md. As the backend's user, in a sandbox; besides, it reads the
+# journal (for errors in the logs) and the names of the backups, not their
+# contents (security audit SEC-016).
 [Unit]
 Description=Ostrich monitoring bot
 After=network-online.target postgresql.service
 Wants=network-online.target
 
 [Service]
+User=ostrich
+Group=ostrich
+SupplementaryGroups=systemd-journal
+# /var/lib/ostrich-monitor, made the user's by systemd.
+StateDirectory=ostrich-monitor
 WorkingDirectory=/opt/ostrich/apps/server
 EnvironmentFile=/opt/ostrich/apps/server/.env
 Environment=NODE_ENV=production
-# Node from nvm (/root/.nvm) if installed there, else from PATH.
-ExecStart=/bin/bash -c '[ -s /root/.nvm/nvm.sh ] && . /root/.nvm/nvm.sh; exec node dist/monitor/main.js'
+Environment=NVM_DIR=/opt/nvm
+# Node from nvm (/opt/nvm) if installed there, else from PATH.
+ExecStart=/bin/bash -c '[ -s /opt/nvm/nvm.sh ] && . /opt/nvm/nvm.sh; exec node dist/monitor/main.js'
 Restart=always
 RestartSec=10
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
 
 [Install]
 WantedBy=multi-user.target

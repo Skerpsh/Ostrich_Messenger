@@ -427,8 +427,8 @@ curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y 
 ```
 
 ([Caddy's install guide](https://caddyserver.com/docs/install) covers adding its repository if
-your distribution does not ship it. Node from [nvm](https://github.com/nvm-sh/nvm) works too: the
-systemd units find it.)
+your distribution does not ship it. Node from [nvm](https://github.com/nvm-sh/nvm) works too, installed
+in `/opt/nvm` so that the backend's user can reach it: the systemd units find it.)
 
 ### 2. Get the code and create the database
 
@@ -454,25 +454,12 @@ chmod 600 /opt/ostrich/apps/server/.env
 
 ### 4. Create the systemd service
 
+The backend runs as its own user, in a sandbox ([`deploy/ostrich.service`](deploy/ostrich.service)):
+
 ```bash
-cat > /etc/systemd/system/ostrich.service <<'EOF'
-[Unit]
-Description=Ostrich backend
-After=network.target postgresql.service
-
-[Service]
-WorkingDirectory=/opt/ostrich/apps/server
-EnvironmentFile=/opt/ostrich/apps/server/.env
-Environment=NODE_ENV=production
-ExecStart=/bin/bash -c '[ -s /root/.nvm/nvm.sh ] && . /root/.nvm/nvm.sh; exec node dist/server.js'
-Restart=always
-RestartSec=2
-TimeoutStopSec=15
-
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl daemon-reload && systemctl enable ostrich
+useradd --system --shell /usr/sbin/nologin --home-dir /nonexistent --no-create-home ostrich
+install -d -o ostrich -g ostrich -m 700 /opt/ostrich/apps/server/data /opt/ostrich/apps/server/data/attachments
+cp /opt/ostrich/deploy/ostrich.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable ostrich
 ```
 
 ### 5. Configure Caddy

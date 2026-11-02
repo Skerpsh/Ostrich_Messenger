@@ -1,0 +1,45 @@
+# The Ostrich backend, one process (several: ostrich@.service). As its own
+# user, in a sandbox: it may write only its files of messages, and cannot read
+# root's files, the backups or the release token (security audit SEC-016).
+# .env stays root's: systemd reads it and hands over the values. See
+# deploy/README.md, "The backend's user".
+[Unit]
+Description=Ostrich backend
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+User=ostrich
+Group=ostrich
+WorkingDirectory=/opt/ostrich/apps/server
+EnvironmentFile=/opt/ostrich/apps/server/.env
+Environment=NODE_ENV=production
+Environment=NVM_DIR=/opt/nvm
+# Node from nvm (/opt/nvm) if installed there, else from PATH.
+ExecStart=/bin/bash -c '[ -s /opt/nvm/nvm.sh ] && . /opt/nvm/nvm.sh; HOST=127.0.0.1 exec node dist/server.js'
+Restart=always
+RestartSec=2
+# Time to tell the connected users they were last seen now.
+TimeoutStopSec=15
+ReadWritePaths=/opt/ostrich/apps/server/data
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
