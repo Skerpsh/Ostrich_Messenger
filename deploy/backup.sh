@@ -32,11 +32,14 @@ ping_healthcheck() {
   fi
 }
 
+# Says in the journal how far it got (the monitoring bot shows this).
+stage="reading the settings"
+
 # Any failing command reports the failure.
-trap 'ping_healthcheck /fail' ERR
+trap 'code=$?; echo "backup: failed at stage: $stage (line $LINENO, exit $code)" >&2; ping_healthcheck /fail' ERR
 
 fail() {
-  echo "backup: $*" >&2
+  echo "backup: failed at stage: $stage ($*)" >&2
   ping_healthcheck /fail
   exit 1
 }
@@ -88,6 +91,8 @@ else
   chmod 700 "$BACKUP_DIR"
 fi
 
+stage="checking the disk space"
+
 # A compressed dump is smaller than the database; its size is an upper
 # bound for the space the backup needs.
 db_bytes="$(psql -tAc "SELECT pg_database_size(current_database())")"
@@ -99,12 +104,15 @@ if [ "$free_bytes" -lt "$needed_bytes" ]; then
     "($((free_bytes / 1024 / 1024)) MB free, need $((needed_bytes / 1024 / 1024)) MB)"
 fi
 
+stage="dumping the database"
 file="$BACKUP_DIR/ostrich-$(date +%Y%m%d-%H%M%S).dump"
 
 # Written under a temporary name, so a failed dump never looks complete.
 pg_dump --format=custom --compress=6 --file="$file.partial"
 mv "$file.partial" "$file"
 chmod 600 "$file"
+
+stage="removing old backups"
 
 # Keep the newest KEEP backups.
 find "$BACKUP_DIR" -maxdepth 1 -name 'ostrich-*.dump' -printf '%T@ %p\n' \
@@ -120,9 +128,18 @@ if [ -n "$OFFSITE_REMOTE" ]; then
   if [ -z "$AGE_RECIPIENT" ]; then
     fail "OFFSITE_REMOTE is set but AGE_RECIPIENT is not"
   fi
-  age -r "$AGE_RECIPIENT" "$file" | rclone rcat "$OFFSITE_REMOTE/db/$(basename "$file").age"
+  stage="off-site: encrypting the dump"
+  # From a file, not a pipe: rclone cannot retry a stream, and one 503 from
+  # the storage would fail the whole backup. Removes what a failed run left.
+  rm -f "$BACKUP_DIR"/ostrich-*.dump.age
+  age -r "$AGE_RECIPIENT" -o "$file.age" "$file"
+  stage="off-site: uploading the dump"
+  rclone copyto "$file.age" "$OFFSITE_REMOTE/db/$(basename "$file").age"
+  rm -f "$file.age"
+  stage="off-site: removing old copies"
   rclone delete --min-age "${OFFSITE_KEEP_DAYS}d" "$OFFSITE_REMOTE/db"
   if [ -d "$ATTACHMENTS_DIR" ]; then
+    stage="off-site: copying the attachments"
     rclone sync "$ATTACHMENTS_DIR" "$OFFSITE_REMOTE/attachments"
   fi
   echo "backup: copied to $OFFSITE_REMOTE"

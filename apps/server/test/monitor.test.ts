@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AlertTracker } from "../src/monitor/alerts.js";
+import { alertHtml, hintsFor, parseJournal, readFailure, redact, topProcesses, unitsFor } from "../src/monitor/diagnose.js";
 import { bytes, dailySummary, duration, problems, report, short, type Thresholds } from "../src/monitor/report.js";
 import { addSample, daysUntilFull, newDay } from "../src/monitor/state.js";
 import type { BackendStats, Snapshot } from "../src/monitor/stats.js";
@@ -248,4 +249,145 @@ test("monitor: alerts after repeated checks, cleared once gone", () => {
   // Seen once (a restart): no alert, nothing to clear.
   assert.deepEqual(tracker.update([down]), { raised: [], cleared: [] });
   assert.deepEqual(tracker.update([]), { raised: [], cleared: [] });
+});
+
+// The real failure of 2026-11-03, with its stage line added.
+const FAILED_BACKUP = [
+  '1793678434.1 host systemd[1]: Starting ostrich-backup.service - Ostrich database backup...',
+  '1793678434.2 host backup.sh[1]: NOTICE: Config file "/root/.config/rclone/rclone.conf" not found - using defaults',
+  '1793678435.1 host backup.sh[1]: ERROR : ostrich-20261103-040034.dump.age: Post request rcat error: no tomes available (503 service_unavailable)',
+  '1793678435.2 host backup.sh[1]: backup: failed at stage: off-site: uploading the dump (line 130, exit 1)',
+  '1793678435.3 host systemd[1]: ostrich-backup.service: Main process exited, code=exited, status=1/FAILURE',
+  "1793678435.4 host systemd[1]: ostrich-backup.service: Failed with result 'exit-code'.",
+  '1793678435.5 host systemd[1]: Failed to start ostrich-backup.service - Ostrich database backup.',
+].join("\n");
+
+test("monitor: a failed run: stage, how it ended, its errors", () => {
+  const failure = readFailure(parseJournal(FAILED_BACKUP));
+
+  assert.equal(failure.stage, "off-site: uploading the dump");
+  assert.equal(failure.how, "exit code 1");
+  assert.equal(failure.seconds, 1);
+  assert.equal(failure.recovered, false);
+  assert.deepEqual(failure.errors, [
+    "ERROR : ostrich-20261103-040034.dump.age: Post request rcat error: no tomes available (503 service_unavailable)",
+  ]);
+});
+
+test("monitor: an earlier failure is told apart from the last run, and a crash's signal", () => {
+  const later = `${FAILED_BACKUP}\n1793700000.1 host systemd[1]: Starting ostrich-backup.service...\n1793700001.1 host backup.sh[2]: backup: copied to b2:x\n1793700002.1 host systemd[1]: ostrich-backup.service: Deactivated successfully.`;
+  assert.equal(readFailure(parseJournal(later)).recovered, true);
+
+  const crash = readFailure(
+    parseJournal(
+      [
+        "1000.0 host systemd[1]: Started ostrich.service - Backend.",
+        '1100.0 host node[3]: {"level":30,"msg":"request completed","req":{"remoteAddress":"8.8.8.8"}}',
+        '1200.0 host node[3]: {"level":50,"msg":"x","err":{"message":"boom at 8.8.8.8"}}',
+        "1300.0 host systemd[1]: ostrich.service: Main process exited, code=killed, status=11/SEGV",
+        "1310.0 host systemd[1]: Started ostrich.service - Backend.",
+      ].join("\n"),
+    ),
+  );
+
+  assert.equal(crash.how, "killed by signal SEGV");
+  assert.equal(crash.seconds, 300);
+  // Only the message of a JSON line, and not its request.
+  assert.deepEqual(crash.errors, ["boom at [ip]"]);
+
+  const oom = "1.0 host systemd[1]: Started a.\n2.0 host systemd[1]: a.service: A process of this unit has been killed by the OOM killer.";
+  assert.equal(readFailure(parseJournal(oom)).how, "killed: out of memory");
+
+  // Nothing failed: no time, and only error lines are taken.
+  const quiet = readFailure(parseJournal("1.0 host node[3]: listening\n2.0 host node[3]: cannot open x"));
+  assert.equal(quiet.at, undefined);
+  assert.deepEqual(quiet.errors, ["cannot open x"]);
+});
+
+test("monitor: secrets and addresses do not reach Telegram", () => {
+  const hidden = [
+    "RCLONE_CONFIG_B2_KEY=K0012345",
+    "password: hunter2",
+    'token="abc"',
+    "Authorization: Bearer abc.def",
+    "postgres://ostrich:hunter2@db/x",
+    "login from 8.8.8.8 and 2001:db8:1:2::5 by me@example.com",
+    "a".repeat(40),
+  ].map(redact);
+
+  for (const secret of ["K0012345", "hunter2", "abc", "8.8.8.8", "2001:db8", "me@example.com", "aaaa"]) {
+    assert.ok(!hidden.join("\n").includes(secret), secret);
+  }
+
+  // What the alerts need stays.
+  for (const kept of [
+    "/var/backups/ostrich/ostrich-20261103-040034.dump",
+    "connect ECONNREFUSED 127.0.0.1:5432",
+    "password authentication failed for user",
+    "04:00:34 62.238.111.55.nip.io",
+  ]) {
+    assert.equal(redact(kept), kept);
+  }
+});
+
+test("monitor: an alert says what, how and at which stage, escaped", () => {
+  const html = alertHtml(
+    "🚨 <b>Service ostrich-backup is failed (failed)</b>",
+    { text: "Service ostrich-backup is failed (failed)" },
+    [{ unit: "ostrich-backup", failure: readFailure(parseJournal(FAILED_BACKUP)) }],
+  );
+
+  assert.match(html, /<b>Stage:<\/b> off-site: uploading the dump/);
+  assert.match(html, /<b>How:<\/b> exit code 1 after 1 s at /);
+  assert.match(html, /<pre>ERROR : .*no tomes available/);
+  assert.match(html, /local dump was made/);
+  assert.match(html, /temporary failure/);
+  assert.match(html, /<code>systemctl restart ostrich-backup<\/code>/);
+  assert.match(html, /<code>journalctl -u ostrich-backup -n 50 --no-pager<\/code>/);
+
+  const tags = alertHtml("t", { text: "x", details: ["2× <b>&"] }, [
+    { unit: "a", failure: { errors: ["</pre><i>"], recovered: false } },
+  ]);
+  assert.match(tags, /&lt;\/pre&gt;&lt;i&gt;/);
+  assert.match(tags, /2× &lt;b&gt;&amp;/);
+});
+
+test("monitor: hints and the services behind a problem", () => {
+  assert.equal(hintsFor("all quiet").length, 0);
+  assert.match(hintsFor("write failed: No space left on device")[0], /du -xh/);
+  assert.match(hintsFor("connect ECONNREFUSED 127.0.0.1:5432")[0], /Nothing is listening/);
+  assert.match(hintsFor("exit code 203 (EXEC)")[0], /could not start the program/);
+
+  const units = ["ostrich", "ostrich@3001", "ostrich-monitor", "postgresql@18-main", "caddy"].map((name) => ({
+    name,
+    active: "active",
+    sub: "running",
+    problem: false,
+    restarts: 0,
+  }));
+  const of = (key: string) => unitsFor({ key, text: "" }, units);
+
+  assert.deepEqual(of("unit caddy"), ["caddy"]);
+  assert.deepEqual(of("backend http://127.0.0.1:3000"), ["ostrich", "ostrich@3001"]);
+  assert.deepEqual(of("database"), ["postgresql@18-main"]);
+  assert.deepEqual(of("backup"), ["ostrich-backup"]);
+  assert.deepEqual(of("memory"), []);
+});
+
+test("monitor: the processes using the most memory, summed by name", () => {
+  assert.equal(topProcesses(" 2048 node\n 1024 postgres\n 1024 postgres\n 512 sshd\n 10 bash\n"), "node 2 MB, postgres 2 MB, sshd 1 MB");
+});
+
+test("monitor: open alerts survive a new day", () => {
+  const state = newDay(at);
+  state.alerts = { backup: { text: "x", since: 1, remindedAt: 1 } };
+  assert.deepEqual(newDay(at, state).alerts, state.alerts);
+});
+
+test("monitor: the most frequent log errors go into the alert", () => {
+  const [problem] = problems(snapshot(), limits, {
+    recentLogErrors: { count: 25, top: "boom", tops: [{ message: "boom", count: 20 }, { message: "bang", count: 5 }] },
+  });
+
+  assert.deepEqual(problem.details, ["20× boom", "5× bang"]);
 });

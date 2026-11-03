@@ -17,6 +17,9 @@ export type State = {
   previous?: { users: number; online: number; messagesRecent: number };
   // Used bytes of each disk (by path), about hourly, for a week.
   samples: { at: number; used: Record<string, number> }[];
+  // The problems alerted on and not fixed yet, by key: a restart neither
+  // repeats their alerts nor forgets how long they last.
+  alerts?: Record<string, { text: string; since: number; remindedAt: number }>;
 };
 
 export const emptyCounters = (): BackendCounters => ({
@@ -34,7 +37,7 @@ export function localDay(date: Date) {
 }
 
 export function newDay(date: Date, keep?: State): State {
-  return { day: localDay(date), traffic: emptyCounters(), crashes: 0, previous: keep?.previous, samples: keep?.samples ?? [] };
+  return { day: localDay(date), traffic: emptyCounters(), crashes: 0, previous: keep?.previous, samples: keep?.samples ?? [], alerts: keep?.alerts };
 }
 
 export async function loadState(file: string): Promise<State> {

@@ -63,7 +63,7 @@ export type Unit = { name: string; active: string; sub: string; problem: boolean
 
 export type Backup = { file: string; at: Date; size: number };
 
-export type LogErrors = { count: number; top?: string };
+export type LogErrors = { count: number; top?: string; tops?: { message: string; count: number }[] };
 
 export type Certificate = { host: string; expiresAt?: Date; error?: string };
 
@@ -316,7 +316,7 @@ async function network() {
 
 // Services worth watching: running, failed, or enabled to run. A oneshot
 // (the backup) is a problem only when it failed.
-async function units(patterns: string[]): Promise<Unit[] | null> {
+export async function units(patterns: string[]): Promise<Unit[] | null> {
   if (patterns.length === 0) {
     return [];
   }
@@ -418,9 +418,12 @@ export async function logErrors(unitNames: string[], since: string, until?: stri
       }
     }
 
-    const top = [...messages].sort((a, b) => b[1] - a[1])[0]?.[0];
+    const tops = [...messages]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([message, times]) => ({ message, count: times }));
 
-    return { count, top };
+    return { count, top: tops[0]?.message, tops };
   } catch {
     return null;
   }

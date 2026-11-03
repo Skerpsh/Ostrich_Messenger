@@ -37,8 +37,9 @@ export type Extras = {
   updates?: Updates;
 };
 
-// `key` names the problem across checks; the text may change.
-export type Problem = { key: string; text: string };
+// `key` names the problem across checks; the text may change. `details`:
+// lines for its alert, not for the reports.
+export type Problem = { key: string; text: string; details?: string[] };
 
 export function escapeHtml(text: string) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -183,6 +184,7 @@ export function problems(snapshot: Snapshot, limits: Thresholds, extras: Extras 
     found.push({
       key: "log errors",
       text: `Backend logged ${logs.count} errors recently${logs.top ? `, mostly "${logs.top}"` : ""}`,
+      ...(logs.tops && { details: logs.tops.map(({ message, count }) => `${count}× ${message}`) }),
     });
   }
 
@@ -207,14 +209,6 @@ export function problems(snapshot: Snapshot, limits: Thresholds, extras: Extras 
   }
 
   return found;
-}
-
-export function problemsText(list: Problem[]) {
-  if (list.length === 0) {
-    return "✅ All good";
-  }
-
-  return [`🔴 <b>${list.length === 1 ? "1 problem" : `${list.length} problems`}</b>`, ...list.map((p) => `• ${escapeHtml(p.text)}`)].join("\n");
 }
 
 // Totals of all processes: they all see the same online users.

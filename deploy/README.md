@@ -190,14 +190,20 @@ A Telegram bot of our own, running on the server next to the backend
   users, messages, peak online, requests, errors, crashes, how much the
   database, the files and the disks grew.
 - **Alerts** with sound, checked every minute, when a problem has lasted two
-  checks, and again when it is fixed: the backend does not answer or is
+  checks, every 6 hours while it lasts, and when it is fixed, with how long
+  it lasted. They say why, from the service's journal: at which stage the
+  backup failed, how a service ended (exit code, signal, out of memory), up
+  to 5 of its error lines, a hint and the commands to look further. Before
+  they leave for Telegram, passwords, keys, tokens, emails and IP addresses
+  are hidden. What it alerts on: the backend does not answer or is
   slow, the database fails, a service failed or crashed (restarted by
   systemd), a disk or the memory is nearly full or a disk will be full
   within two weeks, the last backup is more than 26 hours old, many
   errors in the backend's log or many failed logins, an SSL certificate
   expires within two weeks.
 - **Commands**: `/stats` (the report now), `/today` (the day so far),
-  `/health`, `/id`.
+  `/health` (problems and why), `/logs <service>` (the end of a watched
+  service's log, also with secrets hidden), `/id`.
 
 The day's figures and the disk history are kept in
 `/var/lib/ostrich-monitor/state.json`, so a restart (each deploy) does not
@@ -253,6 +259,7 @@ Other settings, in `.env` as well (the defaults are shown):
 | `MONITOR_REPORT_MINUTES` | `15` | how often to report |
 | `MONITOR_CHECK_SECONDS` | `60` | how often to check |
 | `MONITOR_ALERT_AFTER` | `2` | checks in a row before an alert |
+| `MONITOR_REMIND_HOURS` | `6` | how often to repeat an alert while the problem lasts (not a disk forecast) |
 | `MONITOR_DISK_MIN_FREE_PERCENT` | `10` | a disk is low below this ... |
 | `MONITOR_DISK_MIN_FREE_GB` | `2` | ... or this (uploads stop at 1 GB) |
 | `MONITOR_MEMORY_MIN_FREE_PERCENT` | `5` | |

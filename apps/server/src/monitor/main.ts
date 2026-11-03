@@ -1,11 +1,14 @@
 import { db } from "../database.js";
 import { AlertTracker } from "./alerts.js";
+import { alertHtml, memoryUsers, redact, unitFailure, unitLog, unitsFor, type UnitFailure } from "./diagnose.js";
 import {
   dailySummary,
+  duration,
   escapeHtml,
   problems,
-  problemsText,
   report,
+  time,
+  type Problem,
   type DaySummary,
   type Extras,
   type Thresholds,
@@ -24,6 +27,7 @@ import {
   type CollectOptions,
   type Snapshot,
   type Updates,
+  units as watchedUnits,
 } from "./stats.js";
 import { Telegram } from "./telegram.js";
 
@@ -49,6 +53,7 @@ const CHAT_IDS = new Set(list(process.env.MONITOR_CHAT_IDS, []));
 const REPORT_MINUTES = positive("MONITOR_REPORT_MINUTES", 15);
 const CHECK_SECONDS = positive("MONITOR_CHECK_SECONDS", 60);
 const ALERT_AFTER = positive("MONITOR_ALERT_AFTER", 2);
+const REMIND_MS = positive("MONITOR_REMIND_HOURS", 6) * 3_600_000;
 const STATE_FILE = process.env.MONITOR_STATE_FILE || "/var/lib/ostrich-monitor/state.json";
 // Sites whose certificates to watch; by default those in Caddy's config.
 const TLS_HOSTS = list(process.env.MONITOR_TLS_HOSTS, []);
@@ -117,6 +122,17 @@ async function sendAll(html: string, silent: boolean) {
       console.error(`monitor: cannot send to ${chatId}:`, error);
     }
   }
+}
+
+async function failuresOf(names: string[]) {
+  const found = await Promise.all(names.map(unitFailure));
+  return found.filter((item): item is UnitFailure => item !== null);
+}
+
+// A problem's alert, with what is known about why.
+async function problemAlert(title: string, problem: Problem, units: Snapshot["units"]) {
+  const [failures, memory] = await Promise.all([failuresOf(unitsFor(problem, units)), memoryUsers(problem)]);
+  return alertHtml(`${title} <b>${escapeHtml(redact(problem.text))}</b>`, problem, failures, { memory });
 }
 
 function addCounters(to: BackendCounters, add: BackendCounters) {
@@ -226,7 +242,15 @@ async function check() {
     if (before !== undefined && unit.restarts > before) {
       state.crashes += unit.restarts - before;
       console.warn(`monitor: ${unit.name} crashed`);
-      await sendAll(`💥 <b>${escapeHtml(unit.name)}</b> crashed and was restarted by systemd (${unit.restarts} restarts so far)`, false);
+      await sendAll(
+        alertHtml(
+          `💥 <b>${escapeHtml(unit.name)}</b> crashed and was restarted by systemd (${unit.restarts} restarts so far)`,
+          { text: "" },
+          await failuresOf([unit.name]),
+          { crashed: true },
+        ),
+        false,
+      );
     }
 
     lastRestarts.set(unit.name, unit.restarts);
@@ -246,16 +270,44 @@ async function check() {
     diskFullInDays: diskForecasts(snapshot),
     certificates,
   };
-  const { raised, cleared } = tracker.update(problems(snapshot, thresholds, extras));
+  const found = problems(snapshot, thresholds, extras);
+  const { raised } = tracker.update(found);
+  const alerts = (state.alerts ??= {});
 
-  for (const problem of raised) {
-    console.warn(`monitor: problem: ${problem.text}`);
-    await sendAll(`🚨 ${escapeHtml(problem.text)}`, false);
+  // Also what was fixed while the bot was restarting.
+  for (const [key, alert] of Object.entries(alerts)) {
+    if (!found.some((problem) => problem.key === key)) {
+      delete alerts[key];
+      console.log(`monitor: resolved: ${alert.text}`);
+      await sendAll(
+        `✅ Fixed: ${escapeHtml(redact(alert.text))}\nLasted ${duration((now - alert.since) / 1000)}, since ${time(new Date(alert.since))}`,
+        false,
+      );
+    }
   }
 
-  for (const problem of cleared) {
-    console.log(`monitor: resolved: ${problem.text}`);
-    await sendAll(`✅ Fixed: ${escapeHtml(problem.text)}`, false);
+  for (const problem of raised) {
+    if (!alerts[problem.key]) {
+      alerts[problem.key] = { text: problem.text, since: now - (ALERT_AFTER - 1) * CHECK_SECONDS * 1000, remindedAt: now };
+      console.warn(`monitor: problem: ${problem.text}`);
+      await sendAll(await problemAlert("🚨", problem, snapshot.units), false);
+    }
+  }
+
+  for (const problem of found) {
+    const alert = alerts[problem.key];
+
+    if (!alert) {
+      continue;
+    }
+
+    alert.text = problem.text;
+
+    // A forecast is weeks ahead: no reason to wake anyone up every 6 hours.
+    if (now - alert.remindedAt >= REMIND_MS && !problem.key.startsWith("disk forecast")) {
+      alert.remindedAt = now;
+      await sendAll(await problemAlert(`🔁 Still broken after ${duration((now - alert.since) / 1000)}:`, problem, snapshot.units), false);
+    }
   }
 
   await saveState(STATE_FILE, state);
@@ -372,7 +424,8 @@ async function summary(today: boolean) {
 const HELP = [
   "/stats — full report now",
   "/today — today so far",
-  "/health — any problems now",
+  "/health — any problems now, and why",
+  "/logs <service> — the end of its log",
   "/id — this chat's id",
 ].join("\n");
 
@@ -401,9 +454,26 @@ async function answer(chatId: string, text: string) {
     await telegram.send(chatId, await summary(true));
   } else if (command === "/health") {
     const snapshot = await collect({ ...collectOptions, counts: false, logMinutes: LOG_ALERT_MINUTES });
+    const found = problems(snapshot, thresholds, { recentLogErrors: snapshot.logErrors, diskFullInDays: diskForecasts(snapshot), certificates });
+
+    if (found.length === 0) {
+      await telegram.send(chatId, "✅ All good");
+    }
+
+    for (const problem of found) {
+      await telegram.send(chatId, await problemAlert("🔴", problem, snapshot.units));
+    }
+  } else if (command === "/logs") {
+    // Only these names reach journalctl. The backup is not "watched" between
+    // its runs, so it is added.
+    const names = [...new Set([...((await watchedUnits(collectOptions.services)) ?? []).map((unit) => unit.name), "ostrich-backup"])];
+    const unit = text.trim().split(/\s+/)[1]?.replace(/\.service$/, "");
+
     await telegram.send(
       chatId,
-      problemsText(problems(snapshot, thresholds, { recentLogErrors: snapshot.logErrors, diskFullInDays: diskForecasts(snapshot), certificates })),
+      unit && names.includes(unit)
+        ? await unitLog(unit)
+        : `/logs &lt;service&gt;, one of:\n${names.map((name) => `<code>${escapeHtml(name)}</code>`).join("\n")}`,
     );
   } else if (command === "/start" || command === "/help") {
     await telegram.send(
