@@ -56,7 +56,7 @@ func sessionPath() (string, bool) {
 		return "", false
 	}
 
-	hash := sha256.Sum256([]byte(serverURL))
+	hash := sha256.Sum256([]byte(serverIdentity()))
 
 	return filepath.Join(dir, "ostrich", "session-"+hex.EncodeToString(hash[:6])+".json"), true
 }
@@ -93,9 +93,9 @@ func saveSession(result *LoginResponse) (inKeyring bool, err error) {
 		return false, err
 	}
 
-	file := sessionFile{Server: serverURL, User: result.User}
+	file := sessionFile{Server: serverIdentity(), User: result.User}
 
-	if withTimeout(func() error { return keyring.Set(keyringService, serverURL, string(data)) }) == nil {
+	if withTimeout(func() error { return keyring.Set(keyringService, serverIdentity(), string(data)) }) == nil {
 		file.InKeyring = true
 	} else {
 		file.Secrets = &secrets
@@ -133,7 +133,7 @@ func readSessionFile() (sessionFile, string, bool) {
 	}
 
 	data, err := os.ReadFile(path)
-	if err != nil || json.Unmarshal(data, &file) != nil || file.Server != serverURL {
+	if err != nil || json.Unmarshal(data, &file) != nil || file.Server != serverIdentity() {
 		return file, path, false
 	}
 
@@ -153,7 +153,7 @@ func loadSession() *LoginResponse {
 		var value string
 
 		err := withTimeout(func() (err error) {
-			value, err = keyring.Get(keyringService, serverURL)
+			value, err = keyring.Get(keyringService, serverIdentity())
 			return err
 		})
 
@@ -190,7 +190,7 @@ func forgetSession() {
 	file, path, ok := readSessionFile()
 
 	if ok && file.InKeyring {
-		_ = withTimeout(func() error { return keyring.Delete(keyringService, serverURL) })
+		_ = withTimeout(func() error { return keyring.Delete(keyringService, serverIdentity()) })
 	}
 
 	if path != "" {

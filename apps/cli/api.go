@@ -13,7 +13,21 @@ import (
 	"time"
 )
 
-const defaultServerURL = "https://62.238.111.55.nip.io"
+const defaultServerURL = "https://api.ostrich-messenger.online"
+
+// Where the default server used to be. Sessions, caches and the keyring's
+// entry are named after the server, so they keep this name, or moving the
+// server would log everyone out.
+const previousDefaultServerURL = "https://62.238.111.55.nip.io"
+
+// serverIdentity is the server's name for what is saved on this computer.
+func serverIdentity() string {
+	if serverURL == defaultServerURL {
+		return previousDefaultServerURL
+	}
+
+	return serverURL
+}
 
 // serverURL can be overridden with OSTRICH_SERVER, e.g.
 // OSTRICH_SERVER=http://localhost:3000 for a local backend.

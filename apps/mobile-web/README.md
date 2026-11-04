@@ -55,7 +55,7 @@ npm run typecheck
 npm run build:web  # static web build in dist/
 ```
 
-The app talks to `https://62.238.111.55.nip.io` by default. For a local
+The app talks to `https://api.ostrich-messenger.online` by default. For a local
 backend create `.env.local`:
 
 ```

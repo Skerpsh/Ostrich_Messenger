@@ -72,7 +72,7 @@ func recoveryPath() (string, bool) {
 		return "", false
 	}
 
-	hash := sha256.Sum256([]byte(serverURL))
+	hash := sha256.Sum256([]byte(serverIdentity()))
 
 	return filepath.Join(dir, "ostrich", "recovery-"+hex.EncodeToString(hash[:6])+".json"), true
 }
@@ -90,7 +90,7 @@ func loadSavedRecovery() *savedRecovery {
 
 	var saved savedRecovery
 
-	if json.Unmarshal(data, &saved) != nil || saved.Server != serverURL || saved.ID == "" {
+	if json.Unmarshal(data, &saved) != nil || saved.Server != serverIdentity() || saved.ID == "" {
 		return nil
 	}
 
@@ -321,7 +321,7 @@ func (m *model) askRecovery() tea.Cmd {
 
 		if err == nil {
 			saved = &savedRecovery{
-				Server: serverURL, ID: asked.ID, Secret: asked.Secret,
+				Server: serverIdentity(), ID: asked.ID, Secret: asked.Secret,
 				PrivateKey: base64.StdEncoding.EncodeToString(private), PublicKey: public,
 				Username: asked.Username, Threshold: asked.Threshold, ReadyAt: asked.ReadyAt, ExpiresAt: asked.ExpiresAt,
 			}

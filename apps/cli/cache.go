@@ -45,7 +45,7 @@ func cachePath(userID string) (string, bool) {
 		return "", false
 	}
 
-	hash := sha256.Sum256([]byte(serverURL))
+	hash := sha256.Sum256([]byte(serverIdentity()))
 
 	return filepath.Join(dir, "ostrich", "cache-"+hex.EncodeToString(hash[:6])+"-"+userID+".json"), true
 }

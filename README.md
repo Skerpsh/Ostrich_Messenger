@@ -541,12 +541,12 @@ Client settings:
 
 | Client | Variable | Default |
 |---|---|---|
-| Web / mobile | `EXPO_PUBLIC_API_URL` (in `apps/mobile-web/.env.local`, at build time): the API | `https://62.238.111.55.nip.io` |
+| Web / mobile | `EXPO_PUBLIC_API_URL` (in `apps/mobile-web/.env.local`, at build time): the API | `https://api.ostrich-messenger.online` |
 | Mobile | `EXPO_PUBLIC_WEB_URL` (at build time): the web app, for links | `https://ostrich-messenger.online`, or the API's address when `EXPO_PUBLIC_API_URL` is set |
-| CLI | `OSTRICH_SERVER`: the API | `https://62.238.111.55.nip.io` |
+| CLI | `OSTRICH_SERVER`: the API | `https://api.ostrich-messenger.online` |
 | CLI | `OSTRICH_WEB`: the web app, for links | `https://ostrich-messenger.online`, or `OSTRICH_SERVER` when that is set |
 
-The official setup serves the API at `62.238.111.55.nip.io` and the web app at
+The official setup serves the API at `api.ostrich-messenger.online` and the web app at
 `ostrich-messenger.online`. The web app always makes links to the address it was opened from.
 
 ## Operations: deploys, backups and monitoring

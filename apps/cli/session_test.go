@@ -75,7 +75,7 @@ func TestSessionInKeyring(t *testing.T) {
 		t.Fatal("session still remembered")
 	}
 
-	if _, err := keyring.Get(keyringService, serverURL); !errors.Is(err, keyring.ErrNotFound) {
+	if _, err := keyring.Get(keyringService, serverIdentity()); !errors.Is(err, keyring.ErrNotFound) {
 		t.Fatalf("secret still in the keyring: %v", err)
 	}
 }
@@ -124,6 +124,32 @@ func TestSessionPerServer(t *testing.T) {
 
 	if loadSession() != nil {
 		t.Fatal("another server's session loaded")
+	}
+}
+
+// The server moved: what was saved under its old address must still be found.
+func TestDefaultServerKeepsItsLocalData(t *testing.T) {
+	previous := serverURL
+	defer func() { serverURL = previous }()
+
+	serverURL = defaultServerURL
+	moved, _ := sessionPath()
+
+	if serverIdentity() != previousDefaultServerURL {
+		t.Fatalf("identity of the default server = %q", serverIdentity())
+	}
+
+	serverURL = previousDefaultServerURL
+	before, _ := sessionPath()
+
+	if moved != before {
+		t.Fatalf("session file moved: %s, was %s", moved, before)
+	}
+
+	serverURL = "http://localhost:3000"
+
+	if serverIdentity() != serverURL {
+		t.Fatalf("another server's identity = %q", serverIdentity())
 	}
 }
 
