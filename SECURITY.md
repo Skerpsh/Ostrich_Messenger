@@ -43,6 +43,10 @@ Known limitations, by design:
   between the devices shows each one the other's IP address.
 - Inside a group, members share the group key, so a member working with the
   server could make a message look like another member's.
+- Apps give a group's keys to every member the server lists, and nothing yet
+  signs that list. A server taken over could add a member of its own, without
+  any admin, and so read the group's messages and history. Direct chats are
+  not affected. Signed membership is planned.
 - Without comparing safety codes, the first key a client sees for a contact
   is trusted.
 

@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { verifyPassword } from "../passwords.js";
 import crypto from "node:crypto";
 import { db, withTransaction } from "../database.js";
+import { sharedState } from "../shared-state.js";
 import { AUTH_KEY_PATTERN, authKeyMatches } from "../accounts.js";
 import { authenticate } from "../middleware/auth.js";
 import {
@@ -42,6 +43,14 @@ const changeRateLimit = { rateLimit: { max: 30, timeWindow: "1 minute" } };
 const pollRateLimit = { rateLimit: { max: 60, timeWindow: "1 minute" } };
 
 const hashSecret = (secret: string) => crypto.createHash("sha256").update(secret).digest("hex");
+
+// The answer says whether a password is right, without the OstrichID (a
+// mistyped one must be told, by someone who has lost everything). So wrong
+// ones are counted per account from all addresses too, slowing a list of
+// leaked passwords. Only this route, so nobody can lock anyone out of logging in.
+const MAX_RECOVERY_FAILURES = 20;
+const RECOVERY_FAILURE_WINDOW_MS = 60 * 60 * 1000;
+const recoveryFailuresKey = (username: string) => `recovery ${username.toLowerCase()}`;
 
 const NO_REQUEST = "This request is over: it was cancelled, used or has expired";
 
@@ -321,7 +330,12 @@ export default async function recoveryRoutes(server: FastifyInstance) {
       const username = request.body.username.replace(/^@/, "");
 
       // Shares the login's count of wrong passwords.
-      if (await loginBlocked(request, username)) {
+      const failures = recoveryFailuresKey(username);
+
+      if (
+        (await loginBlocked(request, username)) ||
+        (await sharedState().failures(failures)) >= MAX_RECOVERY_FAILURES
+      ) {
         return reply.status(429).send({ error: TOO_MANY_ATTEMPTS });
       }
 
@@ -342,11 +356,13 @@ export default async function recoveryRoutes(server: FastifyInstance) {
 
       if (!user || !passwordValid) {
         await recordFailedLogin(request, username);
+        await sharedState().addFailure(failures, RECOVERY_FAILURE_WINDOW_MS);
 
         return reply.status(401).send({ error: "Invalid username or password" });
       }
 
       await clearFailedLogins(request, username);
+      await sharedState().clearFailures(failures);
 
       if (!user.setup_id) {
         return reply.status(404).send({

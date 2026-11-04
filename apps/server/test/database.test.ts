@@ -5,10 +5,13 @@ import Fastify from "fastify";
 import { DAILY_UPLOAD_BYTES, insertWithinQuota } from "../src/attachments.js";
 import { db } from "../src/database.js";
 import { checkSwitches } from "../src/disappear.js";
+import { hangUp, startCall } from "../src/calls.js";
 import { createMessage } from "../src/messages.js";
+import { hashPassword } from "../src/passwords.js";
 import { createSession } from "../src/routes/auth.js";
 import chatsRoutes from "../src/routes/chats.js";
 import messagesRoutes from "../src/routes/messages.js";
+import recoveryRoutes from "../src/routes/recovery.js";
 import serverViewRoutes from "../src/routes/server-view.js";
 import { ensureRooms, joinRoom, leaveRoom, listRooms, reportMessage, ROOM_CAPACITY, SEND_LIMIT } from "../src/rooms.js";
 import { MemoryState, useSharedState } from "../src/shared-state.js";
@@ -256,4 +259,71 @@ test("rooms: a persona sends the files its account uploaded", options, async () 
 
   const sent = await createMessage(room.id, persona, "e3:0:AAAA", null, crypto.randomUUID(), [file]);
   assert.ok("message" in sent, JSON.stringify(sent));
+});
+
+test("calls: only after an answer, and a hidden status gives nothing away", options, async () => {
+  const state = new MemoryState();
+  useSharedState(state);
+
+  const caller = await user();
+  const callee = await user();
+  const chatId = await directChat(caller, callee);
+  const side = { userId: caller, tokenHash: "session", socketId: "socket" };
+  const start = () => startCall(side, chatId, crypto.randomUUID(), "c1:AAAA");
+  const end = async () => hangUp(side, (await state.getValue(`call-user:${caller}`))!);
+
+  assert.deepEqual(await start(), { error: "not_replied" });
+
+  await db.query("INSERT INTO messages (chat_id, sender_id, content) VALUES ($1, $2, 'e2:AAAA')", [chatId, callee]);
+
+  // Status shown: the caller is told.
+  assert.deepEqual(await start(), { error: "unavailable" });
+  await state.addSocket(callee, "their-session");
+  await state.setValue(`call-user:${callee}`, "their-call", 60_000);
+  assert.deepEqual(await start(), { error: "busy" });
+
+  // Status hidden: it rings in both cases, and leaves their call alone.
+  await db.query("UPDATE users SET show_presence = FALSE WHERE id = $1", [callee]);
+
+  assert.deepEqual(await start(), { ok: true });
+  await end();
+  assert.equal(await state.getValue(`call-user:${callee}`), "their-call");
+
+  await state.removeSocket(callee, "their-session");
+  await state.deleteValues([`call-user:${callee}`]);
+
+  assert.deepEqual(await start(), { ok: true });
+  // Offline, so free to call as soon as they are back.
+  assert.equal(await state.getValue(`call-user:${callee}`), null);
+  await end();
+});
+
+test("recovery: wrong passwords are counted per account across addresses", options, async () => {
+  useSharedState(new MemoryState());
+
+  const name = `t${crypto.randomBytes(6).toString("hex")}`;
+  const created = await db.query("INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id", [
+    name,
+    await hashPassword("right password"),
+  ]);
+  users.push(created.rows[0].id);
+
+  const server = Fastify();
+  await server.register(recoveryRoutes);
+
+  const ask = (password: string, address: string) =>
+    server.inject({
+      method: "POST",
+      url: "/api/recovery/requests",
+      remoteAddress: address,
+      payload: { username: name, password, public_key: `${"A".repeat(43)}=` },
+    });
+
+  for (let i = 0; i < 20; i++) {
+    assert.equal((await ask("wrong password", `10.0.0.${i}`)).statusCode, 401);
+  }
+
+  // A new address, and even the right password, until the hour is over.
+  assert.equal((await ask("right password", "10.0.1.1")).statusCode, 429);
+  await server.close();
 });

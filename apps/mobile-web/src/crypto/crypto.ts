@@ -45,7 +45,8 @@
 //              sender 0 message 0 epoch))
 //   info     = "i1:" epoch ":" … the group's name and photo (JSON), aad
 //              "ostrich/v1 group info" 0 chat 0 epoch
-// The server keeps the wrapped keys and never has a group key. Members
+// The server keeps the wrapped keys and has no group key, unless it adds a
+// member of its own: nothing signs the list of members (SECURITY.md). Members
 // share the key, so within a group a member (with the server's help)
 // could pass a message off as another member's; outsiders and the server
 // cannot read or forge anything.

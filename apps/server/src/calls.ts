@@ -32,6 +32,9 @@ export type Call = {
   calleeSocket: string | null;
   calleeSession: string | null;
   answeredAt: number | null;
+  // Rings only for the caller: the callee hides their status, and is
+  // offline or in another call (startCall). They are told nothing of it.
+  silent?: boolean;
 };
 
 // Unanswered calls end after this (the caller's app hangs up after 45s).
@@ -59,12 +62,21 @@ export type EndReason =
   | "answered_elsewhere"
   | "blocked";
 
-export type CallError = "not_member" | "not_direct" | "blocked" | "busy" | "in_call" | "unavailable" | "duplicate_id";
+export type CallError =
+  | "not_member"
+  | "not_direct"
+  | "blocked"
+  | "not_replied"
+  | "busy"
+  | "in_call"
+  | "unavailable"
+  | "duplicate_id";
 
 export const CALL_ERRORS: Record<CallError, string> = {
   not_member: "You are not a member of this chat",
   not_direct: "Calls are only in direct chats",
   blocked: "You can't call this user",
+  not_replied: "You can call them once they have written to you",
   busy: "They are in another call",
   in_call: "You are already in a call",
   unavailable: "They are not online",
@@ -118,7 +130,7 @@ async function endCall(call: Call, reason: EndReason, notify: { caller?: boolean
     await sendToSocket(call.callerSocket, event);
   }
 
-  if (notify.callee) {
+  if (notify.callee && !call.silent) {
     if (call.calleeSocket) {
       await sendToSocket(call.calleeSocket, event);
     } else {
@@ -139,10 +151,23 @@ export async function startCall(
 ): Promise<{ ok: true } | { error: CallError }> {
   const result = await db.query(
     `
-    SELECT chats.type, other.user_id AS peer_id
+    SELECT
+      chats.type,
+      other.user_id AS peer_id,
+      callee.show_presence,
+      -- As presenceVisible(): starting a chat tells nothing about someone
+      -- until they answer, and strangers cannot ring them.
+      EXISTS (
+        SELECT 1 FROM messages
+        WHERE messages.chat_id = chats.id
+          AND messages.sender_id = other.user_id
+          AND messages.kind = 'text'
+          AND messages.deliver_at IS NULL
+      ) AS replied
     FROM chats
     JOIN chat_members me ON me.chat_id = chats.id AND me.user_id = $2
     LEFT JOIN chat_members other ON other.chat_id = chats.id AND other.user_id <> $2
+    LEFT JOIN users callee ON callee.id = other.user_id
     WHERE chats.id = $1
     `,
     [chatId, side.userId],
@@ -162,9 +187,17 @@ export async function startCall(
     return { error: "blocked" };
   }
 
-  const calleeId: string = row.peer_id;
+  if (!row.replied) {
+    return { error: "not_replied" };
+  }
 
-  if ((await connectionCount(calleeId)) === 0) {
+  const calleeId: string = row.peer_id;
+  // Who hides their status looks the same online, offline and in a call:
+  // the caller hears it ring until it times out.
+  const hidden = !row.show_presence;
+  const online = (await connectionCount(calleeId)) > 0;
+
+  if (!online && !hidden) {
     return { error: "unavailable" };
   }
 
@@ -174,7 +207,9 @@ export async function startCall(
     return { error: "in_call" };
   }
 
-  if (!(await state.claimValue(userKey(calleeId), callId, RING_MS))) {
+  const rings = online && (await state.claimValue(userKey(calleeId), callId, RING_MS));
+
+  if (!rings && !hidden) {
     await state.deleteValues([userKey(side.userId)]);
     return { error: "busy" };
   }
@@ -189,10 +224,11 @@ export async function startCall(
     calleeSocket: null,
     calleeSession: null,
     answeredAt: null,
+    silent: !rings,
   };
 
   if (!(await state.claimValue(callKey(callId), JSON.stringify(call), RING_MS))) {
-    await state.deleteValues([userKey(side.userId), userKey(calleeId)]);
+    await state.deleteValues([userKey(side.userId), ...(rings ? [userKey(calleeId)] : [])]);
     return { error: "duplicate_id" };
   }
 
@@ -213,11 +249,13 @@ export async function startCall(
     }, RING_MS),
   );
 
-  await sendToUsers([calleeId], {
-    type: "call_incoming",
-    call: { id: callId, chatId, callerId: side.userId },
-    data,
-  });
+  if (rings) {
+    await sendToUsers([calleeId], {
+      type: "call_incoming",
+      call: { id: callId, chatId, callerId: side.userId },
+      data,
+    });
+  }
 
   return { ok: true };
 }
@@ -232,7 +270,7 @@ function stopRinging(callId: string) {
 export async function answerCall(side: CallSide, callId: string, data: string) {
   const call = await loadCall(callId);
 
-  if (!call || call.calleeId !== side.userId || call.answeredAt !== null) {
+  if (!call || call.silent || call.calleeId !== side.userId || call.answeredAt !== null) {
     return false;
   }
 

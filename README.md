@@ -126,9 +126,10 @@ devices.
 To install the web app, use the browser's **Install app** / **Add to Home Screen** option.
 It keeps working offline and sends messages when it is back online.
 
-**Calls.** Press 📞 or 🎥 at the top of a direct chat. Calls ring while Ostrich is open (a
-browser tab, or the app in the foreground); the chat gets an entry for every call, missed ones
-too. A video call shows your camera before you answer, with or without it; the camera can be
+**Calls.** Press 📞 or 🎥 at the top of a direct chat, once the other person has written to you
+there. Calls ring while Ostrich is open (a browser tab, or the app in the foreground); the chat
+gets an entry for every call, missed ones too. Whoever hides their status looks the same to a
+caller online, offline or in another call: it rings until it times out. A video call shows your camera before you answer, with or without it; the camera can be
 turned on and off in any call, and the videos shown one in a corner or side by side. During a
 call, open the **Ostrich handshake**: each of you reads a silly sentence aloud ("Sleepy flamingo
 juggles cacti") and picks the other's among four. If both find it, nobody is in the middle of the
@@ -247,7 +248,8 @@ flowchart LR
   server never sees the link. The web app only shows previews: browsers cannot load other sites.
   A preview is shown only for a link that is in the message's text.
 - **Groups.** A random group key is wrapped separately for every member. A new key epoch starts
-  whenever someone leaves or is removed. The group name and photo are encrypted too.
+  whenever someone leaves or is removed. The group name and photo are encrypted too. The apps
+  trust the server's list of members: see the limit in [SECURITY.md](SECURITY.md).
 - **Calls.** The audio and video go straight between the two devices (WebRTC), or through the TURN
   server when they cannot reach each other, encrypted with DTLS-SRTP either way. The offer and
   answer that set the call up carry the fingerprints of the call's certificates, and they are

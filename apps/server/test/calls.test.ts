@@ -128,6 +128,19 @@ test("the caller cancels a ringing call on all the callee's devices", async () =
   assert.deepEqual(sent(), [{ to: "bob", type: "call_ended", callId: "call-1", reason: "cancelled" }]);
 });
 
+test("a call that rings only for the caller never reaches the callee", async () => {
+  await state.setValue("call:call-1", JSON.stringify({ ...ringing(), silent: true }), 60_000);
+  await state.setValue("call-user:bob", "their-real-call", 60_000);
+
+  assert.equal(await answerCall(phone, "call-1", "c1:X"), false);
+
+  await hangUp(caller, "call-1");
+
+  assert.deepEqual(sent(), []);
+  assert.equal(await state.getValue("call-user:bob"), "their-real-call");
+  assert.equal(await state.getValue("call-user:ann"), null);
+});
+
 test("a user's newer call is not freed by the end of an older one", async () => {
   await state.setValue("call-user:bob", "call-2", 60_000);
   await declineCall(phone, "call-1");
