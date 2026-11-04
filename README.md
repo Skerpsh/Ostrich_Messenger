@@ -597,6 +597,10 @@ One backend process handles a lot. To use several CPU cores or restart without d
 several processes (`deploy/ostrich@.service`) behind Caddy and set `REDIS_URL`. They then share
 WebSocket events, presence, rate limits and failed login counts through Redis.
 
+Under a flood of requests the backend answers `429` rather than slow down for everyone: each
+process checks 2 passwords at a time with 20 more waiting, and an address makes up to 600 requests
+a minute together on the routes without a limit of their own.
+
 ## Testing and CI
 
 ```bash

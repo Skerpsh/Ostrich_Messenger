@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import argon2 from "argon2";
+import { verifyPassword } from "../passwords.js";
 import crypto from "node:crypto";
 import { db, withTransaction } from "../database.js";
 import { AUTH_KEY_PATTERN, authKeyMatches } from "../accounts.js";
@@ -338,7 +338,7 @@ export default async function recoveryRoutes(server: FastifyInstance) {
       );
 
       const user = found.rows[0];
-      const passwordValid = await argon2.verify(user ? user.password_hash : await dummyPasswordHash, password);
+      const passwordValid = await verifyPassword(user ? user.password_hash : await dummyPasswordHash, password);
 
       if (!user || !passwordValid) {
         await recordFailedLogin(request, username);

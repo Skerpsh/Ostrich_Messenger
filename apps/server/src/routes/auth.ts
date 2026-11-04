@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest } from "fastify";
 import type { PoolClient } from "pg";
-import argon2 from "argon2";
+import { hashPassword, verifyPassword } from "../passwords.js";
 import crypto from "node:crypto";
 import {
   db,
@@ -194,7 +194,7 @@ export const TOO_MANY_ATTEMPTS = "Too many failed attempts, try again later";
 
 // Used to spend the same time on unknown usernames as on wrong passwords,
 // so login timing does not reveal which usernames exist.
-export const dummyPasswordHash = argon2.hash(crypto.randomBytes(16).toString("hex"));
+export const dummyPasswordHash = hashPassword(crypto.randomBytes(16).toString("hex"));
 
 export default async function authRoutes(server: FastifyInstance) {
   // REGISTER: the OstrichID was generated on the client; only the auth key
@@ -208,7 +208,7 @@ export default async function authRoutes(server: FastifyInstance) {
     async (request, reply) => {
       const { username, password, keys } = request.body;
 
-      const passwordHash = await argon2.hash(password);
+      const passwordHash = await hashPassword(password);
 
       let user;
 
@@ -294,7 +294,7 @@ export default async function authRoutes(server: FastifyInstance) {
 
       const user = result.rows[0];
 
-      const passwordValid = await argon2.verify(
+      const passwordValid = await verifyPassword(
         user ? user.password_hash : await dummyPasswordHash,
         password,
       );
@@ -526,7 +526,7 @@ export default async function authRoutes(server: FastifyInstance) {
         [request.user.id],
       );
 
-      const passwordValid = await argon2.verify(
+      const passwordValid = await verifyPassword(
         result.rows[0].password_hash,
         current_password,
       );
@@ -540,7 +540,7 @@ export default async function authRoutes(server: FastifyInstance) {
       }
 
       const tokenHash = hashToken(request.token);
-      const passwordHash = await argon2.hash(new_password);
+      const passwordHash = await hashPassword(new_password);
 
       await withTransaction(async (client) => {
         await client.query(
@@ -596,7 +596,7 @@ export default async function authRoutes(server: FastifyInstance) {
         [request.user.id],
       );
 
-      if (!(await argon2.verify(current.rows[0].password_hash, password))) {
+      if (!(await verifyPassword(current.rows[0].password_hash, password))) {
         await recordFailedLogin(request, request.user.username);
 
         return reply.status(403).send({
@@ -834,7 +834,7 @@ export default async function authRoutes(server: FastifyInstance) {
       );
 
       const row = result.rows[0];
-      const passwordValid = await argon2.verify(row.password_hash, password);
+      const passwordValid = await verifyPassword(row.password_hash, password);
 
       if (!passwordValid || !row.auth_key_hash || !authKeyMatches(auth_key, row.auth_key_hash)) {
         await recordFailedLogin(request, request.user.username);
@@ -922,7 +922,7 @@ export default async function authRoutes(server: FastifyInstance) {
       );
 
       const row = result.rows[0];
-      const passwordValid = await argon2.verify(row.password_hash, password);
+      const passwordValid = await verifyPassword(row.password_hash, password);
 
       if (!passwordValid || !row.auth_key_hash || !authKeyMatches(auth_key, row.auth_key_hash)) {
         await recordFailedLogin(request, request.user.username);

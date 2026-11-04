@@ -61,7 +61,8 @@ export default async function avatarsRoutes(server: FastifyInstance) {
   server.put<{ Body: Buffer }>(
     "/api/users/me/avatar",
     {
-      preHandler: authenticate,
+      // Before the body is read: up to 8 MB in memory, for guests too.
+      preParsing: authenticate,
       config: uploadRateLimit,
     },
     async (request, reply) => {
