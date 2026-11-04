@@ -29,6 +29,10 @@ export function redact(text: string) {
       // Loopback says where a local service is; other addresses may be users'.
       .replace(/\b(?!127\.|0\.0\.0\.0)\d{1,3}(?:\.\d{1,3}){3}\b(?![.\w])/g, "[ip]")
       .replace(/\b(?:[0-9a-f]{1,4}:){3,}[0-9a-f:]*/gi, "[ip]")
+      // Shortened with "::"; not C++ names (foo::bar), and ::1 says it is local.
+      .replace(/(?<![\w:.])(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*)?::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*)?(?![\w:])/gi, (address) =>
+        address === "::" || address === "::1" ? address : "[ip]",
+      )
   );
 }
 

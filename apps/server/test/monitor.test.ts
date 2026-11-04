@@ -391,3 +391,10 @@ test("monitor: the most frequent log errors go into the alert", () => {
 
   assert.deepEqual(problem.details, ["20× boom", "5× bang"]);
 });
+
+test("IPv6 addresses are hidden however they are written, times and names are not", () => {
+  assert.equal(redact("from 2001:db8::1 failed"), "from [ip] failed");
+  assert.equal(redact("from [2a01:4f8::abcd]:443"), "from [[ip]]:443");
+  assert.equal(redact("from 2a01:4f8:c17:1234::1"), "from [ip]");
+  assert.equal(redact("at 04:00:34 in foo::bar, on ::1"), "at 04:00:34 in foo::bar, on ::1");
+});

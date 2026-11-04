@@ -3,6 +3,7 @@ import websocket from "@fastify/websocket";
 import rateLimit from "@fastify/rate-limit";
 import cors from "@fastify/cors";
 
+import { addressKey } from "./address.js";
 import { db, isPgError, PG_INVALID_TEXT } from "./database.js";
 import { metrics } from "./metrics.js";
 
@@ -224,9 +225,9 @@ const start = async () => {
 
     await server.register(rateLimit, {
       // For routes without a `rateLimit` config of their own, together.
-      // shortcut: counts each IPv6 address apart, group them by /64 before the API gets an AAAA record.
       max: 600,
       timeWindow: "1 minute",
+      keyGenerator: (request) => addressKey(request.ip),
       // Counted for all processes together.
       // Redis down: requests go through rather than fail.
       ...(sharedRedis() ? { redis: sharedRedis()!, nameSpace: "ostrich:rate-limit:", skipOnError: true } : {}),

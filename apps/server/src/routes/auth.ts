@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest } from "fastify";
 import type { PoolClient } from "pg";
+import { addressKey } from "../address.js";
 import { hashPassword, verifyPassword } from "../passwords.js";
 import crypto from "node:crypto";
 import {
@@ -174,7 +175,7 @@ const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000;
 // Counted in the shared state (shared-state.ts), so it holds across
 // processes.
 function failedLoginKey(request: FastifyRequest, username: string) {
-  return `${username.toLowerCase()} ${request.ip}`;
+  return `${username.toLowerCase()} ${addressKey(request.ip)}`;
 }
 
 export async function loginBlocked(request: FastifyRequest, username: string) {
