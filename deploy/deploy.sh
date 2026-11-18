@@ -31,6 +31,13 @@ HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
 # the releases, so this server cannot get anything else built and signed.
 RELEASE_TOKEN_FILE="${RELEASE_TOKEN_FILE:-/etc/ostrich/release-token}"
 GITHUB_REPO="${GITHUB_REPO:-Skerpsh/Ostrich_Messenger}"
+# The builds run as this user, in a copy of the code without the server's
+# .env and data, so that the packages' install scripts never run as root;
+# root only takes the result. Made on first use.
+BUILD_USER="${BUILD_USER:-ostrich-build}"
+BUILD_HOME="${BUILD_HOME:-/var/lib/ostrich-build}"
+# Node from nvm (/opt/nvm), where other users reach it, not through /root.
+NODE_BIN="$(dirname "$(readlink -f "$(command -v node)")")"
 
 backend=1
 web=1
@@ -55,6 +62,35 @@ for arg in "$@"; do
 done
 
 step() { printf '\n==> %s\n' "$*"; }
+
+# A fresh copy of the committed code for the build user, with the web app's
+# build settings (public values only).
+prepare_build() {
+  id -u "$BUILD_USER" >/dev/null 2>&1 ||
+    useradd --system --home-dir "$BUILD_HOME" --create-home --shell /usr/sbin/nologin "$BUILD_USER"
+  rm -rf "$BUILD_HOME/src"
+  install -d -o "$BUILD_USER" -g "$BUILD_USER" "$BUILD_HOME/src"
+  git -C "$REPO" archive HEAD | as_build tar -x -C "$BUILD_HOME/src"
+  for env in "$REPO"/apps/mobile-web/.env*; do
+    if [ -f "$env" ]; then
+      install -o "$BUILD_USER" -g "$BUILD_USER" -m 600 "$env" "$BUILD_HOME/src/apps/mobile-web/"
+    fi
+  done
+}
+
+# Runs a command as the build user, with nothing of root's environment. A
+# unit of its own: whatever it leaves running is killed when it ends, before
+# root copies anything from the build.
+as_build() {
+  systemd-run --quiet --wait --pipe --collect --uid="$BUILD_USER" --gid="$BUILD_USER" \
+    -p NoNewPrivileges=yes -E HOME="$BUILD_HOME" -E PATH="$NODE_BIN:/usr/local/bin:/usr/bin:/bin" "$@"
+}
+
+# Takes a built directory back as root's: no setuid bits, nothing writable
+# by others, and no devices.
+take_build() {
+  rsync -rlpt --delete --chown=root:root --chmod=ug-s,o-w "$1/" "$2/"
+}
 
 # The version of what is deployed: the commit's tag; else the next one
 # (v1.5.5 → 1.5.6), which the end of the script tags, or, without a
@@ -117,19 +153,25 @@ for env in .env .env.local .env.production .env.production.local; do
   fi
 done
 
+prepare_build
+
 if [ "$backend" = 1 ]; then
   if [ "$backup" = 1 ]; then
     step "Backing up the database"
     "$REPO/deploy/backup.sh"
   fi
 
-  step "Building the backend"
+  step "Building the backend (as $BUILD_USER)"
+  as_build sh -c "cd '$BUILD_HOME/src/apps/server' && npm ci && npm run build"
+  take_build "$BUILD_HOME/src/apps/server/node_modules" "$REPO/apps/server/node_modules"
+  take_build "$BUILD_HOME/src/apps/server/dist" "$REPO/apps/server/dist"
   cd "$REPO/apps/server"
-  npm ci
-  npm run build
 
+  # As the backend's user, with its .env as systemd gives it to the service.
   step "Migrating the database"
-  npm run db:migrate:prod
+  systemd-run --quiet --wait --pipe --collect --uid=ostrich --gid=ostrich \
+    -p WorkingDirectory="$REPO/apps/server" -p EnvironmentFile="$REPO/apps/server/.env" \
+    -E NODE_ENV=production "$NODE_BIN/node" dist/migrate.js
 
   for service in $SERVICES; do
     # ostrich@3001 answers on port 3001; a single service at HEALTH_URL.
@@ -167,16 +209,16 @@ if [ "$backend" = 1 ]; then
 fi
 
 if [ "$web" = 1 ]; then
-  step "Building the web app"
-  cd "$REPO/apps/mobile-web"
-  npm ci
+  step "Building the web app (as $BUILD_USER)"
   # Shown in Settings: the version this deploy releases (see below).
-  EXPO_PUBLIC_APP_VERSION="$(release_version)" npm run build:web
+  version="$(release_version)"
+  as_build sh -c "cd '$BUILD_HOME/src/apps/mobile-web' && npm ci && EXPO_PUBLIC_APP_VERSION='$version' npm run build:web"
 
   step "Publishing to $WEB_ROOT"
   mkdir -p "$WEB_ROOT"
   # New files first, old ones removed after: the site never goes blank.
-  rsync -a --delete-after dist/ "$WEB_ROOT/"
+  # Plain files only: a link made by the build is not followed nor copied.
+  rsync -rt --delete-after "$BUILD_HOME/src/apps/mobile-web/dist/" "$WEB_ROOT/"
 fi
 
 # The apps (desktop, Android, CLI) carry their own copy of the code: the

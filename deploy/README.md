@@ -52,7 +52,7 @@ releases nothing.
 
 ## Database migrations
 
-`deploy/deploy.sh` runs `npm run db:migrate:prod`, which applies the files in
+`deploy/deploy.sh` runs `dist/migrate.js` as the user `ostrich`, which applies the files in
 `apps/server/migrations/` (`001_*.sql`, `002_*.sql`, ...) that the database has
 not had yet, each in a transaction, and records them in `schema_migrations`.
 The first run on an existing database applies `001_baseline.sql`, which
@@ -87,7 +87,13 @@ The backend and the monitoring bot run as the user `ostrich`, in a sandbox
 give the whole server. They write only `apps/server/data` (the bot also its
 `/var/lib/ostrich-monitor`) and cannot read `.env` as a file, `/root`,
 `/etc/ostrich` or the backups' contents; systemd hands them the values from
-`.env`. `deploy.sh` itself stays root's, and `npm ci` runs there.
+`.env`. `deploy.sh` itself stays root's, but builds nothing as root: `npm ci`
+and the builds run as the user `ostrich-build` (made by the first deploy) in
+`/var/lib/ostrich-build/src`, a copy of the committed code without `.env` or
+the attachments, so that a package's install script cannot reach the release
+token, the database or the backups. Root takes back `dist/` and
+`node_modules/` (without setuid bits) and the web app's plain files, and runs
+the migrations as `ostrich`, with `.env` handed over by systemd.
 
 Node must be where they can reach it: nvm in `/opt/nvm`, not `/root/.nvm`.
 
