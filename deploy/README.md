@@ -324,6 +324,18 @@ SECRET=$(openssl rand -hex 32) && IP=$(curl -4 -s ifconfig.me) && sed "s/^static
 sed -i 's/^#\?TURNSERVER_ENABLED=.*/TURNSERVER_ENABLED=1/' /etc/default/coturn 2>/dev/null; systemctl enable --now coturn && systemctl restart coturn ostrich && systemctl is-active coturn ostrich
 ```
 
+On a server set up before, `/etc/turnserver.conf` is a copy: after the
+list of denied addresses changes in `turnserver.conf`, this puts the new list
+in it, keeping its secret, and restarts coturn:
+
+```bash
+grep -v '^denied-peer-ip=' /etc/turnserver.conf > /etc/turnserver.conf.new && grep '^denied-peer-ip=' /opt/ostrich/deploy/turnserver.conf >> /etc/turnserver.conf.new && mv /etc/turnserver.conf.new /etc/turnserver.conf && systemctl restart coturn && sleep 2 && systemctl is-active coturn && journalctl -u coturn -n 30 --no-pager | grep -iE 'denied|error|bad' ; ss -tlnp | grep -E ':(5432|6379) '
+```
+
+The last part shows where PostgreSQL and Redis listen: it must be
+`127.0.0.1` (or `[::1]`), never `0.0.0.0` or `*`, as the relay can reach the
+server's public addresses.
+
 With a firewall (ufw), open the TURN port and the relay ports:
 
 ```bash
