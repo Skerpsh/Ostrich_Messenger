@@ -26,8 +26,12 @@ export const REPORTS_TO_MUTE = 3;
 const REPORT_WINDOW_MS = 10 * 60 * 1000;
 const FIRST_MUTE_MS = 30 * 60 * 1000;
 const MAX_MUTE_MS = 30 * 24 * 60 * 60 * 1000;
+// Reports count only from accounts this old, or a few accounts made for it
+// could silence anyone (registration is free).
+export const REPORTER_MIN_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Messages a persona may send in a row.
+// Messages an account may send in a row in a room, through any of its
+// personas (a new one on each entry would start afresh).
 export const SEND_LIMIT = 10;
 export const SEND_WINDOW_MS = 10_000;
 
@@ -244,7 +248,8 @@ export async function roomSendBlock(chatId: string, senderId: string) {
       CASE WHEN account.room_muted_until > NOW() THEN account.room_muted_until END AS muted_until,
       (
         SELECT COUNT(*)::int FROM messages
-        WHERE chat_id = $1 AND sender_id = $2
+        WHERE chat_id = $1
+          AND sender_id IN (SELECT id FROM users WHERE persona_of = account.id)
           AND created_at > NOW() - make_interval(secs => $3)
       ) AS recent
     FROM users persona
@@ -310,19 +315,25 @@ export async function reportMessage(userId: string, roomId: string, messageId: s
     );
     const { room_muted_until: mutedUntil, room_mutes: mutes } = author.rows[0];
 
-    // Reports from before the last mute ended were paid for by it.
+    // Reports from before the last mute ended were paid for by it. Those
+    // of young accounts are kept but not counted.
     const counts = await client.query(
       `
+      WITH counted AS (
+        SELECT room_reports.* FROM room_reports
+        JOIN users reporter ON reporter.id = room_reports.reporter_id
+        WHERE reporter.created_at < NOW() - make_interval(secs => $5)
+      )
       SELECT
-        (SELECT COUNT(*)::int FROM room_reports WHERE message_id = $1) AS on_message,
+        (SELECT COUNT(*)::int FROM counted WHERE message_id = $1) AS on_message,
         (
-          SELECT COUNT(DISTINCT reporter_id)::int FROM room_reports
+          SELECT COUNT(DISTINCT reporter_id)::int FROM counted
           WHERE author_id = $2
             AND created_at > NOW() - make_interval(secs => $3)
             AND created_at > COALESCE($4::timestamptz, '-infinity')
         ) AS on_author
       `,
-      [messageId, authorId, REPORT_WINDOW_MS / 1000, mutedUntil],
+      [messageId, authorId, REPORT_WINDOW_MS / 1000, mutedUntil, REPORTER_MIN_AGE_MS / 1000],
     );
     const { on_message: onMessage, on_author: onAuthor } = counts.rows[0];
 

@@ -59,7 +59,8 @@ async function send(messages: { to: string; [key: string]: unknown }[]) {
 
 // After a new message: notify the other members' devices that do not
 // have the app open, unless they muted the chat (and were not mentioned).
-// In rooms only those mentioned, on their personas' accounts.
+// In rooms only those mentioned, on their personas' accounts, and never
+// if they muted the room: anyone there can mention anyone.
 export function notifyNewMessage(chatId: string, senderId: string, mentions: string[] = []) {
   (async () => {
     const result = await db.query(
@@ -73,7 +74,7 @@ export function notifyNewMessage(chatId: string, senderId: string, mentions: str
       WHERE chat_members.chat_id = $1
         AND chat_members.user_id <> $2
         AND (
-          chat_members.user_id = ANY($3::uuid[])
+          (chat_members.user_id = ANY($3::uuid[]) AND NOT (chat_members.muted AND member.persona_of IS NOT NULL))
           OR (NOT chat_members.muted AND member.persona_of IS NULL)
         )
       `,

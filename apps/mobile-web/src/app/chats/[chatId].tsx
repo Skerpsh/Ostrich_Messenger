@@ -1468,7 +1468,7 @@ function ChatScreen({ chatId, focusId, look }: { chatId: string; focusId?: strin
         ? [{
             icon: "flag-outline" as const,
             label: "Report",
-            confirmLabel: "Report? Reports from three people remove it",
+            confirmLabel: "Report? Reports from three people whose accounts are over a week old remove it",
             danger: true,
             onPress: () => report(message),
           }]

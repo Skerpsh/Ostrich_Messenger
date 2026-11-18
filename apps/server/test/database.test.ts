@@ -13,7 +13,7 @@ import chatsRoutes from "../src/routes/chats.js";
 import messagesRoutes from "../src/routes/messages.js";
 import recoveryRoutes from "../src/routes/recovery.js";
 import serverViewRoutes from "../src/routes/server-view.js";
-import { ensureRooms, joinRoom, leaveRoom, listRooms, reportMessage, ROOM_CAPACITY, SEND_LIMIT } from "../src/rooms.js";
+import { ensureRooms, joinRoom, leaveRoom, listRooms, reportMessage, REPORTER_MIN_AGE_MS, ROOM_CAPACITY, SEND_LIMIT } from "../src/rooms.js";
 import { MemoryState, useSharedState } from "../src/shared-state.js";
 
 // The SQL itself, against a real PostgreSQL with the migrations applied
@@ -215,8 +215,16 @@ test("rooms: reports delete a message and mute its author", options, async () =>
 
   assert.deepEqual(await reportMessage(author.account, room.id, sent.message.id), { error: "own_message" });
 
+  // A new account's report is kept but does not count.
+  const young = await enter(room.id);
+  assert.deepEqual(await reportMessage(young.account, room.id, sent.message.id), { deleted: false });
+
   for (let i = 0; i < 3; i++) {
     const reporter = await enter(room.id);
+    await db.query("UPDATE users SET created_at = NOW() - make_interval(secs => $2) WHERE id = $1", [
+      reporter.account,
+      REPORTER_MIN_AGE_MS / 1000 + 60,
+    ]);
     assert.deepEqual(await reportMessage(reporter.account, room.id, sent.message.id), { deleted: i === 2 });
   }
 
@@ -227,13 +235,19 @@ test("rooms: reports delete a message and mute its author", options, async () =>
 test("rooms: sending too fast", options, async () => {
   await ensureRooms();
   const [room] = await listRooms(await user());
-  const { persona } = await enter(room.id);
+  const { account, persona } = await enter(room.id);
 
   for (let i = 0; i < SEND_LIMIT; i++) {
     assert.ok("message" in (await roomMessage(room.id, persona)));
   }
 
   assert.deepEqual(await roomMessage(room.id, persona), { error: "room_too_fast" });
+
+  // Coming back under a new name does not start afresh.
+  assert.equal(await leaveRoom(account, room.id), true);
+  const again = await joinRoom(account, room.id, `n${crypto.randomBytes(5).toString("hex")}`);
+  assert.ok("personaId" in again);
+  assert.deepEqual(await roomMessage(room.id, again.personaId), { error: "room_too_fast" });
 });
 
 test("rooms: a new one opens when more than half of the places are taken", options, async () => {
