@@ -521,13 +521,16 @@ export default async function messagesRoutes(server: FastifyInstance) {
       // member sees their messages as read, unless either has turned read
       // receipts off.
       // Shared if the reader has read receipts on (in a direct chat, the
-      // other member too); members with them off do not show them.
+      // other member too); members with them off do not show them. Never
+      // in a room: it would tie a persona's activity to its account's.
       const receipts = await db.query(
         `
-        SELECT CASE WHEN chats.type = 'group'
-          THEN (SELECT read_receipts FROM users WHERE id = $2)
+        SELECT CASE chats.type
+          WHEN 'room' THEN FALSE
+          WHEN 'group' THEN (SELECT read_receipts FROM users WHERE id = $2)
           ELSE BOOL_AND(users.read_receipts)
-        END AS on
+        END AS on,
+        (SELECT COALESCE(persona_of, id) FROM users WHERE id = $2) AS account_id
         FROM chats
         JOIN chat_members ON chat_members.chat_id = chats.id
         JOIN users ON users.id = chat_members.user_id
@@ -540,7 +543,8 @@ export default async function messagesRoutes(server: FastifyInstance) {
       if (receipts.rows[0]?.on) {
         await sendToChatMembers(chatId, event);
       } else {
-        sendToUserSockets(request.user.id, event);
+        // A persona has no sockets of its own: its account's devices.
+        sendToUserSockets(receipts.rows[0]?.account_id ?? request.user.id, event);
       }
 
       return reply.send({

@@ -63,8 +63,10 @@ async function wentOff(userId: string, chatId: string, ago: number) {
 const sent = async (id: string) => (await db.query("SELECT 1 FROM messages WHERE id = $1", [id])).rows.length;
 const left = async (id: string) => (await db.query("SELECT 1 FROM disappear_messages WHERE id = $1", [id])).rows.length;
 
+const state = new MemoryState();
+
 before(() => {
-  useSharedState(new MemoryState());
+  useSharedState(state);
 });
 
 after(async () => {
@@ -192,6 +194,20 @@ test("rooms: inside, the user is only their persona", options, async () => {
   assert.equal(listed.last_message.sender_id, ann.persona);
   assert.equal(listed.unread_count, 1);
   assert.ok(!list.body.includes(ann.account), "the real account never shows");
+
+  // Reading is told only to the reader's own devices.
+  const told: string[][] = [];
+  state.subscribe((event) => {
+    if (event.type === "deliver" && event.data.includes('"type":"read"')) told.push(event.userIds);
+  });
+  const read = await server.inject({
+    method: "POST",
+    url: `/api/chats/${room.id}/read`,
+    headers: await as(bob.account),
+    payload: { message_id: sent.json().message.id },
+  });
+  assert.equal(read.statusCode, 200, read.body);
+  assert.deepEqual(told, [[bob.account]]);
 
   // Nobody deletes the room, and outsiders do not read it.
   const deleted = await server.inject({ method: "DELETE", url: `/api/chats/${room.id}`, headers: await as(ann.account) });
