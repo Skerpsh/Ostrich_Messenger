@@ -49,6 +49,11 @@ Known limitations, by design:
   not affected. Signed membership is planned.
 - Without comparing safety codes, the first key a client sees for a contact
   is trusted.
+- In a browser, the account's private key and session are kept unencrypted
+  in the browser's data, and the app lock only locks the screens: anyone who
+  can copy the browser profile has them. The phones keep them in the
+  Keychain / Keystore, and the desktop app encrypts them with the system's
+  keyring, except on Linux without one (it says so under App lock).
 
 ## Status
 

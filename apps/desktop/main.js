@@ -3,7 +3,7 @@
 // messenger needs on top: an icon in the tray with the unread count, a
 // window that hides there instead of quitting, ostrich:// links, and
 // updates from the GitHub releases.
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, net, Notification, protocol, session, shell, Tray } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, net, Notification, protocol, safeStorage, session, shell, Tray } from "electron";
 import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -93,7 +93,27 @@ function start() {
   startUpdates();
   createWindow();
   createTray();
+  startSafeStorage();
   openLink(process.argv.find((arg) => arg.startsWith("ostrich://")));
+}
+
+// The pages' storage holds the account's key and session: they keep it
+// encrypted with the system's keyring (DPAPI on Windows, the Secret
+// Service or KWallet on Linux), so that a copy of the profile alone does
+// not give them (apps/mobile-web/src/platform/storage.web.ts). Null where
+// there is no keyring: Linux would then use a fixed password, of no use.
+function startSafeStorage() {
+  const usable = () =>
+    safeStorage.isEncryptionAvailable() &&
+    !(process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text");
+  const fromApp = (event) => event.senderFrame?.url.startsWith(`${ORIGIN}/`);
+
+  ipcMain.handle("ostrich:encrypt", (event, text) =>
+    fromApp(event) && usable() ? safeStorage.encryptString(String(text)).toString("base64") : null,
+  );
+  ipcMain.handle("ostrich:decrypt", (event, data) =>
+    fromApp(event) ? safeStorage.decryptString(Buffer.from(String(data), "base64")) : null,
+  );
 }
 
 // The package this is: "appimage", "deb", "rpm", "pacman", "windows", or

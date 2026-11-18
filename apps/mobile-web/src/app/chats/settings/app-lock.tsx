@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Chat } from "@/api/api";
@@ -36,6 +36,27 @@ import {
   useLockSeemsOff,
 } from "@/features/lock/duress";
 import PinPad from "@/features/lock/pin-pad";
+import { storageEncrypted } from "@/platform/storage";
+
+// A browser, or the desktop app on Linux without a keyring, keeps what is
+// stored unencrypted (platform/storage.web.ts): say so, the PIN is no help there.
+function useUnencryptedNote() {
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    storageEncrypted().then(
+      (encrypted) =>
+        setNote(
+          encrypted
+            ? ""
+            : " Here your account's key and session are kept unencrypted in this browser's data: the PIN does not keep them from anyone who can copy those files. The phone apps, and the desktop app with a system keyring, encrypt them.",
+        ),
+      () => {},
+    );
+  }, []);
+
+  return note;
+}
 
 const BACKGROUND: { minutes: number | null; label: string }[] = [
   { minutes: null, label: "Never" },
@@ -66,6 +87,7 @@ export default function AppLockSettings() {
   const [settingUp, setSettingUp] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<"chats" | "alert" | null>(null);
+  const unencrypted = useUnencryptedNote();
 
   const on = config !== null && !seemsOff;
 
@@ -149,7 +171,7 @@ export default function AppLockSettings() {
           <AlertEditor onDone={() => setEditing(null)} />
         ) : on && config ? (
           <View style={styles.sections}>
-            <Section footer="Asked every time Ostrich starts, and after it was in the background for the time chosen. Only on this device: the PIN never leaves it.">
+            <Section footer={`Asked every time Ostrich starts, and after it was in the background for the time chosen. Only on this device: the PIN never leaves it.${unencrypted}`}>
               <Row icon="keypad-outline" label="Change PIN" onPress={() => setFlow(flows.change)} />
               <Divider />
               <Row
@@ -213,9 +235,10 @@ export default function AppLockSettings() {
 
 function OffView({ onTurnOn }: { onTurnOn: () => void }) {
   const { colors } = useAppTheme();
+  const unencrypted = useUnencryptedNote();
 
   return (
-    <Section footer="A 4-digit PIN asked when Ostrich starts and after it was in the background. Only on this device: the PIN never leaves it and is not synced. It locks the screens; it does not encrypt your messages.">
+    <Section footer={`A 4-digit PIN asked when Ostrich starts and after it was in the background. Only on this device: the PIN never leaves it and is not synced. It locks the screens; it does not encrypt your messages.${unencrypted}`}>
       <View style={[settingsStyles.form, styles.top]}>
         <Text style={[settingsStyles.formText, { color: colors.textSoft }]}>Off.</Text>
         <Button title="Turn on app lock" icon="lock-closed-outline" onPress={onTurnOn} />

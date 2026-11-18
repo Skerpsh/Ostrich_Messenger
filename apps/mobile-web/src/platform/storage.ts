@@ -19,3 +19,8 @@ export async function removeItem(key: string): Promise<void> {
 export async function removeItems(keys: string[]): Promise<void> {
   await Promise.all(keys.map((key) => SecureStore.deleteItemAsync(key).catch(() => {})));
 }
+
+// The Keychain / Keystore always are.
+export async function storageEncrypted(): Promise<boolean> {
+  return true;
+}

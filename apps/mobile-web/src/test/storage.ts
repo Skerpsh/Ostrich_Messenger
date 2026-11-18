@@ -17,3 +17,7 @@ export async function removeItem(key: string): Promise<void> {
 export async function removeItems(keys: string[]): Promise<void> {
   keys.forEach((key) => stored.delete(key));
 }
+
+export async function storageEncrypted(): Promise<boolean> {
+  return true;
+}
